@@ -64,9 +64,36 @@ git push origin main
           4. switches traffic, stops the old container
 ```
 
-Recommended: in the Railway dashboard open each service, then
-**Settings -> Source -> Wait for CI**, and enable it. Deployments then stay in
-`WAITING` until the GitHub workflow passes and are `SKIPPED` when it fails.
+### Turning on automatic deploys (one-time, GitHub side)
+
+Railway can only watch a repository its GitHub App has been granted. As of the
+first deploy the app installed on the `Abdurrahman-gurib` account only covers
+the WhatsApp bot repository, so the two services were connected and deployed
+once by the CLI but **later pushes do not deploy until one of these is done**:
+
+**Option A (recommended): Railway's GitHub integration.**
+
+1. GitHub -> Settings -> Applications -> Installed GitHub Apps -> Railway ->
+   Configure -> Repository access -> add `valle-web-frontend` and
+   `valle-web-backend` -> Save.
+2. Railway dashboard -> project `valle-web` -> service `api` -> Settings ->
+   Source -> connect `Abdurrahman-gurib/valle-web-backend`, branch `main`.
+   Same for `web` with `valle-web-frontend`. (Or, from a linked clone:
+   `railway service source connect --repo Abdurrahman-gurib/valle-web-backend --branch main --service api`.)
+3. In the same Source panel enable **Wait for CI**. A deployment then stays in
+   `WAITING` until the GitHub workflow for that commit passes and is `SKIPPED`
+   when it fails, so a red build never reaches production.
+
+**Option B: deploy from GitHub Actions.** Both workflows end with a `deploy` job
+that is skipped unless a `RAILWAY_TOKEN` repository secret exists. Create a
+project token (Railway -> project `valle-web` -> Settings -> Tokens, environment
+`production`), add it as `RAILWAY_TOKEN` under each repository's Settings ->
+Secrets and variables -> Actions, and every green run on `main` uploads and
+deploys that commit with `railway up`. Do not combine A and B, or each push
+deploys twice.
+
+Until one of these is done, deploy the latest `main` by hand:
+`railway redeploy --service api --from-source --yes` (same for `web`).
 
 Branches other than `main` and pull requests run CI only; nothing deploys.
 
