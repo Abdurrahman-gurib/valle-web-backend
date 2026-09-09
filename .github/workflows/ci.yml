@@ -1,0 +1,81 @@
+# Continuous integration for the API. Railway deploys `main` on its own
+# (GitHub autodeploy); with "Wait for CI" enabled on the Railway service, a
+# deployment only starts once this workflow has passed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Superseded pull-request runs are cancelled; pushes to main queue instead, so
+# every main commit gets a real pass/fail for Railway's "Wait for CI" to act on.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --ci
+      - run: npm run build
+
+  e2e:
+    name: API e2e against PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: valle_park
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d valle_park"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: valle_park
+      DB_SSL: "false"
+      TEST_DB: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The same bootstrap Railway runs before every deploy: schema + seed.
+      - name: Load schema and seed
+        run: node scripts/db-init.js
+      - run: npm run test:e2e -- --ci
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: valle-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

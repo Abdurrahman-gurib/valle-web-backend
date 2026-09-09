@@ -1,0 +1,16 @@
+# Keep the build context to what the image needs: source, lockfile, scripts and
+# the two SQL files the Dockerfile copies. Everything else is noise or secrets.
+node_modules
+dist
+coverage
+test
+.git
+.github
+.env
+.env.*
+*.md
+database/.pgdata
+database/seed
+database/scripts
+database/docker-compose.yml
+database/README.md

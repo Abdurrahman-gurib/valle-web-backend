@@ -1,0 +1,65 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  Category,
+  CinematicItem,
+  Combo,
+  ComboItem,
+  Experience,
+  ExperienceFact,
+  ExperienceGallery,
+  GalleryShot,
+  HeroSlide,
+  MapPin,
+  MenuGroup,
+  MenuItem,
+  PackageAddon,
+  PackageTier,
+  PackageTierItem,
+  PhotoAddon,
+  PhotoTier,
+  PriceListEntry,
+  Restaurant,
+  RestaurantGalleryImage,
+  Setting,
+  TeamPack,
+  TeamPackItem,
+  VipItem,
+} from '../entities';
+import { CatalogController } from './catalog.controller';
+import { CatalogService } from './catalog.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      Category,
+      Experience,
+      ExperienceFact,
+      ExperienceGallery,
+      GalleryShot,
+      MapPin,
+      Restaurant,
+      RestaurantGalleryImage,
+      MenuGroup,
+      MenuItem,
+      PackageTier,
+      PackageTierItem,
+      PackageAddon,
+      VipItem,
+      Combo,
+      ComboItem,
+      CinematicItem,
+      PriceListEntry,
+      PhotoTier,
+      PhotoAddon,
+      TeamPack,
+      TeamPackItem,
+      HeroSlide,
+      Setting,
+    ]),
+  ],
+  controllers: [CatalogController],
+  providers: [CatalogService],
+  exports: [CatalogService],
+})
+export class CatalogModule {}

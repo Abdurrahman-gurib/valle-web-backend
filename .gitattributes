@@ -1,0 +1,3 @@
+# Normalise line endings: LF in the repo and on checkout, on every OS, so the
+# SQL and operator scripts behave identically in CI, on Railway and locally.
+* text=auto eol=lf

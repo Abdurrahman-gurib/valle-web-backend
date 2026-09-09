@@ -1,0 +1,1868 @@
+{
+  "CAT": {
+    "adventure": {
+      "name": "Adventure",
+      "badge": "ADVENTURE",
+      "color": "#FF3358",
+      "fg": "#FFFFFF",
+      "pulse": "#FF3358"
+    },
+    "nature": {
+      "name": "Nature",
+      "badge": "NATURE",
+      "color": "#33FF74",
+      "fg": "#340057",
+      "pulse": "#12B54A"
+    },
+    "kids": {
+      "name": "Kids Park",
+      "badge": "KIDS PARK",
+      "color": "#FFFC33",
+      "fg": "#340057",
+      "pulse": "#B09A00"
+    },
+    "tours": {
+      "name": "Tours & Groups",
+      "badge": "TOUR",
+      "color": "#7333FF",
+      "fg": "#FFFFFF",
+      "pulse": "#7333FF"
+    }
+  },
+  "ACTS": [
+    {
+      "id": "zipline",
+      "name": "Zipline Adventures",
+      "cat": "adventure",
+      "thrill": 5,
+      "dur": "1–3 H",
+      "age": "8+",
+      "price": 1600,
+      "mode": "pp",
+      "img": "/images/zipline-waterfall.webp",
+      "blurb": "Fly without wings: high-speed flights over valleys, rivers and forest canopy, with 8 routes from a 300 m waterfall hop to a 5.5 km epic.",
+      "gtk": [
+        {
+          "t": "8 routes: The Plunge (500 m) up to the Advenature Flight (5.5 km, 11 lines)"
+        },
+        {
+          "t": "The Waterfall Zipline flies you to the Chamouzé falls and back"
+        },
+        {
+          "t": "Full harness, briefing and guides included"
+        },
+        {
+          "t": "Closed shoes required · weather dependent"
+        }
+      ]
+    },
+    {
+      "id": "bicycle",
+      "name": "Bicycle Zipline",
+      "cat": "adventure",
+      "thrill": 5,
+      "dur": "15 MIN",
+      "age": "10+",
+      "price": 1200,
+      "mode": "pp",
+      "img": "/images/bicycle-joy.webp",
+      "blurb": "400 metres of sky-high pedalling on a suspended cable, 18 metres above the valley floor.",
+      "gtk": [
+        {
+          "t": "400 m line at 18 m above ground, about 15 minutes"
+        },
+        {
+          "t": "Ride a suspended bike, harnessed at all times"
+        },
+        {
+          "t": "One of only a handful in the world"
+        }
+      ]
+    },
+    {
+      "id": "nepalese",
+      "name": "Nepalese Bridge",
+      "cat": "adventure",
+      "thrill": 4,
+      "dur": "45 MIN",
+      "age": "10+",
+      "price": 900,
+      "mode": "pp",
+      "img": "/images/bridge-family.webp",
+      "blurb": "Cross 350 metres of breathtaking heights, suspended 80–100 metres above the ground.",
+      "gtk": [
+        {
+          "t": "350 m crossing, 80–100 m above the valley floor"
+        },
+        {
+          "t": "Full harness and safety briefing included"
+        },
+        {
+          "t": "Pairs perfectly with the ziplines for a high-wire day"
+        }
+      ]
+    },
+    {
+      "id": "quad",
+      "name": "Quad",
+      "cat": "adventure",
+      "thrill": 4,
+      "dur": "1–2 H",
+      "age": "16+ DRIVE",
+      "price": 2500,
+      "mode": "pp",
+      "img": "/images/quad-river.webp",
+      "blurb": "Hold on tight: guided off-road thrills across Vallé’s wildest trails, mud and all.",
+      "gtk": [
+        {
+          "t": "Guided convoy across off-road valley trails"
+        },
+        {
+          "t": "Driving licence required · passengers welcome"
+        },
+        {
+          "t": "Mud is part of the fun, dress accordingly"
+        }
+      ]
+    },
+    {
+      "id": "buggy",
+      "name": "Buggy",
+      "cat": "adventure",
+      "thrill": 3,
+      "dur": "1–2 H",
+      "age": "16+ DRIVE",
+      "price": 3200,
+      "mode": "flat",
+      "flatLabel": "/ buggy",
+      "img": "/images/buggy-river.webp",
+      "blurb": "Experience Vallé’s raw beauty in comfort: a 2+1 seater buggy on the same wild trails.",
+      "gtk": [
+        {
+          "t": "2+1 seater, bring the family along"
+        },
+        {
+          "t": "Same trails as the quads, more comfort"
+        },
+        {
+          "t": "Driving licence required"
+        }
+      ]
+    },
+    {
+      "id": "luge",
+      "name": "Mountain Luge Kart",
+      "cat": "adventure",
+      "thrill": 3,
+      "dur": "20 MIN",
+      "age": "6+",
+      "price": 800,
+      "mode": "pp",
+      "img": "/images/luge-duo-curve.webp",
+      "blurb": "Fast, exhilarating and gravity-powered. Hold tight and ride the wild curves downhill.",
+      "gtk": [
+        {
+          "t": "Gravity-powered karts on a mountain track"
+        },
+        {
+          "t": "A great first thrill for younger adventurers"
+        },
+        {
+          "t": "Helmets provided"
+        }
+      ]
+    },
+    {
+      "id": "peak",
+      "name": "The Peak",
+      "cat": "adventure",
+      "thrill": 2,
+      "dur": "2 H",
+      "age": "ALL AGES",
+      "price": 1500,
+      "mode": "pp",
+      "img": "/images/peak-tower.webp",
+      "blurb": "Ascend to the highest point of the southern mountains, where unmatched views await.",
+      "gtk": [
+        {
+          "t": "Highest viewpoint of the southern range"
+        },
+        {
+          "t": "Guided ascent with photo stops"
+        },
+        {
+          "t": "Bring water and sun protection"
+        }
+      ]
+    },
+    {
+      "id": "private",
+      "name": "Private Expedition",
+      "cat": "tours",
+      "thrill": 2,
+      "dur": "3 H",
+      "age": "ALL AGES",
+      "price": 5500,
+      "mode": "flat",
+      "flatLabel": "/ group",
+      "img": "/images/expedition-raptor-ocean.webp",
+      "blurb": "An exclusive off-road tour revealing Mauritius’ pristine beauty: your group, your pace.",
+      "gtk": [
+        {
+          "t": "Private guide and vehicle for your group"
+        },
+        {
+          "t": "Tailored route across the park’s highlights"
+        },
+        {
+          "t": "Ideal for families and small groups"
+        }
+      ]
+    },
+    {
+      "id": "group",
+      "name": "Group Expedition",
+      "cat": "tours",
+      "thrill": 2,
+      "dur": "3 H",
+      "age": "ALL AGES",
+      "price": 2800,
+      "mode": "pp",
+      "img": "/images/expedition-convoy-river.webp",
+      "blurb": "A personalised group tour unveiling the natural splendour of the island’s south.",
+      "gtk": [
+        {
+          "t": "Personalised tour of the park’s natural splendour"
+        },
+        {
+          "t": "Great value for larger parties, ideal for team building"
+        },
+        {
+          "t": "Advance booking recommended"
+        }
+      ]
+    },
+    {
+      "id": "waterfalls",
+      "name": "Waterfalls",
+      "cat": "nature",
+      "thrill": 1,
+      "dur": "SELF-GUIDED",
+      "age": "ALL AGES",
+      "price": 0,
+      "mode": "entry",
+      "img": "/images/waterfalls.avif",
+      "blurb": "The breathtaking cascades of the valley: a serene, magical counterpoint to the thrills.",
+      "gtk": [
+        {
+          "t": "Several falls across the valley, incl. the Chamouzé cascade"
+        },
+        {
+          "t": "Viewpoints all along the walking trail"
+        },
+        {
+          "t": "Included with park entry"
+        }
+      ]
+    },
+    {
+      "id": "coloured",
+      "name": "23 Coloured Earth",
+      "cat": "nature",
+      "thrill": 1,
+      "dur": "SELF-GUIDED",
+      "age": "ALL AGES",
+      "price": 0,
+      "mode": "entry",
+      "img": "/images/23colouredearth.avif",
+      "blurb": "Feel the colours: 23 hues of volcanic alchemy in one geological wonder, unique to Chamouny.",
+      "gtk": [
+        {
+          "t": "23 hues of volcanic earth in a single dune"
+        },
+        {
+          "t": "A geological phenomenon unique to this valley"
+        },
+        {
+          "t": "Included with park entry"
+        }
+      ]
+    },
+    {
+      "id": "animals",
+      "name": "Animals",
+      "cat": "nature",
+      "thrill": 1,
+      "dur": "SELF-GUIDED",
+      "age": "ALL AGES",
+      "price": 0,
+      "mode": "entry",
+      "img": "/images/animalpark.avif",
+      "blurb": "Meet the wildest locals: giant tortoises, deer and the wild at heart, in open shared habitats.",
+      "gtk": [
+        {
+          "t": "Giant tortoises, deer and more in open habitats"
+        },
+        {
+          "t": "Feeding times posted at the entrance"
+        },
+        {
+          "t": "Included with park entry"
+        }
+      ]
+    },
+    {
+      "id": "trees",
+      "name": "Endemic Trees",
+      "cat": "nature",
+      "thrill": 1,
+      "dur": "SELF-GUIDED",
+      "age": "ALL AGES",
+      "price": 0,
+      "mode": "entry",
+      "img": "/images/endemictrees.avif",
+      "blurb": "Take it slow among centuries-old ebony and bois de natte, rooted in the soul of the island.",
+      "gtk": [
+        {
+          "t": "Centuries-old ebony and bois de natte trees"
+        },
+        {
+          "t": "A shaded, easy walking trail"
+        },
+        {
+          "t": "Included with park entry"
+        }
+      ]
+    },
+    {
+      "id": "rock",
+      "name": "Rock Garden",
+      "cat": "nature",
+      "thrill": 1,
+      "dur": "SELF-GUIDED",
+      "age": "ALL AGES",
+      "price": 0,
+      "mode": "entry",
+      "img": "/images/rockgarden.avif",
+      "blurb": "Find stillness in the wild: a zen-inspired Japanese garden hidden in the valley.",
+      "gtk": [
+        {
+          "t": "Zen-inspired Japanese rock garden"
+        },
+        {
+          "t": "A quiet pause between adventures"
+        },
+        {
+          "t": "Included with park entry"
+        }
+      ]
+    },
+    {
+      "id": "pirate",
+      "name": "Pirate Ship",
+      "cat": "kids",
+      "thrill": 1,
+      "dur": "15 MIN",
+      "age": "3–12",
+      "price": 350,
+      "mode": "pp",
+      "img": "/images/pirateship.avif",
+      "blurb": "Set sail on gentle thrills: pirate adventures for the smallest buccaneers.",
+      "gtk": [
+        {
+          "t": "Gentle swings suited to young kids"
+        },
+        {
+          "t": "Adult supervision required"
+        },
+        {
+          "t": "In the Kids Park zone, near the entrance"
+        }
+      ]
+    },
+    {
+      "id": "bonding",
+      "name": "Bonding Roller Coaster Zipline",
+      "cat": "kids",
+      "thrill": 2,
+      "dur": "15 MIN",
+      "age": "4+ W/ ADULT",
+      "price": 450,
+      "mode": "pp",
+      "img": "/images/bondingrollercoasterzipline.avif",
+      "blurb": "A ride that bonds parents and children: gentle thrills, curves and giggles.",
+      "gtk": [
+        {
+          "t": "Parent and child ride together"
+        },
+        {
+          "t": "Gentle curves designed for first thrills"
+        },
+        {
+          "t": "In the Kids Park zone"
+        }
+      ]
+    },
+    {
+      "id": "coaster",
+      "name": "Roller Coaster Express",
+      "cat": "kids",
+      "thrill": 2,
+      "dur": "10 MIN",
+      "age": "4–12",
+      "price": 450,
+      "mode": "pp",
+      "img": "/images/rollercoast.avif",
+      "blurb": "Twists, turns and laughter aboard the Kids Park’s favourite express.",
+      "gtk": [
+        {
+          "t": "The Kids Park favourite"
+        },
+        {
+          "t": "Height requirements apply"
+        },
+        {
+          "t": "Adult supervision required"
+        }
+      ]
+    },
+    {
+      "id": "playground",
+      "name": "Outdoor Playground",
+      "cat": "kids",
+      "thrill": 1,
+      "dur": "OPEN PLAY",
+      "age": "3–12",
+      "price": 250,
+      "mode": "pp",
+      "img": "/images/outdoorplayground.avif",
+      "blurb": "Climb, slide and explore in an imaginative outdoor adventure space.",
+      "gtk": [
+        {
+          "t": "Open play, come and go all day"
+        },
+        {
+          "t": "Shaded seating for parents"
+        },
+        {
+          "t": "Adult supervision required"
+        }
+      ]
+    },
+    {
+      "id": "miniquad",
+      "name": "Mini Quad",
+      "cat": "kids",
+      "thrill": 2,
+      "dur": "15 MIN",
+      "age": "6–12",
+      "price": 500,
+      "mode": "pp",
+      "img": "/images/miniquad.avif",
+      "blurb": "Young adventurers steer their own quad on a safe, supervised track.",
+      "gtk": [
+        {
+          "t": "Safe, fenced mini track"
+        },
+        {
+          "t": "Helmets and briefing included"
+        },
+        {
+          "t": "In the Kids Park zone"
+        }
+      ]
+    },
+    {
+      "id": "miniexc",
+      "name": "Mini Excavator",
+      "cat": "kids",
+      "thrill": 1,
+      "dur": "15 MIN",
+      "age": "4–12",
+      "price": 400,
+      "mode": "pp",
+      "img": "/images/miniexcavator.avif",
+      "blurb": "Kids dig, scoop and build with their own mini excavator, hands-on play that quietly builds motor skills.",
+      "detail": "Dig, build and play: creative construction fun at kid scale.",
+      "gtk": [
+        {
+          "t": "Real digging, kid-sized machines"
+        },
+        {
+          "t": "Supervised sessions"
+        },
+        {
+          "t": "In the Kids Park zone"
+        }
+      ]
+    },
+    {
+      "id": "kaz",
+      "name": "Kaz Bon Bon",
+      "cat": "kids",
+      "thrill": 1,
+      "dur": "ANYTIME",
+      "age": "ALL AGES",
+      "price": 0,
+      "mode": "kiosk",
+      "img": "/images/kazbonbon.avif",
+      "blurb": "A delightful stop where kids pick from a wall of sweets and refreshing slushies, a tasty twist to an adventure-filled day.",
+      "detail": "A delightful sweets stop: tasty treats to fuel an advenature-filled day.",
+      "gtk": [
+        {
+          "t": "Sweets and treats kiosk in the Kids Park"
+        },
+        {
+          "t": "Pay at the kiosk"
+        }
+      ]
+    }
+  ],
+  "PINS": [
+    {
+      "n": "A",
+      "px": 49.4,
+      "py": 59.6,
+      "kind": "main",
+      "name": "Park Entrance & Reception",
+      "sub": "Your trail starts here: tickets, briefing, photo kiosk, cafeteria and toilets right by the gate.",
+      "img": "/images/trail-reception.webp",
+      "btnLabel": "Plan your visit",
+      "act": null,
+      "go": "plan"
+    },
+    {
+      "n": "B",
+      "px": 62,
+      "py": 44.4,
+      "kind": "main",
+      "name": "La Tour Viewpoint",
+      "sub": "The first summit, at 367 m. Beyond it rise The Peak (602 m) and Piton Savanne, tallest at 666 m.",
+      "img": "/images/trail-viewpoint.webp",
+      "act": "peak"
+    },
+    {
+      "n": "C",
+      "px": 72.3,
+      "py": 39.5,
+      "kind": "main",
+      "name": "Chamouzé Restaurant",
+      "sub": "Dine beside the cascading waterfall. Mauritian and European fusion, open daily 11:30 to 16:30.",
+      "img": "/images/chamouze-restaurant.webp",
+      "btnLabel": "See the restaurant",
+      "act": null,
+      "go": "chamouze"
+    },
+    {
+      "n": "D",
+      "px": 57.1,
+      "py": 55.7,
+      "kind": "main",
+      "name": "Rock Garden",
+      "sub": null,
+      "img": "/images/rock-garden-trail.webp",
+      "act": "rock"
+    },
+    {
+      "n": "E",
+      "px": 83.3,
+      "py": 29.9,
+      "kind": "main",
+      "name": "Vacoas Waterfall",
+      "sub": "8 to 9 m high and 16 to 18 m wide, named after the rare Vacoas plants preserved around it.",
+      "img": "/images/vacoas-waterfall.webp",
+      "act": "waterfalls"
+    },
+    {
+      "n": "F",
+      "px": 84.2,
+      "py": 21,
+      "kind": "main",
+      "name": "23 Coloured Earth",
+      "sub": null,
+      "img": "/images/coloured-earth.webp",
+      "act": "coloured"
+    },
+    {
+      "n": "G",
+      "px": 44.1,
+      "py": 9.9,
+      "kind": "main",
+      "name": "Luge Kart Zone",
+      "sub": "The top of the loop. Catch the gravity powered Mountain Luge Kart back down if your legs vote no.",
+      "img": "/images/mountainlugecart.avif",
+      "act": "luge"
+    },
+    {
+      "n": "H",
+      "px": 43.7,
+      "py": 31.2,
+      "kind": "main",
+      "name": "La Citronelle",
+      "sub": "Refined Indian cuisine in a rustic lakeside setting. Events up to 400 guests.",
+      "img": "/images/la-citronelle-4.avif",
+      "btnLabel": "See the restaurant",
+      "act": null,
+      "go": "citronelle"
+    },
+    {
+      "n": "I",
+      "px": 50.9,
+      "py": 42.1,
+      "kind": "main",
+      "name": "Kids Park",
+      "sub": "Pirate Ship, mini quads, roller coasters and the Kaz Bon Bon sweets kiosk, all in one fenced zone.",
+      "img": "/images/pirateship.avif",
+      "btnLabel": "See Kids Park",
+      "act": null,
+      "go": "kids"
+    },
+    {
+      "n": "J",
+      "px": 32.2,
+      "py": 56.7,
+      "kind": "main",
+      "name": "La Bigarade",
+      "sub": "Vallé’s events venue on the western loop: weddings, corporate days and celebrations.",
+      "img": "/images/trail-bigarade.webp",
+      "btnLabel": "Plan your visit",
+      "act": null,
+      "go": "plan"
+    },
+    {
+      "n": "GZ",
+      "px": 40.9,
+      "py": 49.4,
+      "kind": "sub",
+      "name": "Green Zone Wildlife",
+      "sub": "Aldabra giant tortoises roam free beside Mauritius’ rarest residents: four albino deer named Kiri, Mendy, Blanche and Avalanche.",
+      "img": "/images/trail-tortoise.webp",
+      "act": "animals"
+    },
+    {
+      "n": "W",
+      "px": 87.1,
+      "py": 42.6,
+      "kind": "sub",
+      "name": "Chamouzé Waterfall",
+      "sub": "15 m of pure stillness, and the only waterfall in Mauritius you can zipline across.",
+      "img": "/images/chamouze-waterfall.webp",
+      "act": "waterfalls"
+    }
+  ],
+  "RESTOS": {
+    "chamouze": {
+      "name": "Le Chamouzé",
+      "badge": "WATERFALL DINING",
+      "img": "/images/lechamouze.avif",
+      "tag": "Dine beside the cascading Chamouzé waterfall, mid-trail.",
+      "cuisine": "Mauritian & European fusion",
+      "hours": "Daily · 11:30 – 16:30",
+      "price": "Menus Rs 700 – 4,250",
+      "setting": "Beside the waterfall",
+      "about": "A terrace set right against the Chamouzé falls, close enough to feel the spray. The kitchen pairs Mauritian classics with European technique: palm-heart salads, grilled catch of the day and slow braises, plus a kids menu for small adventurers. Come up for lunch between two ziplines, or settle in for the afternoon with the waterfall as your soundtrack.",
+      "detail": "Set menus from Rs 700 to Rs 4,250 · vegetarian options · the only restaurant in Mauritius where a zipline crosses the view.",
+      "menuPdf": "/menus/le-chamouze-menu.pdf",
+      "gallery": [
+        "/images/lechamouze.avif",
+        "/images/copy-of-copy-of-dsc-0693.avif",
+        "/images/copy-of-copy-of-copy-of-dsc-0729.avif",
+        "/images/copy-of-copy-of-copy-of-dsc-0722-1.avif",
+        "/images/copy-of-copy-of-copy-of-dsc-0683.avif",
+        "/images/copy-of-copy-of-copy-of-dsc-0715-1.avif"
+      ],
+      "menuGroups": [
+        {
+          "title": "PACKAGE OFFERS · PER PERSON",
+          "items": [
+            {
+              "n": "Menu 1",
+              "note": "Starter, main, dessert, drinks & coffee · European or Mauritian Otentiks",
+              "p": "Rs 2,700"
+            },
+            {
+              "n": "Menu 2 · Shisha Cabana",
+              "note": "All food & drinks + 25 min shisha session",
+              "p": "Rs 5,000"
+            },
+            {
+              "n": "Menu 3 · All Inclusive",
+              "note": "All foods & drinks on the privileged decking",
+              "p": "Rs 9,000"
+            },
+            {
+              "n": "Couple Decking Experience",
+              "note": "Stone cooking, shisha & butler service, for 2",
+              "p": "Rs 26,500"
+            }
+          ]
+        },
+        {
+          "title": "STONE COOKING · FOR TWO",
+          "items": [
+            {
+              "n": "Package 1",
+              "note": "Wagyu beef, scallops, lobster tail, lamb, salmon + burrata salad",
+              "p": "Rs 19,500"
+            },
+            {
+              "n": "Package 2",
+              "note": "Chicken, dorado, calamari, shrimps, mussels + golgappas",
+              "p": "Rs 10,200"
+            }
+          ]
+        },
+        {
+          "title": "STARTERS",
+          "items": [
+            {
+              "n": "Burrata Salad",
+              "note": "Rocket, frozen Mauritian tomatoes, balsamic",
+              "p": "Rs 690"
+            },
+            {
+              "n": "Golgappas Verrines",
+              "note": "Four fillings, vegetarian",
+              "p": "Rs 690"
+            },
+            {
+              "n": "Tetralogy of Gazpachos",
+              "note": "Chef’s creativity, vegetarian",
+              "p": "Rs 605"
+            },
+            {
+              "n": "Béchamel Seafood Gratin",
+              "note": "",
+              "p": "Rs 690"
+            },
+            {
+              "n": "Goat Cheese Honey Glazed",
+              "note": "",
+              "p": "Rs 650"
+            },
+            {
+              "n": "Dim Sum for Two",
+              "note": "20 pieces, veg or non-veg",
+              "p": "Rs 1,550"
+            },
+            {
+              "n": "Mussels Pot",
+              "note": "A couple’s break, with bread & gravy",
+              "p": "Rs 2,500"
+            },
+            {
+              "n": "Kids Menu",
+              "note": "Chicken burger, penne or fish beignet",
+              "p": "Rs 600"
+            }
+          ]
+        },
+        {
+          "title": "MAINS & SIZZLERS",
+          "items": [
+            {
+              "n": "Deer or Wagyu Beef Sizzler",
+              "note": "",
+              "p": "Rs 2,500"
+            },
+            {
+              "n": "Giant Prawns Sizzler",
+              "note": "",
+              "p": "Rs 1,800"
+            },
+            {
+              "n": "Chicken Sizzler",
+              "note": "",
+              "p": "Rs 1,200"
+            },
+            {
+              "n": "Mixed Vegetables Sizzler",
+              "note": "",
+              "p": "Rs 990"
+            },
+            {
+              "n": "Finger Licking Seafood",
+              "note": "Spiny lobster, crab, calamari, giant prawns · for 1 / for 2",
+              "p": "Rs 3,500 / 6,500"
+            },
+            {
+              "n": "South African Rib Eye Steak",
+              "note": "",
+              "p": "Rs 1,550"
+            },
+            {
+              "n": "Chamouzé Famous Souris",
+              "note": "Lamb shank, garlic, rosemary & thyme",
+              "p": "Rs 1,340"
+            },
+            {
+              "n": "Summer Grilled Fish",
+              "note": "Yellowfin tuna or dorado",
+              "p": "Rs 1,010"
+            }
+          ]
+        }
+      ]
+    },
+    "citronelle": {
+      "name": "La Citronelle",
+      "badge": "RIVERSIDE · EVENTS TO 400",
+      "img": "/images/la-citronelle-4.avif",
+      "tag": "Refined Indian cuisine in a rustic lakeside setting.",
+      "cuisine": "Refined Indian",
+      "hours": "Daily · 11:30 – 16:30",
+      "price": "À la carte from Rs 600",
+      "setting": "Lakeside, near the entrance",
+      "about": "A rustic lakeside pavilion serving refined Indian cuisine: tandoor grills, slow-simmered curries and fresh naan, with generous vegetarian choices. The riverside deck hosts weddings and corporate days for up to 400 guests, and quiet valley lunches the rest of the time.",
+      "detail": "À la carte from Rs 600 · vegetarian friendly · event and group bookings via the sales team.",
+      "menuPdf": "/menus/la-citronelle-menu.pdf",
+      "gallery": [
+        "/images/la-citronelle-4.avif",
+        "/images/copy-of-copy-of-dsc-0658-1.avif",
+        "/images/copy-of-copy-of-dsc-0660.avif",
+        "/images/copy-of-copy-of-dsc-0662-1.avif",
+        "/images/copy-of-dsc-0679.avif"
+      ],
+      "menuGroups": [
+        {
+          "title": "THALI",
+          "items": [
+            {
+              "n": "Veg Thali",
+              "note": "Chole masala, malai kofta, aloo jeera, dal makhani, rice, chapati, gulab jamun",
+              "p": "Rs 600 · couple Rs 1,000"
+            },
+            {
+              "n": "Non-Veg Thali",
+              "note": "The veg thali plus butter chicken",
+              "p": "Rs 600 · couple Rs 1,000"
+            }
+          ]
+        },
+        {
+          "title": "INDIAN & MAURITIAN CORNER",
+          "items": [
+            {
+              "n": "Fish Curry",
+              "note": "With rice, cooked grains or mixed salad",
+              "p": "Rs 500"
+            },
+            {
+              "n": "Chicken Curry",
+              "note": "With rice, cooked grains or mixed salad",
+              "p": "Rs 500"
+            },
+            {
+              "n": "Fried Rice",
+              "note": "Chicken & egg Rs 500 · vegetarian Rs 400",
+              "p": "Rs 400 / 500"
+            },
+            {
+              "n": "Fried Noodles",
+              "note": "Chicken & egg Rs 500 · vegetarian Rs 400",
+              "p": "Rs 400 / 500"
+            }
+          ]
+        },
+        {
+          "title": "PASTA",
+          "items": [
+            {
+              "n": "Spaghetti",
+              "note": "Arrabbiata (red) or mushroom (white) · add sautéed chicken +Rs 100",
+              "p": "Rs 400"
+            }
+          ]
+        },
+        {
+          "title": "DESSERTS & DRINKS",
+          "items": [
+            {
+              "n": "Ice-Cream",
+              "note": "",
+              "p": "Rs 150"
+            },
+            {
+              "n": "Indian Sweets",
+              "note": "",
+              "p": "Rs 100"
+            },
+            {
+              "n": "Fiesta Pear",
+              "note": "",
+              "p": "Rs 200"
+            },
+            {
+              "n": "Fiesta Apple",
+              "note": "",
+              "p": "Rs 150"
+            },
+            {
+              "n": "Fresh Juice",
+              "note": "",
+              "p": "Rs 150"
+            },
+            {
+              "n": "Water",
+              "note": "",
+              "p": "Rs 150"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "PACKS": {
+    "ls": [
+      {
+        "name": "Light",
+        "badge": "EASY START",
+        "color": "#33FF74",
+        "fg": "#340057",
+        "img": "/images/quadbuggy.avif",
+        "single": "Rs 11,100",
+        "dbl": "Rs 19,450",
+        "note": "Does not include the Signature Zipline.",
+        "items": [
+          {
+            "t": "Admission fee"
+          },
+          {
+            "t": "Quad Adventure (1 h)"
+          },
+          {
+            "t": "Discovery Tour ziplines (7 lines)"
+          },
+          {
+            "t": "Nepalese Bridge (350 m)"
+          },
+          {
+            "t": "Lunch, Discovery Menu"
+          }
+        ]
+      },
+      {
+        "name": "Standard",
+        "badge": "MOST POPULAR",
+        "color": "#7333FF",
+        "fg": "#FFFFFF",
+        "img": "/images/ziplineadventures.avif",
+        "single": "Rs 11,950",
+        "dbl": "Rs 21,750",
+        "note": "Includes the Signature Zipline.",
+        "items": [
+          {
+            "t": "Admission fee"
+          },
+          {
+            "t": "Quad Adventure (1 h)"
+          },
+          {
+            "t": "Sky Pulse Tour (7 lines)"
+          },
+          {
+            "t": "Nepalese Bridge (350 m)"
+          },
+          {
+            "t": "Lunch, Discovery Menu"
+          }
+        ]
+      }
+    ],
+    "ex": [
+      {
+        "name": "Bronze",
+        "color": "#C77B4F",
+        "img": "/images/waterfalls.avif",
+        "single": "Rs 16,575",
+        "dbl": "Rs 21,625",
+        "hero": "Waterfall Zipline (300 m, 2 lines)",
+        "items": [
+          {
+            "t": "Admission fee"
+          },
+          {
+            "t": "Quad Discovery"
+          },
+          {
+            "t": "The Peak"
+          },
+          {
+            "t": "Nepalese Bridge (350 m)"
+          },
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          },
+          {
+            "t": "GoPro rental, full day"
+          }
+        ]
+      },
+      {
+        "name": "Silver",
+        "color": "#AEB6C2",
+        "img": "/images/thepeak.avif",
+        "single": "Rs 17,200",
+        "dbl": "Rs 23,075",
+        "hero": "The Signature Zipline (1.5 km)",
+        "items": [
+          {
+            "t": "Admission fee"
+          },
+          {
+            "t": "Quad Discovery"
+          },
+          {
+            "t": "The Peak"
+          },
+          {
+            "t": "Nepalese Bridge (350 m)"
+          },
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          },
+          {
+            "t": "GoPro rental, full day"
+          }
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#E3B341",
+        "img": "/images/nepalesebridge.avif",
+        "single": "Rs 19,400",
+        "dbl": "Rs 27,300",
+        "hero": "Sky Pulse Tour (3.1 km, 7 lines)",
+        "items": [
+          {
+            "t": "Admission fee"
+          },
+          {
+            "t": "Quad Adventure"
+          },
+          {
+            "t": "The Peak"
+          },
+          {
+            "t": "Nepalese Bridge"
+          },
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          },
+          {
+            "t": "GoPro rental, full day"
+          }
+        ]
+      },
+      {
+        "name": "Platinum",
+        "color": "#93A1B8",
+        "img": "/images/bicyclezipline.avif",
+        "single": "Rs 23,800",
+        "dbl": "Rs 32,175",
+        "hero": "Advenature Flight (5.5 km, 11 lines)",
+        "items": [
+          {
+            "t": "Admission fee"
+          },
+          {
+            "t": "Exclusive Quad Adventure"
+          },
+          {
+            "t": "The Peak"
+          },
+          {
+            "t": "Nepalese Bridge"
+          },
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          },
+          {
+            "t": "GoPro rental, full day"
+          }
+        ]
+      }
+    ],
+    "addons": [
+      {
+        "t": "Bicycle Zipline",
+        "p": "S Rs 1,150 · D Rs 2,300"
+      },
+      {
+        "t": "Stone-cooking lunch",
+        "p": "S Rs 10,000 · D Rs 18,000"
+      },
+      {
+        "t": "Discovery Menu lunch",
+        "p": "Rs 2,300 pp"
+      },
+      {
+        "t": "Private guide (zipline & quad)",
+        "p": "Rs 3,500 to 5,000"
+      },
+      {
+        "t": "Full-day cinematic video",
+        "p": "Rs 20,000"
+      }
+    ],
+    "vip": [
+      {
+        "t": "Admission fee & The Peak"
+      },
+      {
+        "t": "Exclusive Quad Adventure (1 h)"
+      },
+      {
+        "t": "Advenature Flight (5.5 km, 11 lines)"
+      },
+      {
+        "t": "Nepalese Bridge"
+      },
+      {
+        "t": "Bicycle Zipline"
+      },
+      {
+        "t": "Mountain Luge Kart (3 rides)"
+      },
+      {
+        "t": "Lunch + snacks & beverages in any outlet"
+      },
+      {
+        "t": "Private guide, transfer & butler service"
+      },
+      {
+        "t": "GoPro rental (full day) + photo"
+      },
+      {
+        "t": "Souvenir gift"
+      }
+    ]
+  },
+  "GAL": {
+    "group": {
+      "eyebrow": "THE OPEN-SIDED 4X4 · 8 SEATS · GUIDE ON BOARD",
+      "t1": "Ride where",
+      "t2": "no path goes",
+      "copy": "One truck, your group, and the wild south of Mauritius: river crossings, deer meadows, waterfalls and a private lookout deck. Three hours that most visitors never see.",
+      "foot": "MINIMUM 5 GUESTS · 3 HOURS · ALL AGES",
+      "cta": "Book the expedition →",
+      "shots": [
+        {
+          "src": "/images/expedition-convoy-river.webp",
+          "tag": "RIVER CROSSING",
+          "cap": "Straight through the stream, feet dry, cameras up."
+        },
+        {
+          "src": "/images/expedition-convoy-meadow.webp",
+          "tag": "OPEN MEADOWS",
+          "cap": "Rolling green, deer country, no other vehicle in sight."
+        },
+        {
+          "src": "/images/expedition-convoy-lookout.webp",
+          "tag": "PRIVATE LOOKOUT",
+          "cap": "A deck built for your group, and the whole southern valley below."
+        },
+        {
+          "src": "/images/expedition-convoy-trail.webp",
+          "tag": "FOREST TRACK",
+          "cap": "Twelve kilometres of trail no walking path reaches."
+        }
+      ]
+    },
+    "peak": {
+      "eyebrow": "602 METRES UP · THE HIGHEST POINT OF THE SOUTH · ALL AGES",
+      "t1": "The whole south",
+      "t2": "in one look",
+      "copy": "Ride up past La Tour to the summit, where the valley drops away and the lagoon line runs from Bel Ombre to Souillac. Benches, a lookout tower, and the best photo of your trip.",
+      "foot": "ABOUT 2 HOURS · GUIDED ASCENT · BRING WATER AND SUN PROTECTION",
+      "cta": "Add The Peak to my day →",
+      "shots": [
+        {
+          "src": "/images/peak-view.webp",
+          "tag": "THE VIEW",
+          "cap": "Green valley, cane fields, then the reef breaking white.",
+          "pos": "50% 62%"
+        },
+        {
+          "src": "/images/peak-tower.webp",
+          "tag": "THE LOOKOUT TOWER",
+          "cap": "Climb the timber deck and see the coast end to end."
+        },
+        {
+          "src": "/images/peak-bench.webp",
+          "tag": "TAKE A MINUTE",
+          "cap": "Benches at the edge, built for exactly this."
+        },
+        {
+          "src": "/images/peak-arrival.webp",
+          "tag": "THE LAST STRETCH",
+          "cap": "The final walk to the summit platform."
+        }
+      ]
+    },
+    "buggy": {
+      "eyebrow": "UP TO 3 SEATS · SEATBELTS AND ROLL CAGE · KIDS RIDE ALONG",
+      "t1": "The whole family,",
+      "t2": "one buggy",
+      "copy": "A side-by-side with a roof, belts and room for three. The same rivers and forest tracks as the quad, except everyone rides together and nobody gets left at the gate.",
+      "foot": "FROM RS 3,200 PER BUGGY · DRIVER 16+ WITH LICENCE · HELMETS PROVIDED",
+      "cta": "Add the buggy to my day →",
+      "shots": [
+        {
+          "src": "/images/buggy-river.webp",
+          "tag": "INTO THE RIVER",
+          "cap": "Wheels in the water, everyone screaming, nobody soaked."
+        },
+        {
+          "src": "/images/buggy-faces.webp",
+          "tag": "THREE ACROSS",
+          "cap": "Belted in side by side, ocean behind you."
+        },
+        {
+          "src": "/images/buggy-forest.webp",
+          "tag": "FOREST TRACK",
+          "cap": "Rock, root and mud through the deep green."
+        },
+        {
+          "src": "/images/buggy-earth.webp",
+          "tag": "PAST THE 23 EARTHS",
+          "cap": "The coloured dunes right beside the track."
+        }
+      ]
+    },
+    "quad": {
+      "eyebrow": "STANDARD 450CC OR EXCLUSIVE 625CC · DRIVER 16+ · PASSENGER WELCOME",
+      "t1": "Mud, rivers,",
+      "t2": "no traffic",
+      "copy": "One hour on the Discovery track or two on the Advenature Tour, guided the whole way. River crossings, forest single track and a ridge above the Coloured Earth with the ocean behind it.",
+      "foot": "FROM RS 2,800 · DRIVING LICENCE REQUIRED · HELMETS PROVIDED",
+      "cta": "Add the quad to my day →",
+      "shots": [
+        {
+          "src": "/images/quad-earth.webp",
+          "tag": "THE OCEAN RIDGE",
+          "cap": "Past the Coloured Earth with the southern sea in the distance."
+        },
+        {
+          "src": "/images/quad-river.webp",
+          "tag": "THROUGH THE RIVER",
+          "cap": "Yes, you go straight through it. Yes, you will get wet."
+        },
+        {
+          "src": "/images/quad-duo.webp",
+          "tag": "RIDE TWO UP",
+          "cap": "One drives, one holds on and does the screaming."
+        },
+        {
+          "src": "/images/quad-convoy.webp",
+          "tag": "GUIDED CONVOY",
+          "cap": "A guide in front, a buggy behind, jungle either side."
+        }
+      ]
+    },
+    "zipline": {
+      "eyebrow": "8 ROUTES · 500 M TO 5.5 KM · AGE 8 AND UP",
+      "t1": "Fly the whole",
+      "t2": "valley, line by line",
+      "copy": "From a single 500 m hop to eleven lines strung across 5.5 kilometres of forest, river and waterfall. Pick your route, clip in, and let the valley do the rest.",
+      "foot": "FULL HARNESS · GUIDES ON EVERY PLATFORM · CLOSED SHOES REQUIRED",
+      "cta": "Choose my zipline route →",
+      "shots": [
+        {
+          "src": "/images/zipline-waterfall.webp",
+          "tag": "WATERFALL LINE",
+          "cap": "Straight past the Chamouzé falls, close enough to feel the spray."
+        },
+        {
+          "src": "/images/zipline-superman.webp",
+          "tag": "ARMS OUT",
+          "cap": "Nothing under you but green, all the way down the valley."
+        },
+        {
+          "src": "/images/zipline-duo.webp",
+          "tag": "TWO AT A TIME",
+          "cap": "Parallel lines, so you fly together and race to the platform."
+        },
+        {
+          "src": "/images/zipline-tandem.webp",
+          "tag": "TANDEM WITH A GUIDE",
+          "cap": "Younger flyers ride harnessed to a guide from 8 years up."
+        }
+      ]
+    },
+    "nepalese": {
+      "eyebrow": "350 METRES LONG · 80 TO 100 M ABOVE THE VALLEY · AGE 10+",
+      "t1": "Walk out",
+      "t2": "over nothing",
+      "copy": "One plank at a time, harnessed to the line above, with a hundred metres of open valley under your feet. Slow enough for the whole family, high enough that nobody forgets it.",
+      "foot": "ABOUT 45 MINUTES · FULL HARNESS · BRIEFING INCLUDED",
+      "cta": "Add the bridge to my day →",
+      "shots": [
+        {
+          "src": "/images/bridge-span.webp",
+          "tag": "THE CROSSING",
+          "cap": "A single timber walkway strung across the whole valley."
+        },
+        {
+          "src": "/images/bridge-couple.webp",
+          "tag": "FIRST STEPS",
+          "cap": "Hands on the cable, eyes anywhere but down."
+        },
+        {
+          "src": "/images/bridge-laugh.webp",
+          "tag": "HALFWAY",
+          "cap": "The moment the nerves turn into laughing."
+        },
+        {
+          "src": "/images/bridge-family.webp",
+          "tag": "BRING THE KIDS",
+          "cap": "Harnessed from 10 years up, parents right behind."
+        }
+      ]
+    },
+    "bicycle": {
+      "eyebrow": "400 METRES OF CABLE · 18 M ABOVE THE VALLEY · AGE 10+",
+      "t1": "Pedal",
+      "t2": "across the sky",
+      "copy": "A bicycle bolted to a cable, banana trees below and nothing but air under the wheels. One of only a handful in the world, and easy enough that anyone who can ride a bike can do it.",
+      "foot": "ABOUT 15 MINUTES · HARNESSED AT ALL TIMES · RIDE SIDE BY SIDE",
+      "cta": "Add the bicycle zipline →",
+      "shots": [
+        {
+          "src": "/images/bicycle-sky.webp",
+          "tag": "THE FULL SPAN",
+          "cap": "Over the lake, the Kids Park and out towards the ocean."
+        },
+        {
+          "src": "/images/bicycle-pair.webp",
+          "tag": "SIDE BY SIDE",
+          "cap": "Two cables, so you cross together and can still hear the laughing."
+        },
+        {
+          "src": "/images/bicycle-behind.webp",
+          "tag": "JUST PEDAL",
+          "cap": "Harness on, feet on the pedals, the cable does the rest."
+        },
+        {
+          "src": "/images/bicycle-joy.webp",
+          "tag": "NO HANDS NEEDED",
+          "cap": "Most people forget to be scared about ten metres in."
+        }
+      ]
+    },
+    "luge": {
+      "eyebrow": "GRAVITY POWERED · 6 YEARS AND UP · HELMETS PROVIDED",
+      "t1": "Steer it,",
+      "t2": "brake it, race it",
+      "copy": "No engine, no pedals. You control the speed the whole way down a winding mountain track, past the caution chevrons and into the last banked curve. One ride is never enough.",
+      "foot": "FROM RS 500 · 1, 2 OR 3 RIDES · ADULTS AND KIDS FROM 6",
+      "cta": "Add the luge to my day →",
+      "shots": [
+        {
+          "src": "/images/luge-duo-curve.webp",
+          "tag": "THE TRACK",
+          "cap": "Chevrons, banked bends and a fight for the inside line."
+        },
+        {
+          "src": "/images/luge-family.webp",
+          "tag": "RIDE TOGETHER",
+          "cap": "Little ones ride in front, grown-ups steer behind."
+        },
+        {
+          "src": "/images/luge-race.webp",
+          "tag": "HEAD TO HEAD",
+          "cap": "Two karts, one finish line, no engines."
+        },
+        {
+          "src": "/images/luge-joy.webp",
+          "tag": "THE FACE",
+          "cap": "This is the photo you will buy at the kiosk."
+        }
+      ]
+    },
+    "private": {
+      "eyebrow": "YOUR OWN 4X4 RAPTOR · UP TO 4 GUESTS · PRIVATE GUIDE",
+      "t1": "Your route,",
+      "t2": "your pace",
+      "copy": "Just your party and a guide who knows every track. Stop where you want, stay as long as you like, from the 23 Coloured Earth to the ridge where the ocean fills the horizon.",
+      "foot": "FROM 2 TO 4 GUESTS · 3 HOURS · PRIVATE GUIDE INCLUDED",
+      "cta": "Book the private expedition →",
+      "shots": [
+        {
+          "src": "/images/expedition-raptor-ocean.webp",
+          "tag": "THE OCEAN RIDGE",
+          "cap": "Park where the valley opens onto the southern sea."
+        },
+        {
+          "src": "/images/expedition-raptor-earth.webp",
+          "tag": "23 COLOURED EARTH",
+          "cap": "Pull up beside the dunes, no crowd, no queue."
+        },
+        {
+          "src": "/images/expedition-guide-guests.webp",
+          "tag": "YOUR GUIDE",
+          "cap": "A local storyteller for the whole three hours."
+        }
+      ]
+    }
+  },
+  "COMBO": [
+    {
+      "name": "Ace",
+      "color": "#33FF74",
+      "items": [
+        {
+          "t": "Quad Adventure Track · 1 h"
+        },
+        {
+          "t": "The Discovery Tour · 1.6 km, 7 lines"
+        }
+      ],
+      "rr": [
+        5375,
+        8600
+      ],
+      "nr": [
+        7400,
+        12100
+      ]
+    },
+    {
+      "name": "Conqueror",
+      "color": "#FF3358",
+      "items": [
+        {
+          "t": "Quad Adventure Track · 1 h"
+        },
+        {
+          "t": "Sky Pulse Tour · 3.1 km, 7 lines"
+        }
+      ],
+      "rr": [
+        6350,
+        10550
+      ],
+      "nr": [
+        8900,
+        14975
+      ]
+    }
+  ],
+  "CINE": [
+    {
+      "n": "Koi Pond Experience",
+      "p": 4000
+    },
+    {
+      "n": "Swing Experience",
+      "p": 2500
+    },
+    {
+      "n": "Swing Experience · with dress",
+      "p": 4000
+    },
+    {
+      "n": "Cinematic Package · 1 activity",
+      "p": 12000
+    },
+    {
+      "n": "Cinematic Package · 2 activities",
+      "p": 14000
+    },
+    {
+      "n": "Cinematic Package · 3 activities",
+      "p": 16000
+    },
+    {
+      "n": "Cinematic Full Day",
+      "p": 20000
+    }
+  ],
+  "RATEP": {
+    "zipline": [
+      875,
+      1375
+    ],
+    "bicycle": [
+      700,
+      1150
+    ],
+    "nepalese": [
+      700,
+      1300
+    ],
+    "quad": [
+      2800,
+      3600
+    ],
+    "buggy": [
+      6200,
+      7500
+    ],
+    "luge": [
+      500,
+      700
+    ],
+    "peak": [
+      3850,
+      4900
+    ],
+    "private": [
+      3350,
+      3800
+    ],
+    "group": [
+      1100,
+      1350
+    ]
+  },
+  "PL": {
+    "admission": [
+      {
+        "n": "12 years old & above",
+        "rr": 400,
+        "nr": 550
+      },
+      {
+        "n": "6 to 11 years old",
+        "rr": 275,
+        "nr": 325
+      },
+      {
+        "n": "1 to 5 years old",
+        "rr": 0,
+        "nr": 0
+      }
+    ],
+    "zipline": [
+      {
+        "n": "The Plunge · 500 m, 1 line",
+        "rr": 875,
+        "nr": 1375
+      },
+      {
+        "n": "Waterfall Zipline · 300 m, 2 lines",
+        "rr": 1025,
+        "nr": 1950
+      },
+      {
+        "n": "The Signature · 1.5 km, 1 line",
+        "rr": 1725,
+        "nr": 2850
+      },
+      {
+        "n": "Discovery Tour · 1.6 km, 7 lines",
+        "rr": 2250,
+        "nr": 3600
+      },
+      {
+        "n": "Adventure Tour · 2.4 km, 6 lines",
+        "rr": 2350,
+        "nr": 2950
+      },
+      {
+        "n": "10 Flight Trail · 3.5 km, 10 lines",
+        "rr": 2900,
+        "nr": 4150
+      },
+      {
+        "n": "Sky Pulse Tour · 3.1 km, 7 lines",
+        "rr": 3250,
+        "nr": 4975
+      },
+      {
+        "n": "Advenature Flight · 5.5 km, 11 lines",
+        "rr": 3950,
+        "nr": 5650
+      }
+    ],
+    "quad": [
+      {
+        "n": "Quad Discovery 1 h · standard, single",
+        "rr": 2800,
+        "nr": 3600
+      },
+      {
+        "n": "Quad Discovery 1 h · standard, double",
+        "rr": 3800,
+        "nr": 4700
+      },
+      {
+        "n": "Quad Adventure 1 h · standard, single",
+        "rr": 3125,
+        "nr": 3950
+      },
+      {
+        "n": "Quad Adventure 1 h · standard, double",
+        "rr": 4100,
+        "nr": 5150
+      },
+      {
+        "n": "Advenature Tour 2 h · standard, single",
+        "rr": 4300,
+        "nr": 5250
+      },
+      {
+        "n": "Advenature Tour 2 h · standard, double",
+        "rr": 5075,
+        "nr": 6250
+      },
+      {
+        "n": "Exclusive Quad 625cc · from",
+        "rr": 6450,
+        "nr": 7600
+      }
+    ],
+    "buggy": [
+      {
+        "n": "Buggy Discovery · 1 h",
+        "rr": 6200,
+        "nr": 7500
+      },
+      {
+        "n": "Buggy 4X · 1 h",
+        "rr": 10900,
+        "nr": 13500
+      },
+      {
+        "n": "Buggy Exclusive 2 pax · 1 h 30",
+        "rr": 12150,
+        "nr": 15500
+      },
+      {
+        "n": "Buggy Exclusive 4 pax · 1 h 30",
+        "rr": 16300,
+        "nr": 19500
+      }
+    ],
+    "luge": [
+      {
+        "n": "1 ride",
+        "rr": 500,
+        "nr": 700
+      },
+      {
+        "n": "2 rides",
+        "rr": 775,
+        "nr": 1025
+      },
+      {
+        "n": "3 rides",
+        "rr": 1000,
+        "nr": 1300
+      }
+    ],
+    "bicycle": [
+      {
+        "n": "Bicycle Zipline · 400 m",
+        "rr": 700,
+        "nr": 1150
+      }
+    ],
+    "nepalese": [
+      {
+        "n": "Nepalese Bridge · 350 m",
+        "rr": 700,
+        "nr": 1300
+      }
+    ],
+    "peak": [
+      {
+        "n": "Explorer's Drive to The Peak · 1 h",
+        "rr": 3850,
+        "nr": 4900
+      },
+      {
+        "n": "Elite Expedition",
+        "rr": 8000,
+        "nr": 8000
+      }
+    ],
+    "private": [
+      {
+        "n": "Private Vallé Expedition · 2 pax",
+        "rr": 3350,
+        "nr": 4250
+      },
+      {
+        "n": "Private Vallé Expedition · 3 pax",
+        "rr": 3575,
+        "nr": 4550
+      },
+      {
+        "n": "Private Vallé Expedition · 4 pax",
+        "rr": 3650,
+        "nr": 4650
+      },
+      {
+        "n": "Private guide · per guide, per activity",
+        "rr": 1500,
+        "nr": 1500
+      }
+    ],
+    "group": [
+      {
+        "n": "Group Expedition · per person, min 5 pax",
+        "rr": 1100,
+        "nr": 1350
+      }
+    ]
+  },
+  "PHOTO": {
+    "rr": {
+      "tiers": [
+        {
+          "name": "Bronze",
+          "color": "#C77B4F",
+          "act": "1 activity",
+          "single": "Rs 850",
+          "dbl": "Rs 1,050"
+        },
+        {
+          "name": "Silver",
+          "color": "#AEB6C2",
+          "act": "2 activities",
+          "single": "Rs 1,050",
+          "dbl": "Rs 1,250"
+        },
+        {
+          "name": "Gold",
+          "color": "#E3B341",
+          "act": "3 activities",
+          "single": "Rs 1,250",
+          "dbl": "Rs 1,450"
+        },
+        {
+          "name": "Platinum",
+          "color": "#93A1B8",
+          "act": "Full activities",
+          "single": "Rs 1,600",
+          "dbl": "Rs 1,800"
+        }
+      ],
+      "addons": [
+        {
+          "t": "Additional printed photo",
+          "p": "Rs 400 / print"
+        },
+        {
+          "t": "Per additional person, digital only",
+          "p": "Rs 550"
+        }
+      ]
+    },
+    "nr": {
+      "tiers": [
+        {
+          "name": "Bronze",
+          "color": "#C77B4F",
+          "act": "1 activity",
+          "single": "Rs 1,200",
+          "dbl": "Rs 1,400"
+        },
+        {
+          "name": "Silver",
+          "color": "#AEB6C2",
+          "act": "2 activities",
+          "single": "Rs 1,500",
+          "dbl": "Rs 1,900"
+        },
+        {
+          "name": "Gold",
+          "color": "#E3B341",
+          "act": "3 activities",
+          "single": "Rs 1,700",
+          "dbl": "Rs 2,100"
+        },
+        {
+          "name": "Platinum",
+          "color": "#93A1B8",
+          "act": "4 activities",
+          "single": "Rs 2,175",
+          "dbl": "Rs 2,575"
+        }
+      ],
+      "addons": [
+        {
+          "t": "Additional printed photo",
+          "p": "Rs 400 / print"
+        },
+        {
+          "t": "Per additional person, digital only",
+          "p": "Rs 700"
+        }
+      ]
+    }
+  },
+  "TEAM": [
+    {
+      "img": "/images/mountainlugecart.avif",
+      "items": [
+        {
+          "t": "Fun games (2 to 3 h)"
+        },
+        {
+          "t": "Mountain Luge Kart (1 ride)"
+        },
+        {
+          "t": "Wellness lunch"
+        },
+        {
+          "t": "Water 0.5 L per person"
+        }
+      ]
+    },
+    {
+      "img": "/images/nepalesebridge.avif",
+      "items": [
+        {
+          "t": "Fun games (2 to 3 h)"
+        },
+        {
+          "t": "Waterfall Zipline"
+        },
+        {
+          "t": "Nepalese Bridge (350 m)"
+        },
+        {
+          "t": "Wellness lunch"
+        },
+        {
+          "t": "Water 0.5 L per person"
+        }
+      ]
+    },
+    {
+      "img": "/images/ziplineadventures.avif",
+      "items": [
+        {
+          "t": "Fun games (2 to 3 h)"
+        },
+        {
+          "t": "Nepalese Bridge (350 m)"
+        },
+        {
+          "t": "Mountain Luge Kart (1 ride)"
+        },
+        {
+          "t": "The Plunge zipline (500 m)"
+        },
+        {
+          "t": "Wellness lunch"
+        },
+        {
+          "t": "Water 0.5 L per person"
+        }
+      ]
+    }
+  ],
+  "HERO": [
+    "/images/valle-zipline-adventure-mauritius.avif",
+    "/images/valle-waterfall-nature-trail-mauritius.avif",
+    "/images/valle-quad-bike-adventure-mauritius.avif",
+    "/images/valle-23-colored-earth-chamouny.avif",
+    "/images/valle-giant-tortoise-park-mauritius.avif"
+  ],
+  "ENTRY_A": 500,
+  "ENTRY_C": 250
+}

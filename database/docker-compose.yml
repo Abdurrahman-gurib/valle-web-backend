@@ -1,0 +1,39 @@
+# VALLÉ Advenature™ Park: PostgreSQL via Docker
+#
+# LOCAL DEV CONVENIENCE ONLY. The default postgres/postgres credentials and the
+# published port are here so `docker compose up -d` just works on a laptop; the
+# port is bound to 127.0.0.1 so the database is never reachable off the machine.
+# Production deploys use the root docker-compose.yml, which keeps `db`
+# unpublished, and there a real `DB_PASSWORD` secret must be supplied.
+#
+#   docker compose up -d          # first start applies schema.sql + seed.sql
+#   docker compose down -v        # wipe and start over (re-runs init scripts)
+#
+# Init scripts only run on an EMPTY volume. After editing seed/data.json,
+# regenerate seed.sql (node scripts/generate-seed.js) and either
+# `docker compose down -v && docker compose up -d`, or apply manually:
+#   docker compose exec db psql -U postgres -d valle_park -f /docker-entrypoint-initdb.d/02-seed.sql
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: valle-park-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-valle_park}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - valle_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-valle_park}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  valle_pgdata:
