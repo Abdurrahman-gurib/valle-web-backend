@@ -14,7 +14,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY --from=build /app/dist ./dist
 # Operator scripts and the SQL they apply, so `node scripts/db-init.js` runs
-# inside this image: Railway's pre-deploy command (railway.json) and any
+# inside this image: Railway's pre-deploy command (.railway/railway.ts) and any
 # one-off shell (`railway ssh`). `pg` and `bcryptjs` are runtime dependencies.
 COPY scripts ./scripts
 COPY database/schema.sql database/seed.sql ./database/

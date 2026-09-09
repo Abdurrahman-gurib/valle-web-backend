@@ -10,7 +10,7 @@ repositories feed it and every push to `main` deploys automatically.
 | `api`           | https://github.com/Abdurrahman-gurib/valle-web-backend (this) | private network only, `api.railway.internal:3001`      |
 | `Postgres`      | Railway PostgreSQL template (`postgres-ssl`, TLS on)          | private network only, `postgres.railway.internal:5432` |
 
-Public site: `https://<web-domain>` (the Railway-provided domain of `web`; see
+Public site: `https://web-production-ff60b.up.railway.app` (the Railway-provided domain of `web`; see
 [Custom domain](#custom-domain) to put `vallepark.com` in front of it).
 
 ## Topology
@@ -35,8 +35,13 @@ browser --https--> Railway edge --> web (nginx, PORT 80)
 - Railway's edge terminates TLS and reports the visitor in `X-Real-IP`. nginx
   forwards that as `X-Forwarded-For` (`TRUST_EDGE_HEADERS=1`), the API trusts one
   proxy hop (`TRUST_PROXY=true`), and so the rate limiters key on the real visitor.
-- The API is pinned to **one replica** (`railway.json`): live chat keeps socket
-  state in memory. See [Scaling notes](#scaling-notes) before raising it.
+- The API is pinned to **one replica** (`.railway/railway.ts`): live chat keeps
+  socket state in memory. See [Scaling notes](#scaling-notes) before raising it.
+- The whole project (services, sources, variables, healthchecks, the pre-deploy
+  command, the database and its volume) is described in
+  [`.railway/railway.ts`](.railway/railway.ts), Railway's infrastructure-as-code
+  file, and applied with `railway config apply`. Railway's older `railway.json`
+  is deprecated and no longer read for new services.
 
 ## CI/CD pipeline
 
@@ -130,6 +135,18 @@ an API against a half-built schema. `schema.sql` begins with `DROP TABLE`, so it
 is only ever applied to an empty database: ship later schema changes as
 migrations, never by re-running it.
 
+### Running commands inside the api container
+
+`railway ssh` needs an SSH key registered with your Railway account. One-time
+setup on a new machine:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519      # skip if you already have one
+railway ssh keys add                             # registers ~/.ssh/id_ed25519.pub
+ssh-keyscan ssh.railway.com >> ~/.ssh/known_hosts   # non-interactive shells only
+railway ssh --service api -- node scripts/db-init.js   # any command, or omit for a shell
+```
+
 ### Re-seed content / reset
 
 Both options are **destructive**. `seed.sql` truncates the content tables and
@@ -206,7 +223,35 @@ canonical origin.
 
 ## Recreating the project from scratch
 
-Everything above was created with the CLI and is reproducible:
+The project is described in [`.railway/railway.ts`](.railway/railway.ts).
+`railway config plan` diffs that file against the live project (read-only) and
+`railway config apply` creates or updates whatever differs, so a fresh project
+is a handful of commands plus the one secret:
+
+```bash
+railway login
+railway init --name valle-web            # empty project, links this directory to it
+npm install                              # the "railway" dev dependency provides railway/iac
+railway config apply                     # Postgres + volume, web, api, variables, healthchecks, pre-deploy
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))" | railway variable set JWT_SECRET --stdin --service api
+railway domain --service web --port 80   # public domain for the site
+```
+
+The api's first deployment fails its boot checks until `JWT_SECRET` is set;
+setting it triggers the redeploy. Non-secret variables live in the file;
+secrets are `preserve()`d, never written to source.
+
+Windows note: with the CLI installed through npm, `railway config plan` /
+`apply` fail with "requires Railway CLI 5.42.1 or newer" even on a current CLI,
+because the SDK spawns `railway` without a shell and cannot run the npm `.cmd`
+shim. Put the real executable first on `PATH` for that shell:
+
+```powershell
+$env:PATH = "$env:APPDATA\npm\node_modules\@railway\cli\bin;$env:PATH"
+railway config plan
+```
+
+The equivalent manual CLI commands, for reference:
 
 ```bash
 railway login
@@ -230,8 +275,10 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))" |
 
 Connecting a GitHub repo requires the Railway GitHub App to be installed on the
 GitHub account with access to both repositories (GitHub -> Settings ->
-Applications -> Railway). The build/deploy settings themselves live in each
-repo's `railway.json`, which overrides the dashboard.
+Applications -> Railway). Each service builds from the `Dockerfile` at its repo
+root; every other deploy setting (healthcheck, pre-deploy command, replicas,
+restart policy) comes from `.railway/railway.ts`, so change it there and run
+`railway config apply` rather than editing the dashboard.
 
 ## Health probes
 
@@ -255,14 +302,14 @@ failover.
 3. Wire a real payment provider if you intend to take money online: the current
    "pay online" path records the intent and does not charge a card.
 4. Watch the Railway metrics and HTTP logs for 5xx rates and login 429s; add an
-   uptime monitor on `https://<web-domain>/api/health`.
+   uptime monitor on `https://web-production-ff60b.up.railway.app/api/health`.
 
 ## Scaling notes
 
 The chat gateway keeps socket state in memory, so **more than one API replica
 needs a shared adapter** or a visitor and an agent can land on different
-instances and never see each other. That is why `railway.json` pins
-`numReplicas` to 1, and it is the only supported setting until:
+instances and never see each other. That is why `.railway/railway.ts` pins
+`replicas` to 1, and it is the only supported setting until:
 
 1. a Redis service reachable over the private network exists (`railway add --database redis`);
 2. the socket.io Redis adapter is wired into the chat gateway;

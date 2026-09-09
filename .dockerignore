@@ -14,3 +14,4 @@ database/seed
 database/scripts
 database/docker-compose.yml
 database/README.md
+.railway
