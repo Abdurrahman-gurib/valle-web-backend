@@ -325,6 +325,7 @@ CREATE TABLE booking_lines (
   id            serial PRIMARY KEY,
   booking_id    uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
   experience_id text REFERENCES experiences(id),  -- null for the park-entry line
+  variant       text NOT NULL DEFAULT '',          -- price_list label of the option booked, '' = base price
   label         text NOT NULL,
   adults        int  NOT NULL DEFAULT 0,
   kids          int  NOT NULL DEFAULT 0,

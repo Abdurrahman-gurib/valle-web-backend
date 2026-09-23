@@ -73,8 +73,14 @@ const EXPS: PricingExperience[] = [
   }),
 ];
 
+const ROWS = [
+  { groupKey: 'zipline', label: 'The Plunge · 500 m, 1 line', rr: 875, nr: 1375 },
+  { groupKey: 'zipline', label: 'Advenature Flight · 5.5 km, 11 lines', rr: 3950, nr: 5650 },
+  { groupKey: 'buggy', label: 'Buggy 4X · 1 h', rr: 10900, nr: 13500 },
+];
+
 const input = (
-  items: { id: string; adults?: number; kids?: number; units?: number }[],
+  items: { id: string; variant?: string; adults?: number; kids?: number; units?: number }[],
   over: Partial<{ adults: number; kids: number; rate: 'rr' | 'nr' }> = {},
 ) => ({ adults: 2, kids: 1, rate: 'rr' as const, ...over, items });
 
@@ -231,6 +237,71 @@ describe('computeBooking', () => {
       label: 'Mountain Luge Kart · 0 adult',
       amount: 0,
     });
+  });
+
+  it('prices a chosen option from its price_list row and names it in the label', () => {
+    const r = computeBooking(
+      EXPS,
+      SETTINGS,
+      input(
+        [
+          { id: 'zipline', variant: 'Advenature Flight · 5.5 km, 11 lines', adults: 2 },
+          { id: 'buggy', variant: 'Buggy 4X · 1 h', units: 1 },
+        ],
+        { adults: 2, kids: 0, rate: 'nr' },
+      ),
+      ROWS,
+    );
+    expect(r.lines[1]).toMatchObject({
+      experienceId: 'zipline',
+      variant: 'Advenature Flight · 5.5 km, 11 lines',
+      label: 'Zipline Adventures · Advenature Flight · 5.5 km, 11 lines · 2 adults',
+      amount: 5650 * 2,
+    });
+    expect(r.lines[2]).toMatchObject({ variant: 'Buggy 4X · 1 h', amount: 13500 });
+    expect(r.total).toBe(500 * 2 + 5650 * 2 + 13500);
+  });
+
+  it('allows two options of one experience but counts it once for the discount', () => {
+    const r = computeBooking(
+      EXPS,
+      SETTINGS,
+      input(
+        [
+          { id: 'zipline', variant: 'The Plunge · 500 m, 1 line', adults: 1 },
+          { id: 'zipline', variant: 'Advenature Flight · 5.5 km, 11 lines', adults: 1 },
+          { id: 'nepalese', adults: 1 },
+        ],
+        { adults: 1, kids: 0 },
+      ),
+      ROWS,
+    );
+    expect(r.lines).toHaveLength(4);
+    expect(r.advCount).toBe(2);
+    expect(r.discount).toBe(0);
+  });
+
+  it('rejects an option that is not on the price list for that experience', () => {
+    expect(() =>
+      computeBooking(EXPS, SETTINGS, input([{ id: 'nepalese', variant: 'The Plunge · 500 m, 1 line', adults: 1 }]), ROWS),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      computeBooking(EXPS, SETTINGS, input([{ id: 'zipline', variant: 'Nope', adults: 1 }]), ROWS),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects the same option twice', () => {
+    expect(() =>
+      computeBooking(
+        EXPS,
+        SETTINGS,
+        input([
+          { id: 'zipline', variant: 'The Plunge · 500 m, 1 line', adults: 1 },
+          { id: 'zipline', variant: 'The Plunge · 500 m, 1 line', adults: 1 },
+        ]),
+        ROWS,
+      ),
+    ).toThrow(BadRequestException);
   });
 
   it('rejects unknown experience ids', () => {

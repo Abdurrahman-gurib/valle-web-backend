@@ -12,6 +12,10 @@ export class BookingLine {
   @Column({ name: 'experience_id', type: 'text', nullable: true })
   experienceId: string | null;
 
+  /** price_list label of the option booked ('' = the experience's base price) */
+  @Column({ name: 'variant', type: 'text', default: '' })
+  variant: string;
+
   @Column({ name: 'label', type: 'text' })
   label: string;
 

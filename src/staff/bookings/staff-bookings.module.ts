@@ -7,8 +7,7 @@ import {
   ChatConversation,
   Experience,
   Quote,
-  Setting,
-} from '../../entities';
+  Setting, PriceListEntry } from '../../entities';
 import { StaffAuthModule } from '../auth/staff-auth.module';
 import { StaffBookingsController } from './staff-bookings.controller';
 import { StaffBookingsService } from './staff-bookings.service';
@@ -28,6 +27,7 @@ import { StaffBookingsService } from './staff-bookings.service';
       Quote,
       ChatConversation,
       Experience,
+      PriceListEntry,
       Setting,
     ]),
     StaffAuthModule,

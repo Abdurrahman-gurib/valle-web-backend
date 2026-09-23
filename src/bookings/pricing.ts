@@ -25,9 +25,19 @@ export interface PricingSettings {
 
 export interface PricingItem {
   id: string;
+  /** price_list label of the option booked; undefined / '' = base price */
+  variant?: string;
   adults?: number;
   kids?: number;
   units?: number;
+}
+
+/** A price_list row: one priced option of an experience (group_key = experience id). */
+export interface PricingPriceRow {
+  groupKey: string;
+  label: string;
+  rr: number;
+  nr: number;
 }
 
 export interface PricingInput {
@@ -39,6 +49,7 @@ export interface PricingInput {
 
 export interface PricedLine {
   experienceId: string | null;
+  variant: string;
   label: string;
   adults: number;
   kids: number;
@@ -85,14 +96,17 @@ export function computeBooking(
   experiences: PricingExperience[],
   settings: PricingSettings,
   input: PricingInput,
+  priceRows: PricingPriceRow[] = [],
 ): PricedBooking {
   const byId = new Map(experiences.map((e) => [e.id, e]));
+  const lineKey = (item: PricingItem) => item.id + '::' + (item.variant || '');
 
   const entry =
     settings.entryAdult * input.adults + settings.entryChild * input.kids;
   const lines: PricedLine[] = [
     {
       experienceId: null,
+      variant: '',
       label: 'Park entry · ' + partyLabel(input.adults, input.kids),
       adults: input.adults,
       kids: input.kids,
@@ -103,18 +117,28 @@ export function computeBooking(
 
   let subtotal = entry;
   let advSubtotal = 0;
-  let advCount = 0;
+  const advIds = new Set<string>();
 
-  // The client keys its selection by experience id, so duplicates can never be
-  // legitimate, and allowing them would inflate advCount into a free 15% discount.
+  // The client keys its selection by experience id + option, so duplicates can
+  // never be legitimate. (The Explorer Pass counts DISTINCT experiences, so two
+  // options of the same experience are fine but never inflate the discount.)
   const seen = new Set<string>();
   for (const item of input.items) {
-    if (seen.has(item.id)) {
+    const key = lineKey(item);
+    if (seen.has(key)) {
       throw new BadRequestException(`Duplicate experience "${item.id}" in items`);
     }
-    seen.add(item.id);
+    seen.add(key);
     if (!byId.has(item.id)) {
       throw new BadRequestException(`Unknown experience "${item.id}"`);
+    }
+    if (
+      item.variant &&
+      !priceRows.some((r) => r.groupKey === item.id && r.label === item.variant)
+    ) {
+      throw new BadRequestException(
+        `Unknown option "${item.variant}" for experience "${item.id}"`,
+      );
     }
   }
 
@@ -133,7 +157,14 @@ export function computeBooking(
       );
     }
 
-    const price = priceFor(exp, input.rate);
+    const row = item.variant
+      ? priceRows.find((r) => r.groupKey === exp.id && r.label === item.variant)
+      : undefined;
+    const price = row
+      ? input.rate === 'nr'
+        ? row.nr
+        : row.rr
+      : priceFor(exp, input.rate);
     const a = item.adults || 0;
     const k = item.kids || 0;
     const u = item.units || 0;
@@ -154,11 +185,12 @@ export function computeBooking(
     subtotal += amount;
     if (exp.categoryId === 'adventure' && exp.priceMode === 'pp' && amount > 0) {
       advSubtotal += amount;
-      advCount++;
+      advIds.add(exp.id);
     }
     lines.push({
       experienceId: exp.id,
-      label: exp.name + ' · ' + q,
+      variant: item.variant || '',
+      label: exp.name + (item.variant ? ' · ' + item.variant : '') + ' · ' + q,
       adults: a,
       kids: k,
       units: u,
@@ -166,6 +198,7 @@ export function computeBooking(
     });
   }
 
+  const advCount = advIds.size;
   const discount = advCount >= 3 ? Math.round(advSubtotal * 0.15) : 0;
   return {
     lines,

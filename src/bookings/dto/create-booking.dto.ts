@@ -27,6 +27,14 @@ export class BookingItemDto {
   @IsNotEmpty()
   id: string;
 
+  /** A price_list label of this experience (e.g. one zipline tour); omitted = base price. */
+  @ApiPropertyOptional({ example: 'Advenature Flight · 5.5 km, 11 lines' })
+  @IsOptional()
+  @IsString()
+  @IsSafeText()
+  @MaxLength(120)
+  variant?: string;
+
   @ApiPropertyOptional({ minimum: 0, maximum: 12, example: 2 })
   @IsOptional()
   @IsInt()

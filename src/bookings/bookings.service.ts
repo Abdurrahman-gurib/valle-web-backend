@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
-import { Booking, BookingLine, Experience, Setting } from '../entities';
+import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../entities';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { computeBooking, PricedBooking } from './pricing';
 
@@ -30,6 +30,8 @@ export class BookingsService {
     private readonly lineRepo: Repository<BookingLine>,
     @InjectRepository(Experience)
     private readonly experienceRepo: Repository<Experience>,
+    @InjectRepository(PriceListEntry)
+    private readonly priceRepo: Repository<PriceListEntry>,
     @InjectRepository(Setting)
     private readonly settingRepo: Repository<Setting>,
   ) {}
@@ -52,9 +54,10 @@ export class BookingsService {
       throw new BadRequestException('visitDate cannot be in the past');
     }
 
-    const [experiences, settings] = await Promise.all([
+    const [experiences, settings, priceRows] = await Promise.all([
       this.experienceRepo.find(),
       this.settingRepo.find(),
+      this.priceRepo.find(),
     ]);
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
     const priced = computeBooking(
@@ -69,6 +72,7 @@ export class BookingsService {
         rate: dto.rate,
         items: dto.items,
       },
+      priceRows,
     );
 
     for (let attempt = 0; attempt < REF_MAX_TRIES; attempt++) {
@@ -121,6 +125,7 @@ export class BookingsService {
         manager.create(BookingLine, {
           bookingId: saved.id,
           experienceId: l.experienceId,
+          variant: l.variant,
           label: l.label,
           adults: l.adults,
           kids: l.kids,

@@ -26,8 +26,10 @@
  * Exits non-zero on any failure, so a broken bootstrap fails the deploy rather
  * than starting an API against a half-built schema.
  *
- * Schema CHANGES are not handled here: schema.sql starts with DROP TABLE, so it
- * is only ever applied to an empty database. Ship later changes as migrations.
+ * Schema CHANGES: schema.sql starts with DROP TABLE, so it is only ever applied
+ * to an empty database. Later changes ship as database/migrations/NNN-*.sql,
+ * every one idempotent (IF NOT EXISTS ...); they are applied in name order on
+ * every run, after the schema/seed step.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -36,6 +38,7 @@ const { clientConfig, connect, describe } = require('./lib/db');
 const DB_DIR = path.join(__dirname, '..', 'database');
 const SCHEMA = path.join(DB_DIR, 'schema.sql');
 const SEED = path.join(DB_DIR, 'seed.sql');
+const MIGRATIONS = path.join(DB_DIR, 'migrations');
 
 const args = process.argv.slice(2);
 const unknown = args.filter((a) => a !== '--reseed' && a !== '--reset');
@@ -107,6 +110,11 @@ async function main() {
       await apply(client, SEED);
     } else {
       console.log('[db-init] schema and content already present, nothing to do');
+    }
+
+    if (fs.existsSync(MIGRATIONS)) {
+      const files = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
+      for (const f of files) await apply(client, path.join(MIGRATIONS, f));
     }
 
     const { rows } = await client.query(

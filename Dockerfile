@@ -18,6 +18,7 @@ COPY --from=build /app/dist ./dist
 # one-off shell (`railway ssh`). `pg` and `bcryptjs` are runtime dependencies.
 COPY scripts ./scripts
 COPY database/schema.sql database/seed.sql ./database/
+COPY database/migrations ./database/migrations
 EXPOSE 3001
 USER node
 # Liveness, not readiness: a database blip must not mark the container unhealthy

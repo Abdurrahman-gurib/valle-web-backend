@@ -22,8 +22,7 @@ import {
   ChatConversation,
   Experience,
   Quote,
-  Setting,
-} from '../../entities';
+  Setting, PriceListEntry } from '../../entities';
 import type { StaffPrincipal } from '../auth/staff-auth.types';
 import {
   BookingStatus,
@@ -304,9 +303,10 @@ export class StaffBookingsService {
       where: { bookingId: booking.id, experienceId: Not(IsNull()) },
       order: { sortOrder: 'ASC' },
     });
-    const [experiences, settings] = await Promise.all([
+    const [experiences, settings, priceRows] = await Promise.all([
       manager.find(Experience),
       manager.find(Setting),
+      manager.find(PriceListEntry),
     ]);
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
@@ -323,11 +323,13 @@ export class StaffBookingsService {
         items: existing.map((line) => ({
           // The where clause already excluded the null (park entry) rows.
           id: line.experienceId ?? '',
+          variant: line.variant || undefined,
           adults: line.adults,
           kids: line.kids,
           units: line.units,
         })),
       },
+      priceRows,
     );
 
     booking.entryAmount = priced.entry;
@@ -341,6 +343,7 @@ export class StaffBookingsService {
         manager.create(BookingLine, {
           bookingId: booking.id,
           experienceId: line.experienceId,
+          variant: line.variant,
           label: line.label,
           adults: line.adults,
           kids: line.kids,
