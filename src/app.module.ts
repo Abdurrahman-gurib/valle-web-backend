@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -15,6 +17,8 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
 @Module({
   imports: [
+    // Sentry first so its filter and tracing wrap every other module's handlers.
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -48,6 +52,10 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     // HR-only code path.
     CareersModule,
     HrModule,
+  ],
+  providers: [
+    // Reports unhandled (5xx) exceptions to Sentry; expected HttpExceptions are not noise.
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
   ],
 })
 export class AppModule {}
