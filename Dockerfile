@@ -10,7 +10,10 @@ RUN npm run build
 # and upload it under that release so stack traces show TypeScript lines.
 ARG SENTRY_AUTH_TOKEN=
 ARG SENTRY_RELEASE=
-RUN SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN SENTRY_RELEASE=$SENTRY_RELEASE sh scripts/sentry-sourcemaps.sh
+# ENV (not inline on RUN): buildkit prints RUN lines with ARGs expanded, ENV lines as written.
+ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
+ENV SENTRY_RELEASE=$SENTRY_RELEASE
+RUN sh scripts/sentry-sourcemaps.sh
 
 # ---- runtime ----
 FROM node:22-alpine
