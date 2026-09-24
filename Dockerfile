@@ -5,6 +5,15 @@ COPY package.json package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
+# Source maps to Sentry (build stage only, never shipped): when the Railway build
+# variables SENTRY_AUTH_TOKEN and SENTRY_RELEASE are set, tag dist/ with debug ids
+# and upload it under that release so stack traces show TypeScript lines.
+ARG SENTRY_AUTH_TOKEN=
+ARG SENTRY_RELEASE=
+RUN if [ -n "$SENTRY_AUTH_TOKEN" ] && [ -n "$SENTRY_RELEASE" ]; then \
+      npx sentry-cli sourcemaps inject ./dist && \
+      npx sentry-cli sourcemaps upload --org valle-advenature-park --project valle-web-api --release "$SENTRY_RELEASE" ./dist; \
+    else echo 'Sentry source maps: skipped (no token/release)'; fi
 
 # ---- runtime ----
 FROM node:22-alpine

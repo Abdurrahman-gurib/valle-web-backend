@@ -93,6 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     steps:
       - if: env.RAILWAY_TOKEN == ''
         run: echo "RAILWAY_TOKEN is not set, skipping (Railway's GitHub autodeploy handles deploys)."
@@ -106,3 +107,13 @@ jobs:
         run: railway variables --service api --skip-deploys --set "SENTRY_RELEASE=${{ github.sha }}"
       - if: env.RAILWAY_TOKEN != ''
         run: railway up --service api --ci --message "GitHub Actions ${{ github.sha }}"
+      # Deploy tracking in Sentry (needs the SENTRY_AUTH_TOKEN repository secret):
+      # marks this commit as deployed to production so issues show "first seen in".
+      - if: env.RAILWAY_TOKEN != '' && env.SENTRY_AUTH_TOKEN != ''
+        env:
+          SENTRY_ORG: valle-advenature-park
+          SENTRY_PROJECT: valle-web-api
+        run: |
+          npx --yes @sentry/cli releases new "${{ github.sha }}" --finalize
+          npx --yes @sentry/cli releases set-commits "${{ github.sha }}" --auto --ignore-missing
+          npx --yes @sentry/cli deploys new --release "${{ github.sha }}" --env production
