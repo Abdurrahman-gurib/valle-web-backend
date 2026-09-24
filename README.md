@@ -240,3 +240,5 @@ Server-side pricing in `src/bookings/pricing.ts` exactly mirrors
   15% off those items (`round(advSubtotal × 0.15)`).
 - Items with `entry`/`kiosk` price modes or unknown ids are rejected (400).
 - Reference codes look like `VAL-4821-26` and are re-generated on collision.
+
+<!-- CI deploys to Railway via the RAILWAY_TOKEN secret (added 2026-09-24). -->
