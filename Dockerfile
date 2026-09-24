@@ -10,10 +10,7 @@ RUN npm run build
 # and upload it under that release so stack traces show TypeScript lines.
 ARG SENTRY_AUTH_TOKEN=
 ARG SENTRY_RELEASE=
-RUN if [ -n "$SENTRY_AUTH_TOKEN" ] && [ -n "$SENTRY_RELEASE" ]; then \
-      npx sentry-cli sourcemaps inject ./dist && \
-      npx sentry-cli sourcemaps upload --org valle-advenature-park --project valle-web-api --release "$SENTRY_RELEASE" ./dist; \
-    else echo 'Sentry source maps: skipped (no token/release)'; fi
+RUN SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN SENTRY_RELEASE=$SENTRY_RELEASE sh scripts/sentry-sourcemaps.sh
 
 # ---- runtime ----
 FROM node:22-alpine
