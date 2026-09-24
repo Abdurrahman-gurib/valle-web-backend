@@ -100,5 +100,9 @@ jobs:
         uses: actions/checkout@v4
       - if: env.RAILWAY_TOKEN != ''
         run: npm install -g @railway/cli
+      # Tag the build with the commit so Sentry groups issues by release and can
+      # tell which deploy introduced a regression (crash-free sessions need it too).
+      - if: env.RAILWAY_TOKEN != ''
+        run: railway variables --service api --skip-deploys --set "SENTRY_RELEASE=${{ github.sha }}"
       - if: env.RAILWAY_TOKEN != ''
         run: railway up --service api --ci --message "GitHub Actions ${{ github.sha }}"
