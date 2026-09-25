@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity({ name: 'restaurants' })
 export class Restaurant {
@@ -41,4 +41,8 @@ export class Restaurant {
 
   @Column({ name: 'sort_order', type: 'int' })
   sortOrder: number;
+
+  /** Bumped by a database trigger on every UPDATE; feeds the sitemap's lastmod. */
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }

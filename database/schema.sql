@@ -46,7 +46,8 @@ CREATE TABLE experiences (
   detail         text,
   price_rr       int,                        -- rate-dependent "from" prices (null = not rate dependent)
   price_nr       int,
-  sort_order     int NOT NULL
+  sort_order     int NOT NULL,
+  updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE experience_facts (               -- "good to know" bullets
@@ -106,7 +107,8 @@ CREATE TABLE restaurants (
   about         text NOT NULL,
   detail        text NOT NULL,
   menu_pdf      text NOT NULL DEFAULT '',
-  sort_order    int NOT NULL
+  sort_order    int NOT NULL,
+  updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE restaurant_gallery (
@@ -146,7 +148,8 @@ CREATE TABLE package_tiers (
   dbl_label    text NOT NULL,
   note         text,
   hero         text,
-  sort_order   int NOT NULL
+  sort_order   int NOT NULL,
+  updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE package_tier_items (
@@ -202,7 +205,8 @@ CREATE TABLE price_list (
   label      text NOT NULL,
   rr         int  NOT NULL,                  -- resident MUR (0 = FREE)
   nr         int  NOT NULL,                  -- non-resident MUR
-  sort_order int  NOT NULL
+  sort_order int  NOT NULL,
+  updated_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_price_list_group ON price_list(group_key);
 

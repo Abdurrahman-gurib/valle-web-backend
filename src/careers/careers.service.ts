@@ -18,6 +18,8 @@ export interface VacancyCard {
   salaryRange: string;
   /** ISO date (YYYY-MM-DD) or null. */
   closesOn: string | null;
+  /** ISO date the role was published; feeds JobPosting.datePosted on the public page. */
+  postedOn: string;
 }
 
 /** The full role page. Still no ids, no author, no applicant data. */
@@ -137,6 +139,7 @@ function toVacancyCard(v: JobVacancy): VacancyCard {
     summary: v.summary,
     salaryRange: v.salaryRange,
     closesOn: toDateString(v.closesOn),
+    postedOn: toDateString(v.createdAt) ?? '',
   };
 }
 

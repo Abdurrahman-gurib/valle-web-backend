@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 /** Price list rows for detail pages + admission. */
 @Entity({ name: 'price_list' })
@@ -23,4 +23,8 @@ export class PriceListEntry {
 
   @Column({ name: 'sort_order', type: 'int' })
   sortOrder: number;
+
+  /** Bumped by a database trigger on every UPDATE; feeds the sitemap's lastmod. */
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }

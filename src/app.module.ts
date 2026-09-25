@@ -12,6 +12,7 @@ import { dbSslOptions } from './config/db';
 import { HealthModule } from './health/health.module';
 import { HrModule } from './hr/hr.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { SeoModule } from './seo/seo.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
@@ -52,6 +53,8 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     // HR-only code path.
     CareersModule,
     HrModule,
+    // sitemap.xml + robots.txt (nginx proxies the root paths here).
+    SeoModule,
   ],
   providers: [
     // Reports unhandled (5xx) exceptions to Sentry; expected HttpExceptions are not noise.

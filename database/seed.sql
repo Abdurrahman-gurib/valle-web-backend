@@ -184,16 +184,16 @@ INSERT INTO restaurants (id, name, badge, image, tag, cuisine, hours_label, pric
 -- restaurant_gallery
 INSERT INTO restaurant_gallery (restaurant_id, src, sort_order) VALUES
   ('chamouze', '/images/lechamouze.avif', 0),
-  ('chamouze', '/images/copy-of-copy-of-dsc-0693.avif', 1),
-  ('chamouze', '/images/copy-of-copy-of-copy-of-dsc-0729.avif', 2),
-  ('chamouze', '/images/copy-of-copy-of-copy-of-dsc-0722-1.avif', 3),
-  ('chamouze', '/images/copy-of-copy-of-copy-of-dsc-0683.avif', 4),
-  ('chamouze', '/images/copy-of-copy-of-copy-of-dsc-0715-1.avif', 5),
+  ('chamouze', '/images/le-chamouze-dessert-plate.avif', 1),
+  ('chamouze', '/images/le-chamouze-grilled-steak.avif', 2),
+  ('chamouze', '/images/le-chamouze-catch-of-the-day-fries.avif', 3),
+  ('chamouze', '/images/le-chamouze-restaurant-entrance.avif', 4),
+  ('chamouze', '/images/le-chamouze-bartender-cocktail.avif', 5),
   ('citronelle', '/images/la-citronelle-4.avif', 0),
-  ('citronelle', '/images/copy-of-copy-of-dsc-0658-1.avif', 1),
-  ('citronelle', '/images/copy-of-copy-of-dsc-0660.avif', 2),
-  ('citronelle', '/images/copy-of-copy-of-dsc-0662-1.avif', 3),
-  ('citronelle', '/images/copy-of-dsc-0679.avif', 4);
+  ('citronelle', '/images/la-citronelle-dining-hall.avif', 1),
+  ('citronelle', '/images/la-citronelle-garden-lawn.avif', 2),
+  ('citronelle', '/images/la-citronelle-entrance-hall.avif', 3),
+  ('citronelle', '/images/la-citronelle-mauritian-thali.avif', 4);
 
 -- menu_groups
 INSERT INTO menu_groups (id, restaurant_id, title, sort_order) VALUES

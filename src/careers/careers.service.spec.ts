@@ -117,6 +117,7 @@ describe('CareersService.listPublished', () => {
       summary: 'Run the line, keep everyone safe.',
       salaryRange: 'Rs 22,000 - Rs 28,000',
       closesOn: '2026-09-30',
+      postedOn: '2026-08-01',
     });
     expect(Object.keys(card)).not.toContain('id');
     expect(Object.keys(card)).not.toContain('createdBy');

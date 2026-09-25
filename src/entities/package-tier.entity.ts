@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity({ name: 'package_tiers' })
 export class PackageTier {
@@ -39,4 +39,8 @@ export class PackageTier {
 
   @Column({ name: 'sort_order', type: 'int' })
   sortOrder: number;
+
+  /** Bumped by a database trigger on every UPDATE; feeds the sitemap's lastmod. */
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }
