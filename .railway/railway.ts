@@ -39,6 +39,10 @@ export default defineRailway(() => {
       PORT: "80",
       API_UPSTREAM: "api.railway.internal:3001",
       TRUST_EDGE_HEADERS: "1",
+      // Canonical origin baked into the prerendered pages (build arg) and
+      // enforced by nginx at runtime (see "Search engines" in DEPLOYMENT.md).
+      VITE_SITE_URL: "https://web-production-ff60b.up.railway.app",
+      CANONICAL_HOST: "web-production-ff60b.up.railway.app",
     },
   });
 
@@ -53,6 +57,8 @@ export default defineRailway(() => {
     env: {
       NODE_ENV: "production",
       PORT: "3001",
+      // Origin named in /api/sitemap.xml and /api/robots.txt.
+      SITE_URL: "https://web-production-ff60b.up.railway.app",
       DB_HOST: Postgres.env.RAILWAY_PRIVATE_DOMAIN,
       DB_PORT: "5432",
       DB_USER: Postgres.env.PGUSER,
