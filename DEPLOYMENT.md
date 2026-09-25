@@ -457,15 +457,15 @@ renders every public route with the bundled catalog), so crawlers get full HTML.
 Railway variables that matter:
 
 - `web`: `VITE_SITE_URL` (build arg, declared in the Dockerfile) is the canonical
-  origin written into canonical, Open Graph and hreflang tags. Set to
-  `https://vallepark.com` on 2026-09-25, so even the railway.app deployment
-  declares the custom domain as canonical (search engines then never index the
-  railway.app URL). `CANONICAL_HOST` (runtime) makes nginx 301 every other
-  hostname (www., the railway.app URL) to that host and upgrade http to https.
-  Leave `CANONICAL_HOST` EMPTY until DNS for vallepark.com points at Railway:
-  set earlier, the railway.app site would redirect visitors to the old site.
-- `api`: `SITE_URL` is the origin used in the sitemap and robots.txt; set to
-  `https://vallepark.com` on 2026-09-25. Unset, it follows the request host.
+  origin written into canonical, Open Graph, hreflang and the Organization
+  JSON-LD. `CANONICAL_HOST` (runtime) makes nginx 301 every other hostname to
+  it and upgrade http to https. Both point at the Railway hostname
+  (`https://web-production-ff60b.up.railway.app`, set 2026-09-25) because that
+  is the live site. If the site ever moves to a custom domain, change both
+  (and `SITE_URL` on `api`) to the new origin, redeploy, and resubmit the
+  sitemap.
+- `api`: `SITE_URL` is the origin used in the sitemap and robots.txt (same
+  Railway hostname). Unset, it follows the request host.
 - `web`: `MAINTENANCE=1` answers every page 503 with `Retry-After` while keeping
   assets and the API up.
 
@@ -475,9 +475,8 @@ prerendered files, so adding an experience to the database needs a web rebuild
 (push to the frontend repo) before its URL stops answering 404. Vacancy pages
 are rendered by the app from the API and need no rebuild.
 
-Go-live checklist for the custom domain: point DNS at Railway and add the
-domain to the `web` service, then set `CANONICAL_HOST=vallepark.com` on `web`,
-then the Search Console steps below. After launch, in Google Search Console: add the
-property for the canonical domain, submit `https://<domain>/sitemap.xml`, and
+Search Console: add a URL-prefix property for the Railway origin (or a Domain
+property if a custom domain is used later) and follow the steps below. In Google Search Console: add the
+property for the canonical origin, submit `<origin>/sitemap.xml`, and
 run URL Inspection on the home page, `/explore`, `/packages` and two or three
 activity pages. A sitemap helps discovery; indexing is Google's decision.
