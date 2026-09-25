@@ -136,7 +136,7 @@ CREATE TABLE menu_items (
 
 CREATE TABLE package_tiers (
   id           serial PRIMARY KEY,
-  family       text NOT NULL CHECK (family IN ('ls','ex')),   -- Light/Standard | Exclusive tiers
+  family       text NOT NULL CHECK (family IN ('ls','ex','diamond','resident','senior')),   -- package families
   name         text NOT NULL,
   badge        text,
   color        text NOT NULL,

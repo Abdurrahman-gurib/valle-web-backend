@@ -7,7 +7,7 @@ export class PackageTier {
 
   /** ls (Light/Standard) | ex (Exclusive tiers) */
   @Column({ name: 'family', type: 'text' })
-  family: 'ls' | 'ex';
+  family: 'ls' | 'ex' | 'diamond' | 'resident' | 'senior';
 
   @Column({ name: 'name', type: 'text' })
   name: string;

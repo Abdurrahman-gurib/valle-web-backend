@@ -364,7 +364,7 @@
       "thrill": 1,
       "dur": "15 MIN",
       "age": "3–12",
-      "price": 350,
+      "price": 200,
       "mode": "pp",
       "img": "/images/pirateship.avif",
       "blurb": "Set sail on gentle thrills: pirate adventures for the smallest buccaneers.",
@@ -387,7 +387,7 @@
       "thrill": 2,
       "dur": "15 MIN",
       "age": "4+ W/ ADULT",
-      "price": 450,
+      "price": 200,
       "mode": "pp",
       "img": "/images/bondingrollercoasterzipline.avif",
       "blurb": "A ride that bonds parents and children: gentle thrills, curves and giggles.",
@@ -410,7 +410,7 @@
       "thrill": 2,
       "dur": "10 MIN",
       "age": "4–12",
-      "price": 450,
+      "price": 200,
       "mode": "pp",
       "img": "/images/rollercoast.avif",
       "blurb": "Twists, turns and laughter aboard the Kids Park’s favourite express.",
@@ -433,8 +433,8 @@
       "thrill": 1,
       "dur": "OPEN PLAY",
       "age": "3–12",
-      "price": 250,
-      "mode": "pp",
+      "price": 0,
+      "mode": "entry",
       "img": "/images/outdoorplayground.avif",
       "blurb": "Climb, slide and explore in an imaginative outdoor adventure space.",
       "gtk": [
@@ -456,7 +456,7 @@
       "thrill": 2,
       "dur": "15 MIN",
       "age": "6–12",
-      "price": 500,
+      "price": 200,
       "mode": "pp",
       "img": "/images/miniquad.avif",
       "blurb": "Young adventurers steer their own quad on a safe, supervised track.",
@@ -479,7 +479,7 @@
       "thrill": 1,
       "dur": "15 MIN",
       "age": "4–12",
-      "price": 400,
+      "price": 200,
       "mode": "pp",
       "img": "/images/miniexcavator.avif",
       "blurb": "Kids dig, scoop and build with their own mini excavator, hands-on play that quietly builds motor skills.",
@@ -988,6 +988,9 @@
             "t": "The Peak"
           },
           {
+            "t": "Waterfall Zipline (300 m, 2 lines)"
+          },
+          {
             "t": "Nepalese Bridge (350 m)"
           },
           {
@@ -1014,6 +1017,9 @@
           },
           {
             "t": "The Peak"
+          },
+          {
+            "t": "The Signature Zipline (1.5 km)"
           },
           {
             "t": "Nepalese Bridge (350 m)"
@@ -1044,6 +1050,9 @@
             "t": "The Peak"
           },
           {
+            "t": "Sky Pulse Tour (3.1 km, 7 lines)"
+          },
+          {
             "t": "Nepalese Bridge"
           },
           {
@@ -1072,6 +1081,9 @@
             "t": "The Peak"
           },
           {
+            "t": "Advenature Flight (5.5 km, 11 lines)"
+          },
+          {
             "t": "Nepalese Bridge"
           },
           {
@@ -1085,7 +1097,7 @@
     ],
     "addons": [
       {
-        "t": "Bicycle Zipline",
+        "t": "Bicycle Zipline (max 100 kg)",
         "p": "S Rs 1,150 · D Rs 2,300"
       },
       {
@@ -1093,16 +1105,20 @@
         "p": "S Rs 10,000 · D Rs 18,000"
       },
       {
-        "t": "Discovery Menu lunch",
-        "p": "Rs 2,300 pp"
+        "t": "Full-day cinematic video",
+        "p": "Rs 20,000"
+      },
+      {
+        "t": "Swing Experience (with dress)",
+        "p": "Rs 3,500"
       },
       {
         "t": "Private guide (zipline & quad)",
-        "p": "Rs 3,500 to 5,000"
+        "p": "Rs 5,000"
       },
       {
-        "t": "Full-day cinematic video",
-        "p": "Rs 20,000"
+        "t": "Discovery Menu lunch",
+        "p": "Rs 2,300 pp"
       }
     ],
     "vip": [
@@ -1135,6 +1151,191 @@
       },
       {
         "t": "Souvenir gift"
+      }
+    ],
+    "diamond": [
+      {
+        "name": "Diamond",
+        "badge": "NR · SOUVENIR GIFT OFFERED",
+        "color": "#7333FF",
+        "fg": "#FFFFFF",
+        "img": "/images/expedition-raptor-ocean.webp",
+        "single": "Rs 120,000",
+        "dbl": "Rs 149,000",
+        "hero": "The whole valley, a hunting expedition and your own film",
+        "note": "Non-resident rate. The double includes two GoPro rentals. A special souvenir gift is offered.",
+        "items": [
+          {
+            "t": "Admission fee"
+          },
+          {
+            "t": "Private guide & transfer + butler service"
+          },
+          {
+            "t": "Exclusive Quad Adventure (1 hour)"
+          },
+          {
+            "t": "Advenature Flight (5.5 km, 11 lines)"
+          },
+          {
+            "t": "Bicycle Zipline (max 100 kg)"
+          },
+          {
+            "t": "Mountain Luge Kart (3 rides)"
+          },
+          {
+            "t": "Nepalese Bridge"
+          },
+          {
+            "t": "Stone-cooking lunch at Le Chamouzé"
+          },
+          {
+            "t": "The Peak"
+          },
+          {
+            "t": "Snacks and beverages in any outlet"
+          },
+          {
+            "t": "GoPro rental (full day) + photo"
+          },
+          {
+            "t": "3-hour hunting expedition"
+          },
+          {
+            "t": "Cinematic video of your complete day"
+          }
+        ]
+      }
+    ],
+    "resident": [
+      {
+        "name": "Ventu Rush",
+        "color": "#33FF74",
+        "fg": "#340057",
+        "img": "/images/luge-family.webp",
+        "single": "Rs 1,700",
+        "dbl": "",
+        "hero": "Three classics in one afternoon",
+        "items": [
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          },
+          {
+            "t": "Nepalese Bridge"
+          },
+          {
+            "t": "Bicycle Zipline"
+          }
+        ]
+      },
+      {
+        "name": "Triple Thrill",
+        "color": "#FFFC33",
+        "fg": "#340057",
+        "img": "/images/zipline-waterfall.webp",
+        "single": "Rs 2,025",
+        "dbl": "",
+        "hero": "Add the waterfall crossing",
+        "items": [
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          },
+          {
+            "t": "Nepalese Bridge OR Bicycle Zipline"
+          },
+          {
+            "t": "Waterfall Zipline (300 m, 2 lines)"
+          }
+        ]
+      },
+      {
+        "name": "Adventure Lust",
+        "color": "#FF3358",
+        "fg": "#FFFFFF",
+        "img": "/images/zipline-superman.webp",
+        "single": "Rs 2,725",
+        "dbl": "",
+        "hero": "The Signature, 1.5 km across the valley",
+        "items": [
+          {
+            "t": "Signature Zipline (1.5 km)"
+          },
+          {
+            "t": "Nepalese Bridge OR Bicycle Zipline"
+          },
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          }
+        ]
+      },
+      {
+        "name": "Elysian Escape",
+        "color": "#7333FF",
+        "fg": "#FFFFFF",
+        "img": "/images/zipline-duo.webp",
+        "single": "Rs 3,950",
+        "dbl": "",
+        "hero": "Seven lines plus every suspended thrill",
+        "items": [
+          {
+            "t": "The Discovery Tour (1.6 km, 7 lines)"
+          },
+          {
+            "t": "Nepalese Bridge"
+          },
+          {
+            "t": "Bicycle Zipline"
+          },
+          {
+            "t": "Mountain Luge Kart (1 ride)"
+          }
+        ]
+      }
+    ],
+    "senior": [
+      {
+        "name": "Package 1",
+        "badge": "AGES 55 AND ABOVE",
+        "color": "#33FF74",
+        "fg": "#340057",
+        "img": "/images/trail-tortoise.webp",
+        "single": "Rs 1,100",
+        "dbl": "",
+        "hero": "A gentle day in the valley",
+        "note": "Lunch: rice, fish curry, chicken blanquette with vegetables, salad, ice cream, water and soft drinks. Veg options available.",
+        "items": [
+          {
+            "t": "Entrance visit"
+          },
+          {
+            "t": "Lunch"
+          },
+          {
+            "t": "Tea break"
+          }
+        ]
+      },
+      {
+        "name": "Package 2",
+        "badge": "AGES 55 AND ABOVE",
+        "color": "#FFFC33",
+        "fg": "#340057",
+        "img": "/images/expedition-guide-guests.webp",
+        "single": "Rs 1,500",
+        "dbl": "",
+        "hero": "See it all by jeep",
+        "note": "Same lunch menu as Package 1. Veg options available.",
+        "items": [
+          {
+            "t": "Visit by jeep (45 min)"
+          },
+          {
+            "t": "Lunch"
+          },
+          {
+            "t": "Tea break"
+          }
+        ]
       }
     ]
   },
@@ -1514,6 +1715,26 @@
     "group": [
       1100,
       1350
+    ],
+    "pirate": [
+      200,
+      300
+    ],
+    "bonding": [
+      200,
+      300
+    ],
+    "coaster": [
+      200,
+      300
+    ],
+    "miniquad": [
+      200,
+      300
+    ],
+    "miniexc": [
+      200,
+      300
     ]
   },
   "PL": {
@@ -1705,6 +1926,105 @@
         "n": "Group Expedition · per person, min 5 pax",
         "rr": 1100,
         "nr": 1350
+      }
+    ],
+    "student": [
+      {
+        "n": "Entrance fee · visit of the park",
+        "rr": 200,
+        "nr": 200
+      },
+      {
+        "n": "Nepalese Bridge · 350 m",
+        "rr": 375,
+        "nr": 375
+      },
+      {
+        "n": "Mountain Luge Kart · 1 ride",
+        "rr": 325,
+        "nr": 325
+      },
+      {
+        "n": "Mountain Luge Kart · 2 rides",
+        "rr": 475,
+        "nr": 475
+      },
+      {
+        "n": "Mountain Luge Kart · 3 rides",
+        "rr": 750,
+        "nr": 750
+      },
+      {
+        "n": "Smallest Zipline · 190 m, min 20 pax",
+        "rr": 200,
+        "nr": 200
+      },
+      {
+        "n": "The Plunge · 500 m",
+        "rr": 500,
+        "nr": 500
+      },
+      {
+        "n": "The Waterfall Zipline",
+        "rr": 550,
+        "nr": 550
+      },
+      {
+        "n": "Signature Zipline · 1.5 km",
+        "rr": 800,
+        "nr": 800
+      },
+      {
+        "n": "The Discovery Tour Zipline · 1.6 km, 7 lines",
+        "rr": 1000,
+        "nr": 1000
+      },
+      {
+        "n": "Sky Pulse Tour · 3.1 km, 7 lines",
+        "rr": 2000,
+        "nr": 2000
+      },
+      {
+        "n": "Bicycle Zipline",
+        "rr": 350,
+        "nr": 350
+      },
+      {
+        "n": "Lunch menu · 4 to 11 yrs",
+        "rr": 250,
+        "nr": 250
+      },
+      {
+        "n": "Lunch menu · 12 yrs and over",
+        "rr": 300,
+        "nr": 300
+      }
+    ],
+    "kids": [
+      {
+        "n": "Mini Quad",
+        "rr": 200,
+        "nr": 300
+      },
+      {
+        "n": "Roller Coaster Zipline",
+        "rr": 200,
+        "nr": 300
+      },
+      {
+        "n": "Roller Coaster Express",
+        "rr": 200,
+        "nr": 300
+      },
+      {
+        "n": "Mini Excavator",
+        "rr": 200,
+        "nr": 300
+      },
+      {
+        "n": "Pirate Ship",
+        "rr": 200,
+        "nr": 300
       }
     ]
   },

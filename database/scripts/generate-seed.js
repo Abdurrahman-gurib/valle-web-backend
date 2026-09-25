@@ -197,7 +197,7 @@ insert('map_pins',
   const itemRows = [];
   let tierId = 0;
 
-  for (const family of ['ls', 'ex']) {
+  for (const family of ['ls', 'ex', 'diamond', 'resident', 'senior']) {
     (data.PACKS[family] || []).forEach((t, i) => {
       tierId += 1;
       tierRows.push([

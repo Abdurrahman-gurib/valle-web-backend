@@ -101,8 +101,16 @@ export function computeBooking(
   const byId = new Map(experiences.map((e) => [e.id, e]));
   const lineKey = (item: PricingItem) => item.id + '::' + (item.variant || '');
 
-  const entry =
-    settings.entryAdult * input.adults + settings.entryChild * input.kids;
+  // Park entry follows the printed admission rows when they exist (RR 400/275, NR 550/325);
+  // the flat settings values are only a fallback for a database without them.
+  const admission = (needle: string) =>
+    priceRows.find((r) => r.groupKey === 'admission' && r.label.toLowerCase().includes(needle));
+  const adultRow = admission('12 years');
+  const childRow = admission('6 to 11');
+  const entryAdult = adultRow ? (input.rate === 'nr' ? adultRow.nr : adultRow.rr) : settings.entryAdult;
+  const entryChild = childRow ? (input.rate === 'nr' ? childRow.nr : childRow.rr) : settings.entryChild;
+
+  const entry = entryAdult * input.adults + entryChild * input.kids;
   const lines: PricedLine[] = [
     {
       experienceId: null,

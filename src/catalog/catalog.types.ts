@@ -88,6 +88,9 @@ export interface PackTierDto {
 export interface PacksDto {
   ls: PackTierDto[];
   ex: PackTierDto[];
+  diamond: PackTierDto[];
+  resident: PackTierDto[];
+  senior: PackTierDto[];
   addons: { t: string; p: string }[];
   vip: PackItemDto[];
 }

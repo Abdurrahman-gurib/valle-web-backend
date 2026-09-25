@@ -249,6 +249,9 @@ export class CatalogService {
     const PACKS: CatalogDto['PACKS'] = {
       ls: packageTiers.filter((t) => t.family === 'ls').map(mapTier),
       ex: packageTiers.filter((t) => t.family === 'ex').map(mapTier),
+      diamond: packageTiers.filter((t) => t.family === 'diamond').map(mapTier),
+      resident: packageTiers.filter((t) => t.family === 'resident').map(mapTier),
+      senior: packageTiers.filter((t) => t.family === 'senior').map(mapTier),
       addons: packageAddons.map((a) => ({ t: a.text, p: a.priceLabel })),
       vip: vipItems.map((v) => ({ t: v.text })),
     };

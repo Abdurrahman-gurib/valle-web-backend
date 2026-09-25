@@ -304,6 +304,18 @@ describe('computeBooking', () => {
     ).toThrow(BadRequestException);
   });
 
+  it('prices park entry from the admission rows at the chosen rate', () => {
+    const rows = [
+      ...ROWS,
+      { groupKey: 'admission', label: '12 years old & above', rr: 400, nr: 550 },
+      { groupKey: 'admission', label: '6 to 11 years old', rr: 275, nr: 325 },
+    ];
+    expect(computeBooking(EXPS, SETTINGS, input([], { adults: 2, kids: 1, rate: 'rr' }), rows).entry).toBe(400 * 2 + 275);
+    expect(computeBooking(EXPS, SETTINGS, input([], { adults: 2, kids: 1, rate: 'nr' }), rows).entry).toBe(550 * 2 + 325);
+    // without admission rows the settings still apply
+    expect(computeBooking(EXPS, SETTINGS, input([], { adults: 2, kids: 1 })).entry).toBe(500 * 2 + 250);
+  });
+
   it('rejects unknown experience ids', () => {
     expect(() =>
       computeBooking(EXPS, SETTINGS, input([{ id: 'nope', adults: 1 }])),
