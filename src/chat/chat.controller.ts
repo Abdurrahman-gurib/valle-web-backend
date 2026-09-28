@@ -176,7 +176,7 @@ export class StaffChatController {
   async conversations(
     @Query() query: StaffConversationsQueryDto,
   ): Promise<{ items: ConversationSummary[] }> {
-    return { items: await this.chat.listConversations(query.status) };
+    return { items: await this.chat.listConversations(query.status, query.q) };
   }
 
   @Get('conversations/:conversationId/messages')

@@ -110,6 +110,14 @@ export class StaffConversationsQueryDto {
   @IsOptional()
   @IsIn(['open', 'closed'])
   status?: 'open' | 'closed';
+
+  @ApiPropertyOptional({ description: 'Case-insensitive match on the visitor name, e-mail, subject or any message', maxLength: 120 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @IsSafeText()
+  @MaxLength(120)
+  q?: string;
 }
 
 export class PostStaffMessageDto {

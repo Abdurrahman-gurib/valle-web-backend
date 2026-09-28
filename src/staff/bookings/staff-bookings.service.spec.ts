@@ -61,6 +61,9 @@ class FakeQueryBuilder {
     this.takeCall = n;
     return this;
   }
+  addSelect(): this {
+    return this;
+  }
   select(expr: string, alias: string): this {
     this.selectCall = [expr, alias];
     return this;
@@ -770,14 +773,15 @@ describe('UpdateBookingDto', () => {
 });
 
 describe('StaffBookingsService.stats', () => {
-  it('returns the four dashboard counters', async () => {
+  it('returns the dashboard counters', async () => {
     const booking = makeRepo<Booking>([
       new FakeQueryBuilder({ count: 4 }), // bookingsToday
       new FakeQueryBuilder({ count: 7 }), // arrivalsToday
       new FakeQueryBuilder({ raw: { sum: '128500' } }), // revenueMonth
+      new FakeQueryBuilder({ raw: { sum: '9800', guests: '21' } }), // today's visits
     ]);
     const chat = makeRepo<ChatConversation>();
-    chat.count.mockResolvedValue(2);
+    chat.count.mockResolvedValueOnce(2).mockResolvedValueOnce(1);
 
     const stats = await build({ booking, chat }).stats();
 
@@ -785,6 +789,9 @@ describe('StaffBookingsService.stats', () => {
       bookingsToday: 4,
       arrivalsToday: 7,
       openChats: 2,
+      unansweredChats: 1,
+      guestsToday: 21,
+      revenueToday: 9800,
       revenueMonth: 128500,
     });
     expect(chat.count).toHaveBeenCalledWith({ where: { status: 'open' } });
@@ -796,6 +803,7 @@ describe('StaffBookingsService.stats', () => {
       new FakeQueryBuilder({ count: 0 }),
       arrivals,
       new FakeQueryBuilder({ raw: { sum: null } }),
+      new FakeQueryBuilder({ raw: { sum: null, guests: null } }),
     ]);
     const chat = makeRepo<ChatConversation>();
     chat.count.mockResolvedValue(0);

@@ -336,6 +336,7 @@ export class ChatService {
    */
   async listConversations(
     status?: ConversationStatus,
+    q?: string,
   ): Promise<ConversationSummary[]> {
     const qb = this.convRepo
       .createQueryBuilder('c')
@@ -350,7 +351,16 @@ export class ChatService {
         'lastMessage',
       )
       .orderBy('c.lastMessageAt', 'DESC');
-    if (status) qb.where('c.status = :status', { status });
+    if (status) qb.andWhere('c.status = :status', { status });
+    const term = q?.trim();
+    if (term) {
+      // One bound parameter, wildcards added here; message bodies through an
+      // EXISTS so a match anywhere in the thread surfaces the conversation.
+      qb.andWhere(
+        '(c.visitorName ILIKE :q OR c.visitorEmail ILIKE :q OR c.subject ILIKE :q OR EXISTS (SELECT 1 FROM chat_messages m2 WHERE m2.conversation_id = c.id AND m2.body ILIKE :q))',
+        { q: `%${term}%` },
+      );
+    }
 
     // No joins, so raw rows line up one-for-one with the hydrated entities.
     const { entities, raw } = await qb.getRawAndEntities<{

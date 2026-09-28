@@ -11,6 +11,7 @@ import {
   Not,
   Repository,
   SelectQueryBuilder,
+  MoreThan,
 } from 'typeorm';
 import { computeBooking, PricedBooking } from '../../bookings/pricing';
 import {
@@ -101,6 +102,12 @@ export interface StaffStats {
   /** Bookings due on site today (visit_date), cancellations excluded. */
   arrivalsToday: number;
   openChats: number;
+  /** Open conversations with a visitor message nobody has answered yet. */
+  unansweredChats: number;
+  /** Guests (adults + children) due on site today, cancellations excluded. */
+  guestsToday: number;
+  /** SUM(total) of today's visits, cancellations excluded. */
+  revenueToday: number;
   /** SUM(total) of bookings created this calendar month, cancellations excluded. */
   revenueMonth: number;
 }
@@ -440,11 +447,24 @@ export class StaffBookingsService {
 
         this.chatRepo.count({ where: { status: 'open' } }),
       ]);
+    const [todayRaw, unansweredChats] = await Promise.all([
+      this.bookingRepo
+        .createQueryBuilder('b')
+        .where('b.visitDate = :today', { today })
+        .andWhere('b.status <> :cancelled', { cancelled: 'cancelled' })
+        .select('COALESCE(SUM(b.total), 0)', 'sum')
+        .addSelect('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
+        .getRawOne<{ sum: string | number | null; guests: string | number | null }>(),
+      this.chatRepo.count({ where: { status: 'open', unreadStaff: MoreThan(0) } }),
+    ]);
 
     return {
       bookingsToday,
       arrivalsToday,
       openChats,
+      unansweredChats,
+      guestsToday: Number(todayRaw?.guests ?? 0),
+      revenueToday: Number(todayRaw?.sum ?? 0),
       revenueMonth: Number(revenueRaw?.sum ?? 0),
     };
   }
