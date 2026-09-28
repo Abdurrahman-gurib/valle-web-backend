@@ -577,7 +577,7 @@ function toIso(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-function toBookingRow(b: Booking): BookingRow {
+export function toBookingRow(b: Booking): BookingRow {
   return {
     id: b.id,
     refCode: b.refCode,

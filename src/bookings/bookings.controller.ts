@@ -1,7 +1,8 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { BookingsService, BookingResponse } from './bookings.service';
+import { AvailabilityDay, BookingsService, BookingResponse } from './bookings.service';
+import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
 /**
@@ -14,13 +15,24 @@ import { CreateBookingDto } from './dto/create-booking.dto';
  * are only 9000 per year. Households behind one NAT share this budget, which
  * is the trade-off we accept for having no account to key on.
  */
-const BOOKING_LIMIT = 10;
+// BOOKING_RATE_LIMIT overrides the ceiling; only the local docker compose stack
+// does, so the e2e suite (three viewports booking in parallel from one IP) is
+// not throttled. Production keeps the default.
+const BOOKING_LIMIT = Number(process.env.BOOKING_RATE_LIMIT) > 0 ? Number(process.env.BOOKING_RATE_LIMIT) : 10;
 const BOOKING_TTL_MS = 600_000;
 
 @ApiTags('bookings')
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
+
+  @Get('availability')
+  @ApiOperation({ summary: 'How busy each arrival slot is (quiet / busy / very-busy / full) for the date picker' })
+  @Header('Cache-Control', 'public, max-age=120')
+  availability(@Query() q: AvailabilityQueryDto): Promise<AvailabilityDay[]> {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Indian/Mauritius' });
+    return this.bookingsService.availability(q.from ?? today, q.days ?? 14);
+  }
 
   @Post()
   // Public write: capped per IP so nobody can fill the reservations table

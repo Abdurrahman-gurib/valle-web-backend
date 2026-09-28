@@ -13,6 +13,8 @@ import { HealthModule } from './health/health.module';
 import { HrModule } from './hr/hr.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SeoModule } from './seo/seo.module';
+import { FxModule } from './fx/fx.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
@@ -55,6 +57,8 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     HrModule,
     // sitemap.xml + robots.txt (nginx proxies the root paths here).
     SeoModule,
+    FxModule,
+    NotificationsModule,
   ],
   providers: [
     // Reports unhandled (5xx) exceptions to Sentry; expected HttpExceptions are not noise.

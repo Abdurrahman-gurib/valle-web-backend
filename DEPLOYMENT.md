@@ -119,6 +119,19 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `STAFF_COOKIE_NAME` | `valle_staff`                            |                                                                       |
 | `CORS_ORIGIN`       | `https://${{web.RAILWAY_PUBLIC_DOMAIN}}` | Exact https origin(s), comma separated; add a custom domain here too   |
 | `TRUST_PROXY`       | `true`                                   | One hop: the nginx container                                           |
+| `SITE_URL`          | public origin                            | Named in the sitemap and robots.txt (see Search engines below)         |
+| `SMTP_URL`          | `smtps://user:pass@host:465`             | Optional. New-booking e-mails to the desk; unset = no e-mail (the dashboard is still told live over the staff socket) |
+| `BOOKING_NOTIFY_TO` | `sales@vallepark.com`                    | Optional, default shown. Comma-separated recipients of the new-booking e-mail |
+| `MAIL_FROM`         | `VALLÉ bookings <no-reply@vallepark.com>`| Optional, default shown. Must be a sender the SMTP account may use     |
+| `BOOKING_RATE_LIMIT` | `10`                                     | Optional, default shown. Bookings per IP per 10 minutes; the compose stack raises it for the e2e suite. Leave unset in production |
+| `BOOKING_SLOT_CAPACITY` | `150`                                | Optional, default shown. Guests per arrival slot behind the quiet / busy / very busy / full dots on the booking date picker (35 %, 70 %, 100 %) |
+
+New bookings reach the back office three ways: the row is written to Postgres,
+every open `/staff` tab receives it over the staff websocket (toast, banner and
+a new row without a reload), and, when `SMTP_URL` is set, the desk gets an
+e-mail. Exchange rates for the currency picker come from the Bank of Mauritius
+consolidated indicative page (`/api/fx`, refreshed every 6 hours, bundled
+snapshot as fallback); no variable is needed.
 
 The API refuses to start in production when `JWT_SECRET` is missing or short, when
 `CORS_ORIGIN` is empty, contains `*` or uses `http://`, when `DB_PASSWORD` or

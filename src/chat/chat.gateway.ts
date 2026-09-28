@@ -269,6 +269,15 @@ export class ChatGateway {
     });
   }
 
+  /**
+   * A guest just booked on the website: every open back-office tab gets the row
+   * so the list, the stats strip and a toast update without a reload.
+   */
+  async announceBooking(booking: unknown): Promise<void> {
+    if (!this.server) return; // no websocket server (unit tests)
+    await this.emitToStaff('booking:new', { booking });
+  }
+
   /** Fan-out for a status change (e.g. a conversation closed over REST). */
   async announceConversation(conversation: ChatConversation): Promise<void> {
     if (!this.server) return;

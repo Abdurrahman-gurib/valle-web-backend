@@ -2,10 +2,16 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
+  Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
+import { ChatGateway } from '../chat/chat.gateway';
 import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../entities';
+import { BookingNotifierService } from '../notifications/booking-notifier.service';
+import { toBookingRow } from '../staff/bookings/staff-bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { computeBooking, PricedBooking } from './pricing';
 
@@ -19,6 +25,30 @@ export interface BookingResponse {
 
 const REF_MAX_TRIES = 20;
 const PG_UNIQUE_VIOLATION = '23505';
+
+/** How busy an arrival slot is, for the date picker. */
+export type BusyLevel = 'quiet' | 'busy' | 'very-busy' | 'full';
+export interface SlotLoad { bookings: number; guests: number; level: BusyLevel }
+export interface AvailabilityDay { date: string; morning: SlotLoad; afternoon: SlotLoad }
+
+/** Guests one arrival slot comfortably takes; BOOKING_SLOT_CAPACITY overrides. */
+const DEFAULT_SLOT_CAPACITY = 150;
+export const AVAILABILITY_MAX_DAYS = 62;
+
+export function busyLevel(guests: number, capacity: number): BusyLevel {
+  const share = guests / capacity;
+  if (share >= 1) return 'full';
+  if (share >= 0.7) return 'very-busy';
+  if (share >= 0.35) return 'busy';
+  return 'quiet';
+}
+
+const addDays = (iso: string, n: number): string => {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const dateOf = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 
 @Injectable()
 export class BookingsService {
@@ -34,7 +64,62 @@ export class BookingsService {
     private readonly priceRepo: Repository<PriceListEntry>,
     @InjectRepository(Setting)
     private readonly settingRepo: Repository<Setting>,
-  ) {}
+    @Optional() private readonly notifier?: BookingNotifierService,
+    @Optional() private readonly gateway?: ChatGateway,
+    @Optional() config?: ConfigService,
+  ) {
+    const cap = Number(config?.get<string>('BOOKING_SLOT_CAPACITY') ?? '');
+    this.slotCapacity = Number.isFinite(cap) && cap > 0 ? cap : DEFAULT_SLOT_CAPACITY;
+  }
+
+  private readonly logger = new Logger(BookingsService.name);
+  private readonly slotCapacity: number;
+
+  /**
+   * Bookings per arrival slot for the date picker: how many parties and guests
+   * already hold each morning / afternoon, as a level rather than raw counts
+   * that the public could read too much into. Cancelled bookings do not count.
+   */
+  async availability(from: string, days: number): Promise<AvailabilityDay[]> {
+    const n = Math.min(Math.max(1, days), AVAILABILITY_MAX_DAYS);
+    const to = addDays(from, n - 1);
+    const rows = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.visitDate', 'date')
+      .addSelect('b.slot', 'slot')
+      .addSelect('COUNT(*)', 'bookings')
+      .addSelect('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
+      .where('b.visitDate BETWEEN :from AND :to', { from, to })
+      .andWhere('b.status <> :cancelled', { cancelled: 'cancelled' })
+      .groupBy('b.visitDate')
+      .addGroupBy('b.slot')
+      .getRawMany<{ date: unknown; slot: string; bookings: string; guests: string }>();
+
+    const byDate = new Map<string, AvailabilityDay>();
+    const empty = (): SlotLoad => ({ bookings: 0, guests: 0, level: 'quiet' });
+    for (let i = 0; i < n; i++) {
+      const date = addDays(from, i);
+      byDate.set(date, { date, morning: empty(), afternoon: empty() });
+    }
+    for (const r of rows) {
+      const day = byDate.get(dateOf(r.date));
+      if (!day || (r.slot !== 'morning' && r.slot !== 'afternoon')) continue;
+      const guests = Number(r.guests) || 0;
+      day[r.slot] = { bookings: Number(r.bookings) || 0, guests, level: busyLevel(guests, this.slotCapacity) };
+    }
+    return [...byDate.values()];
+  }
+
+  /** Tells the back office about a new booking: live socket first, then e-mail. Never throws. */
+  private async notifyStaff(booking: Booking, lines: BookingLine[]): Promise<void> {
+    this.logger.log(`Booking ${booking.refCode}: announcing to the staff room (gateway ${this.gateway ? 'wired' : 'absent'}, mail ${this.notifier?.enabled ? 'on' : 'off'})`);
+    try {
+      await this.gateway?.announceBooking(toBookingRow(booking));
+    } catch (e) {
+      this.logger.warn(`Live booking notice for ${booking.refCode} failed: ${(e as Error).message}`);
+    }
+    await this.notifier?.notifyNewBooking(booking, lines);
+  }
 
   async create(dto: CreateBookingDto): Promise<BookingResponse> {
     const email = (dto.email ?? '').trim();
@@ -99,7 +184,7 @@ export class BookingsService {
     phone: string,
     visitDate: string,
   ): Promise<BookingResponse> {
-    return this.dataSource.transaction(async (manager) => {
+    const { saved, lines } = await this.dataSource.transaction(async (manager) => {
       const booking = manager.create(Booking, {
         refCode,
         visitDate,
@@ -135,15 +220,19 @@ export class BookingsService {
         }),
       );
       await manager.save(lines);
-
-      return {
-        refCode: saved.refCode,
-        total: saved.total,
-        discount: saved.discount,
-        lines: priced.lines.map((l) => ({ label: l.label, amount: l.amount })),
-        status: saved.status,
-      };
+      return { saved, lines };
     });
+
+    // After the commit, so the desk is never told about a booking that rolled back.
+    void this.notifyStaff(saved, lines);
+
+    return {
+      refCode: saved.refCode,
+      total: saved.total,
+      discount: saved.discount,
+      lines: priced.lines.map((l) => ({ label: l.label, amount: l.amount })),
+      status: saved.status,
+    };
   }
 
   /** 'VAL-' + 4 random digits (1000..9999) + '-26' */
