@@ -32,6 +32,8 @@ import {
   PageQueryDto,
 } from './dto/list-bookings.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
+import { CreateStaffBookingDto } from './dto/create-staff-booking.dto';
+import { BookingsService } from '../../bookings/bookings.service';
 
 /** The park's wall clock: "today" is whatever day it is on site, not on the server. */
 const PARK_TZ = 'Indian/Mauritius';
@@ -42,29 +44,8 @@ const MONEY_FIELDS = ['adults', 'kids', 'rate'] as const;
 /** How many audit entries the drawer shows. */
 const AUDIT_LIMIT = 20;
 
-export interface BookingRow {
-  id: string;
-  refCode: string;
-  /** YYYY-MM-DD */
-  visitDate: string;
-  slot: string;
-  adults: number;
-  kids: number;
-  rate: string;
-  guestName: string;
-  email: string;
-  phone: string;
-  nationality: string;
-  payMode: string;
-  status: string;
-  entryAmount: number;
-  subtotal: number;
-  discount: number;
-  total: number;
-  currency: string;
-  /** ISO 8601 */
-  createdAt: string;
-}
+export { toBookingRow, type BookingRow } from './booking-row';
+import { toBookingRow, toDateString, toIso, type BookingRow } from './booking-row';
 
 export interface BookingLineRow {
   label: string;
@@ -156,6 +137,7 @@ export class StaffBookingsService {
     private readonly quoteRepo: Repository<Quote>,
     @InjectRepository(ChatConversation)
     private readonly chatRepo: Repository<ChatConversation>,
+    private readonly bookings: BookingsService,
   ) {}
 
   // ----------------------------------------------------------------- bookings
@@ -173,6 +155,10 @@ export class StaffBookingsService {
     if (query.to) {
       qb.andWhere('b.visitDate <= :to', { to: query.to });
     }
+    if (query.slot) qb.andWhere('b.slot = :slot', { slot: query.slot });
+    if (query.payMode) qb.andWhere('b.payMode = :payMode', { payMode: query.payMode });
+    if (query.rate) qb.andWhere('b.rate = :rate', { rate: query.rate });
+    if (query.nationality) qb.andWhere('b.nationality = :nationality', { nationality: query.nationality });
     const term = query.q?.trim();
     if (term) {
       // One bound parameter reused across the four columns; the wildcards are
@@ -183,13 +169,46 @@ export class StaffBookingsService {
       );
     }
 
+    const order: Record<string, [string, 'ASC' | 'DESC']> = {
+      newest: ['b.createdAt', 'DESC'], oldest: ['b.createdAt', 'ASC'], visit_asc: ['b.visitDate', 'ASC'],
+      visit_desc: ['b.visitDate', 'DESC'], total_desc: ['b.total', 'DESC'], total_asc: ['b.total', 'ASC'], guest: ['b.guestName', 'ASC'],
+    };
+    const [col, dir] = order[query.sort ?? 'newest'] ?? order.newest;
     const [rows, total] = await qb
-      .orderBy('b.createdAt', 'DESC')
+      .orderBy(col, dir)
+      .addOrderBy('b.createdAt', 'DESC')
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount();
 
     return { items: rows.map(toBookingRow), total, page, pageSize };
+  }
+
+  /**
+   * A booking taken by an operator (phone, front desk, e-mail, WhatsApp). Priced
+   * and validated exactly like a website booking, then stamped with who took it
+   * and through which channel, so the trail starts with a 'create' entry.
+   */
+  async createForGuest(dto: CreateStaffBookingDto, staff: StaffPrincipal): Promise<BookingDetail> {
+    const { channel, note, ...bookingDto } = dto;
+    const created = await this.bookings.create(bookingDto);
+    const booking = await this.bookingRepo.findOne({ where: { refCode: created.refCode } });
+    if (!booking) throw new NotFoundException(`No booking ${created.refCode}`);
+    const stamp = `Taken by ${staff.name} (${channel})`;
+    booking.staffNote = [stamp, (note ?? '').trim()].filter(Boolean).join('\n');
+    booking.updatedAt = new Date();
+    booking.updatedBy = staff.id;
+    await this.bookingRepo.save(booking);
+    await this.auditRepo.save(
+      this.auditRepo.create({
+        bookingId: booking.id,
+        staffId: staff.id,
+        staffEmail: staff.email,
+        action: 'create',
+        changes: { channel: { from: null, to: channel } },
+      }),
+    );
+    return this.detail(booking.refCode);
   }
 
   async detail(refCode: string): Promise<BookingDetail> {
@@ -567,39 +586,8 @@ function auditAction(changed: PatchField[]): BookingAuditAction {
 }
 
 /** `date` columns arrive as strings; tolerate a Date in case a driver parses them. */
-function toDateString(value: string | Date): string {
-  return value instanceof Date
-    ? value.toLocaleDateString('en-CA')
-    : String(value).slice(0, 10);
-}
 
-function toIso(value: string | Date): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
 
-export function toBookingRow(b: Booking): BookingRow {
-  return {
-    id: b.id,
-    refCode: b.refCode,
-    visitDate: toDateString(b.visitDate),
-    slot: b.slot,
-    adults: b.adults,
-    kids: b.kids,
-    rate: b.rate,
-    guestName: b.guestName,
-    email: b.email,
-    phone: b.phone,
-    nationality: b.nationality,
-    payMode: b.payMode,
-    status: b.status,
-    entryAmount: b.entryAmount,
-    subtotal: b.subtotal,
-    discount: b.discount,
-    total: b.total,
-    currency: b.currency,
-    createdAt: toIso(b.createdAt),
-  };
-}
 
 function toBookingDetail(
   booking: Booking,

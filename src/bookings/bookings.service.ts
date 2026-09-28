@@ -11,7 +11,7 @@ import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { ChatGateway } from '../chat/chat.gateway';
 import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../entities';
 import { BookingNotifierService } from '../notifications/booking-notifier.service';
-import { toBookingRow } from '../staff/bookings/staff-bookings.service';
+import { toBookingRow } from '../staff/bookings/booking-row';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { computeBooking, PricedBooking } from './pricing';
 

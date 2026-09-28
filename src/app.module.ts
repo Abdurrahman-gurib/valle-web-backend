@@ -14,6 +14,7 @@ import { HrModule } from './hr/hr.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SeoModule } from './seo/seo.module';
 import { FxModule } from './fx/fx.module';
+import { ReportsModule } from './staff/reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
@@ -58,6 +59,7 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     // sitemap.xml + robots.txt (nginx proxies the root paths here).
     SeoModule,
     FxModule,
+    ReportsModule,
     NotificationsModule,
   ],
   providers: [

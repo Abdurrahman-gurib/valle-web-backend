@@ -378,6 +378,21 @@ CREATE TABLE chat_messages (
 );
 CREATE INDEX idx_chat_msg_conv ON chat_messages(conversation_id, created_at);
 
+-- Files sent in chat (photos, GIFs, voice notes, documents), bytes in Postgres.
+CREATE TABLE chat_attachments (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id      uuid NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+  conversation_id uuid NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+  kind            text NOT NULL CHECK (kind IN ('image','gif','audio','file')),
+  name            text NOT NULL,
+  mime            text NOT NULL,
+  size            int  NOT NULL,
+  data            bytea NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_chat_att_message ON chat_attachments(message_id);
+CREATE INDEX idx_chat_att_conv    ON chat_attachments(conversation_id);
+
 -- ---------- careers ----------
 -- Public site lists `published` vacancies at /vacancies; HR manages them at /hr.
 

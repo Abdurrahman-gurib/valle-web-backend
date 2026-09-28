@@ -85,6 +85,26 @@ export class PostVisitorMessageDto {
   body: string;
 }
 
+/** Multipart fields that travel with an uploaded file. */
+export class VisitorAttachmentDto {
+  @Matches(VISITOR_KEY_PATTERN)
+  visitorKey: string;
+
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(MESSAGE_MAX_LENGTH)
+  caption?: string;
+}
+
+export class StaffAttachmentDto {
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(MESSAGE_MAX_LENGTH)
+  caption?: string;
+}
+
 export class StaffConversationsQueryDto {
   @ApiPropertyOptional({ enum: ['open', 'closed'] })
   @IsOptional()

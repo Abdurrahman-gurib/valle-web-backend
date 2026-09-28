@@ -6,7 +6,7 @@ import {
 } from 'typeorm';
 
 /** What kind of edit an audit row records (mirrors the schema.sql comment). */
-export type BookingAuditAction = 'edit' | 'status' | 'note';
+export type BookingAuditAction = 'edit' | 'status' | 'note' | 'create';
 
 /** Audited values are scalars only, so the trail stays readable as JSON. */
 export type BookingAuditValue = string | number | null;

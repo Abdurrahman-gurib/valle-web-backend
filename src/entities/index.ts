@@ -35,5 +35,6 @@ export { Quote } from './quote.entity';
 export { StaffUser } from './staff-user.entity';
 export { ChatConversation } from './chat-conversation.entity';
 export { ChatMessage } from './chat-message.entity';
+export { ChatAttachment } from './chat-attachment.entity';
 export { JobVacancy } from './job-vacancy.entity';
 export { JobApplication } from './job-application.entity';

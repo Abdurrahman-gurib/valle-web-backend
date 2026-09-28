@@ -9,7 +9,10 @@ import {
   Post,
   Query,
   UseGuards,
+  Header,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentStaff } from '../staff/auth/current-staff.decorator';
 import { Roles, RolesGuard } from '../staff/auth/roles.guard';
@@ -87,6 +90,15 @@ export class HrController {
   }
 
   // ------------------------------------------------------------- applications
+
+  @Get('applications/export.csv')
+  @ApiOperation({ summary: 'CSV of the applications matching the same filters as the list' })
+  @Header('Cache-Control', 'no-store')
+  async exportApplications(@Query() query: ListApplicationsQueryDto, @Res() res: Response): Promise<void> {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="applications.csv"');
+    res.send(await this.hr.exportApplications(query));
+  }
 
   @Get('applications')
   @ApiOperation({ summary: 'Applications, newest first, filtered and paged' })

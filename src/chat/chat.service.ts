@@ -1,12 +1,23 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { ChatConversation, ChatMessage, StaffUser } from '../entities';
+import { ChatAttachment, ChatConversation, ChatMessage, StaffUser } from '../entities';
+import type { ChatAttachmentKind } from '../entities/chat-attachment.entity';
 import type { ChatSender } from '../entities/chat-message.entity';
+
+/** Contract shape: one file on a message. The bytes come from the attachment routes. */
+export interface MsgAttachment {
+  id: string;
+  kind: ChatAttachmentKind;
+  name: string;
+  mime: string;
+  size: number;
+}
 
 /** Contract shape: one chat message as the frontend consumes it. */
 export interface Msg {
@@ -16,6 +27,32 @@ export interface Msg {
   staffName?: string;
   body: string;
   createdAt: string;
+  attachments?: MsgAttachment[];
+}
+
+/** What can be sent in chat, and how big. Anything else is refused with a 400. */
+export const ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+export const ATTACHMENT_MIMES: Record<string, ChatAttachmentKind> = {
+  'image/jpeg': 'image', 'image/png': 'image', 'image/webp': 'image', 'image/heic': 'image', 'image/gif': 'gif',
+  'audio/webm': 'audio', 'audio/ogg': 'audio', 'audio/mpeg': 'audio', 'audio/mp4': 'audio', 'audio/x-m4a': 'audio', 'audio/wav': 'audio', 'audio/aac': 'audio',
+  'application/pdf': 'file', 'text/plain': 'file', 'text/csv': 'file',
+  'application/msword': 'file', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'file',
+  'application/vnd.ms-excel': 'file', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'file',
+  'application/vnd.ms-powerpoint': 'file', 'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'file',
+};
+export interface UploadedChatFile { originalname: string; mimetype: string; size: number; buffer: Buffer }
+
+/** The browser sets a codec-suffixed type for recordings ("audio/webm;codecs=opus"). */
+export function attachmentKind(mime: string): ChatAttachmentKind | null {
+  const base = mime.split(';')[0].trim().toLowerCase();
+  return ATTACHMENT_MIMES[base] ?? null;
+}
+
+/** File names are shown back to people: strip path parts and control characters. */
+export function safeFileName(name: string, fallback: string): string {
+  const base = (name || '').split(/[\\/]/).pop() || '';
+  const clean = base.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 120);
+  return clean || fallback;
 }
 
 /** Contract shape: one row of the back-office conversation list. */
@@ -73,7 +110,91 @@ export class ChatService {
     private readonly messageRepo: Repository<ChatMessage>,
     @InjectRepository(StaffUser)
     private readonly staffRepo: Repository<StaffUser>,
+    @InjectRepository(ChatAttachment)
+    private readonly attachmentRepo: Repository<ChatAttachment>,
   ) {}
+
+  // -------------------------------------------------------------- attachments
+
+  /**
+   * A photo, GIF, voice note or document, sent as its own message (the caption
+   * is the message body). Same counters as a text message, so the back office
+   * sees the unread badge and the visitor the reply dot.
+   */
+  async addAttachment(
+    conversationId: string,
+    sender: 'visitor' | 'staff',
+    staffUserId: string | null,
+    file: UploadedChatFile | undefined,
+    caption = '',
+    visitorKey?: string,
+  ): Promise<PostedMessage> {
+    if (!file || !file.buffer?.length) throw new BadRequestException('No file received');
+    if (file.size > ATTACHMENT_MAX_BYTES || file.buffer.length > ATTACHMENT_MAX_BYTES) {
+      throw new BadRequestException(`File too large: at most ${ATTACHMENT_MAX_BYTES / 1024 / 1024} MB`);
+    }
+    const kind = attachmentKind(file.mimetype);
+    if (!kind) throw new BadRequestException(`Files of type ${file.mimetype || 'unknown'} cannot be sent here`);
+
+    const conversation = sender === 'visitor'
+      ? await this.assertVisitorOwns(conversationId, visitorKey ?? '')
+      : await this.requireConversation(conversationId);
+
+    // One transaction: a message never exists without its file, nor the reverse.
+    const { message, att } = await this.messageRepo.manager.transaction(async (m) => {
+      const message = await m.save(
+        m.create(ChatMessage, { conversationId: conversation.id, sender, staffUserId, body: caption.trim().slice(0, 2000) }),
+      );
+      const att = await m.save(
+        m.create(ChatAttachment, {
+          messageId: message.id,
+          conversationId: conversation.id,
+          kind,
+          name: safeFileName(file.originalname, kind === 'audio' ? 'voice-note.webm' : kind + '-' + message.id.slice(0, 8)),
+          mime: file.mimetype.split(';')[0].trim().toLowerCase(),
+          size: file.buffer.length,
+          data: file.buffer,
+        }),
+      );
+      return { message, att };
+    });
+    await this.convRepo.update(
+      { id: conversation.id },
+      sender === 'visitor'
+        ? { unreadStaff: () => 'unread_staff + 1', lastMessageAt: message.createdAt ?? new Date() }
+        : { unreadStaff: 0, unreadVisitor: () => 'unread_visitor + 1', lastMessageAt: message.createdAt ?? new Date() },
+    );
+    await this.cacheStaffNames([message]);
+    return {
+      conversation: await this.requireConversation(conversation.id),
+      message: this.toMsg(message, [att]),
+    };
+  }
+
+  /** Bytes of one attachment; `visitorKey` must own the conversation unless staff asks. */
+  async getAttachment(id: string, visitorKey?: string): Promise<ChatAttachment> {
+    this.assertUuid(id);
+    const att = await this.attachmentRepo
+      .createQueryBuilder('a')
+      .addSelect('a.data')
+      .where('a.id = :id', { id })
+      .getOne();
+    if (!att) throw new NotFoundException('Attachment not found');
+    if (visitorKey !== undefined) await this.assertVisitorOwns(att.conversationId, visitorKey);
+    return att;
+  }
+
+  /** Map messages to the contract shape with their attachments in one query. */
+  private async withAttachments(messages: ChatMessage[]): Promise<Msg[]> {
+    if (messages.length === 0) return [];
+    const atts = await this.attachmentRepo.find({
+      where: { messageId: In(messages.map((m) => m.id)) },
+      order: { createdAt: 'ASC' },
+    });
+    const byMessage = new Map<string, ChatAttachment[]>();
+    for (const a of atts) byMessage.set(a.messageId, [...(byMessage.get(a.messageId) ?? []), a]);
+    return messages.map((m) => this.toMsg(m, byMessage.get(m.id)));
+  }
 
   // --------------------------------------------------------------- visitor side
 
@@ -221,7 +342,7 @@ export class ChatService {
       .addSelect(
         (sub) =>
           sub
-            .select('m.body')
+            .select("COALESCE(NULLIF(m.body, ''), '[file]')")
             .from(ChatMessage, 'm')
             .where('m.conversationId = c.id')
             .orderBy('m.createdAt', 'DESC')
@@ -270,7 +391,7 @@ export class ChatService {
       order: { createdAt: 'ASC' },
     });
     await this.cacheStaffNames(messages);
-    return messages.map((m) => this.toMsg(m));
+    return this.withAttachments(messages);
   }
 
   /** Summary for a single conversation, preview included. */
@@ -304,7 +425,7 @@ export class ChatService {
     return summary;
   }
 
-  toMsg(message: ChatMessage): Msg {
+  toMsg(message: ChatMessage, attachments?: ChatAttachment[]): Msg {
     const msg: Msg = {
       id: message.id,
       conversationId: message.conversationId,
@@ -312,6 +433,9 @@ export class ChatService {
       body: message.body,
       createdAt: iso(message.createdAt),
     };
+    if (attachments && attachments.length > 0) {
+      msg.attachments = attachments.map((a) => ({ id: a.id, kind: a.kind, name: a.name, mime: a.mime, size: a.size }));
+    }
     const staffName = message.staffUserId
       ? this.staffNames.get(message.staffUserId)
       : undefined;

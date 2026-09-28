@@ -19,6 +19,9 @@ export const BOOKING_STATUSES = ['confirmed', 'arrived', 'cancelled'] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 export const DEFAULT_PAGE_SIZE = 25;
+export const SORTS = ['newest', 'oldest', 'visit_asc', 'visit_desc', 'total_desc', 'total_asc', 'guest'] as const;
+export type BookingSort = (typeof SORTS)[number];
+
 export const MAX_PAGE_SIZE = 100;
 
 /** Shared page/pageSize query params. */
@@ -63,6 +66,32 @@ export class ListBookingsQueryDto extends PageQueryDto {
   @IsOptional()
   @IsCalendarDate()
   to?: string;
+
+  @ApiPropertyOptional({ enum: ['morning', 'afternoon'] })
+  @IsOptional()
+  @IsIn(['morning', 'afternoon'])
+  slot?: 'morning' | 'afternoon';
+
+  @ApiPropertyOptional({ enum: ['gate', 'online'] })
+  @IsOptional()
+  @IsIn(['gate', 'online'])
+  payMode?: 'gate' | 'online';
+
+  @ApiPropertyOptional({ enum: ['rr', 'nr'] })
+  @IsOptional()
+  @IsIn(['rr', 'nr'])
+  rate?: 'rr' | 'nr';
+
+  @ApiPropertyOptional({ description: 'Exact nationality as stored (see the nationality list)', maxLength: 60 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  nationality?: string;
+
+  @ApiPropertyOptional({ enum: SORTS, default: 'newest' })
+  @IsOptional()
+  @IsIn(SORTS)
+  sort?: BookingSort;
 
   @ApiPropertyOptional({
     description: 'Case-insensitive match on refCode / guestName / email / phone',

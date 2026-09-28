@@ -126,6 +126,13 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `BOOKING_RATE_LIMIT` | `10`                                     | Optional, default shown. Bookings per IP per 10 minutes; the compose stack raises it for the e2e suite. Leave unset in production |
 | `BOOKING_SLOT_CAPACITY` | `150`                                | Optional, default shown. Guests per arrival slot behind the quiet / busy / very busy / full dots on the booking date picker (35 %, 70 %, 100 %) |
 
+Back-office reports (`/api/staff/reports/*`: sales summary, nationalities,
+experiences, day reconciliation, forecast, CSV exports) and staff-taken
+bookings (`POST /api/staff/bookings`) need no configuration. Chat attachments
+(photos, GIFs, voice notes, documents, 8 MB each) are stored in Postgres
+(`chat_attachments`, migration 004, applied by the api pre-deploy); nginx
+allows 10 MB bodies on `/api/`.
+
 New bookings reach the back office three ways: the row is written to Postgres,
 every open `/staff` tab receives it over the staff websocket (toast, banner and
 a new row without a reload), and, when `SMTP_URL` is set, the desk gets an

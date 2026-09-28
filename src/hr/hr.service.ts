@@ -1,3 +1,4 @@
+import { toCsv } from '../staff/reports/csv';
 import {
   BadRequestException,
   ConflictException,
@@ -229,10 +230,22 @@ export class HrService {
 
   // ------------------------------------------------------------- applications
 
+  /** Every application matching the filters as CSV (capped at 5000 rows). */
+  async exportApplications(query: ListApplicationsQueryDto): Promise<string> {
+    const { items } = await this.listApplications({ ...query, page: 1, pageSize: 5000 }, 5000);
+    return toCsv(
+      ['Applied at', 'Role', 'Name', 'Email', 'Phone', 'Years of experience', 'Status', 'CV', 'HR note', 'Updated at'],
+      items.map((a) => [a.createdAt, a.vacancyTitle, a.fullName, a.email, a.phone, a.yearsExperience ?? '', a.status, a.cvUrl, a.hrNote, a.updatedAt]),
+    );
+  }
+
   async listApplications(
     query: ListApplicationsQueryDto,
+    maxPageSize?: number,
   ): Promise<HrPaged<HrApplicationRow>> {
-    const { page, pageSize } = resolvePaging(query);
+    const paging = resolvePaging(query);
+    const page = paging.page;
+    const pageSize = maxPageSize ? Math.min(maxPageSize, Math.max(1, Number(query.pageSize) || paging.pageSize)) : paging.pageSize;
     const qb = this.applicationRepo.createQueryBuilder('a');
 
     if (query.vacancyId) {

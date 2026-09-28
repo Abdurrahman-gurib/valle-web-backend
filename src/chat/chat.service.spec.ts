@@ -1,6 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { ChatConversation, ChatMessage, StaffUser } from '../entities';
+import { ChatAttachment, ChatConversation, ChatMessage, StaffUser } from '../entities';
 import { ChatService } from './chat.service';
 
 const CONV_ID = '11111111-1111-4111-8111-111111111111';
@@ -62,10 +62,12 @@ function build(): { service: ChatService } & Mocks {
     find: jest.fn().mockResolvedValue([{ id: STAFF_ID, name: 'Ana' }]),
   };
 
+  const attachmentRepo = { find: jest.fn().mockResolvedValue([]), save: jest.fn(), create: jest.fn((v: unknown) => v) };
   const service = new ChatService(
     convRepo as unknown as Repository<ChatConversation>,
     messageRepo as unknown as Repository<ChatMessage>,
     staffRepo as unknown as Repository<StaffUser>,
+    attachmentRepo as unknown as Repository<ChatAttachment>,
   );
   return { service, convRepo, messageRepo, staffRepo };
 }

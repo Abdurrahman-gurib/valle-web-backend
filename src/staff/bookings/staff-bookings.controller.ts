@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import {
   PageQueryDto,
 } from './dto/list-bookings.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
+import { CreateStaffBookingDto } from './dto/create-staff-booking.dto';
 import {
   BookingDetail,
   BookingRow,
@@ -42,6 +44,16 @@ export class StaffBookingsController {
   @ApiOperation({ summary: 'List bookings, newest first, filtered and paged' })
   list(@Query() query: ListBookingsQueryDto): Promise<Paged<BookingRow>> {
     return this.staffBookings.list(query);
+  }
+
+  @Post('bookings')
+  @ApiOperation({ summary: 'Take a booking for a guest (phone, desk, e-mail...); priced like a website booking' })
+  @ApiResponse({ status: 400, description: 'Validation or pricing error' })
+  create(
+    @Body() dto: CreateStaffBookingDto,
+    @CurrentStaff() staff: StaffPrincipal,
+  ): Promise<BookingDetail> {
+    return this.staffBookings.createForGuest(dto, staff);
   }
 
   @Get('bookings/:refCode')

@@ -7,23 +7,44 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import type { Response } from 'express';
+import { memoryStorage } from 'multer';
 import { CurrentStaff } from '../staff/auth/current-staff.decorator';
 import { Roles, RolesGuard } from '../staff/auth/roles.guard';
 import { StaffAuthGuard } from '../staff/auth/staff-auth.guard';
 import type { StaffPrincipal } from '../staff/auth/staff-auth.types';
 import { ChatGateway } from './chat.gateway';
-import { ChatService, ConversationSummary, Msg } from './chat.service';
+import { ATTACHMENT_MAX_BYTES, ChatService, ConversationSummary, Msg, UploadedChatFile } from './chat.service';
 import {
   PostStaffMessageDto,
   PostVisitorMessageDto,
+  StaffAttachmentDto,
   StaffConversationsQueryDto,
   StartSessionDto,
+  VisitorAttachmentDto,
   VisitorKeyQueryDto,
 } from './dto/chat.dto';
+import { ChatAttachment } from '../entities';
+
+/** One file per request, held in memory (it goes straight into Postgres), capped. */
+const upload = () => FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: ATTACHMENT_MAX_BYTES, files: 1 } });
+
+function sendAttachment(res: Response, att: ChatAttachment): void {
+  res.setHeader('Content-Type', att.mime);
+  res.setHeader('Content-Length', String(att.data.length));
+  res.setHeader('Content-Disposition', `${att.kind === 'file' ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(att.name)}`);
+  res.setHeader('Cache-Control', 'private, max-age=86400');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(att.data);
+}
 
 /**
  * New conversations: 10 per 10 minutes per IP. Resuming costs nothing extra,
@@ -100,6 +121,35 @@ export class ChatController {
     await this.gateway.announceVisitorMessage(conversation, message);
     return { message };
   }
+
+  @Post('session/:conversationId/attachments')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseInterceptors(upload())
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Send a photo, GIF, voice note or document (multipart: file, visitorKey, caption)' })
+  @ApiResponse({ status: 400, description: 'Missing, too large or unsupported file' })
+  @ApiResponse({ status: 403, description: 'visitorKey does not own it' })
+  async postAttachment(
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Body() dto: VisitorAttachmentDto,
+    @UploadedFile() file: UploadedChatFile | undefined,
+  ): Promise<{ message: Msg }> {
+    const { conversation, message } = await this.chat.addAttachment(conversationId, 'visitor', null, file, dto.caption, dto.visitorKey);
+    await this.gateway.announceVisitorMessage(conversation, message);
+    return { message };
+  }
+
+  @Get('attachments/:id')
+  @ApiOperation({ summary: 'Download / display an attachment of a conversation the key owns' })
+  @ApiResponse({ status: 403, description: 'visitorKey does not own the conversation' })
+  async attachment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: VisitorKeyQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    sendAttachment(res, await this.chat.getAttachment(id, query.visitorKey));
+  }
 }
 
 /**
@@ -155,6 +205,28 @@ export class StaffChatController {
     );
     await this.gateway.announceStaffMessage(conversation, message);
     return { message };
+  }
+
+  @Post('conversations/:conversationId/attachments')
+  @UseInterceptors(upload())
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Send a file to the visitor (multipart: file, caption)' })
+  @ApiResponse({ status: 400, description: 'Missing, too large or unsupported file' })
+  async replyWithAttachment(
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Body() dto: StaffAttachmentDto,
+    @UploadedFile() file: UploadedChatFile | undefined,
+    @CurrentStaff() staff: StaffPrincipal,
+  ): Promise<{ message: Msg }> {
+    const { conversation, message } = await this.chat.addAttachment(conversationId, 'staff', staff.id, file, dto.caption);
+    await this.gateway.announceStaffMessage(conversation, message);
+    return { message };
+  }
+
+  @Get('attachments/:id')
+  @ApiOperation({ summary: 'Download / display any attachment (staff)' })
+  async attachment(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response): Promise<void> {
+    sendAttachment(res, await this.chat.getAttachment(id));
   }
 
   @Post('conversations/:conversationId/close')

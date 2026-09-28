@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager, ObjectLiteral, Repository } from 'typeorm';
 import { computeBooking } from '../../bookings/pricing';
+import { BookingsService } from '../../bookings/bookings.service';
 import {
   Booking,
   BookingAudit,
@@ -47,6 +48,9 @@ class FakeQueryBuilder {
   }
   orderBy(field: string, dir: string): this {
     this.orderByCall = [field, dir];
+    return this;
+  }
+  addOrderBy(): this {
     return this;
   }
   skip(n: number): this {
@@ -290,6 +294,7 @@ function build(repos: {
     repos.audit ?? makeRepo<BookingAudit>(),
     repos.quote ?? makeRepo<Quote>(),
     repos.chat ?? makeRepo<ChatConversation>(),
+    { create: jest.fn() } as unknown as BookingsService,
   );
 }
 
