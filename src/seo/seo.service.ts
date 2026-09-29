@@ -14,7 +14,7 @@ export interface SitemapUrl {
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Languages of the public site; English at the root, the others under /fr, /de, /it. */
-export const SITE_LANGS = ['en', 'fr', 'de', 'it'] as const;
+export const SITE_LANGS = ['en', 'fr', 'de', 'it', 'ar'] as const;
 type SiteLang = (typeof SITE_LANGS)[number];
 
 /** '/explore?cat=kids' -> '/fr/explore?cat=kids'; '/' -> '/fr'. Mirrors the frontend's localizePath. */

@@ -9,11 +9,12 @@ describe('localizePath', () => {
     expect(localizePath('/explore?cat=kids', 'de')).toBe('/de/explore?cat=kids');
     expect(localizePath('/activities/zipline', 'it')).toBe('/it/activities/zipline');
     expect(localizePath('/booking', 'en')).toBe('/booking');
+    expect(localizePath('/packages', 'ar')).toBe('/ar/packages');
   });
 });
 
 describe('SeoService.sitemapXml', () => {
-  it('lists every page in the four languages with hreflang alternates and x-default', async () => {
+  it('lists every page in the five languages with hreflang alternates and x-default', async () => {
     const svc = new SeoService(
       repo([{ id: 'zipline', updatedAt: d }]),
       repo([{ id: 'chamouze', updatedAt: d }]),
@@ -23,11 +24,11 @@ describe('SeoService.sitemapXml', () => {
     );
     const xml = await svc.sitemapXml('https://example.test');
     expect(xml).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
-    for (const loc of ['https://example.test/activities/zipline', 'https://example.test/fr/activities/zipline', 'https://example.test/de/activities/zipline', 'https://example.test/it/activities/zipline', 'https://example.test/fr']) {
+    for (const loc of ['https://example.test/activities/zipline', 'https://example.test/fr/activities/zipline', 'https://example.test/de/activities/zipline', 'https://example.test/it/activities/zipline', 'https://example.test/ar/activities/zipline', 'https://example.test/fr']) {
       expect(xml).toContain(`<loc>${loc}</loc>`);
     }
     expect(xml).toContain('<xhtml:link rel="alternate" hreflang="x-default" href="https://example.test/activities/zipline"/>');
     const urls = xml.match(/<url>/g)!.length;
-    expect(urls % 4).toBe(0);
+    expect(urls % 5).toBe(0);
   });
 });
