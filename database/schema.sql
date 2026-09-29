@@ -308,9 +308,9 @@ CREATE TABLE bookings (
   staff_note   text NOT NULL DEFAULT '',      -- internal only, never returned publicly
   updated_at   timestamptz NOT NULL DEFAULT now(),
   updated_by   uuid REFERENCES staff_users(id) ON DELETE SET NULL,
-  created_at   timestamptz NOT NULL DEFAULT now()
+  created_at   timestamptz NOT NULL DEFAULT now(),
   ticket_sent_at   timestamptz,               -- guest ticket delivered (e-mail / WhatsApp)
-  reminder_sent_at timestamptz,               -- evening-before reminder delivered
+  reminder_sent_at timestamptz                -- evening-before reminder delivered
 );
 CREATE INDEX idx_bookings_visit  ON bookings(visit_date, status);
 CREATE INDEX idx_bookings_created ON bookings(created_at DESC);
