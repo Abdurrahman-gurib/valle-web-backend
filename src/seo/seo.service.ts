@@ -12,6 +12,18 @@ export interface SitemapUrl {
 }
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Languages of the public site; English at the root, the others under /fr, /de, /it. */
+export const SITE_LANGS = ['en', 'fr', 'de', 'it'] as const;
+type SiteLang = (typeof SITE_LANGS)[number];
+
+/** '/explore?cat=kids' -> '/fr/explore?cat=kids'; '/' -> '/fr'. Mirrors the frontend's localizePath. */
+export function localizePath(path: string, lang: SiteLang): string {
+  if (lang === 'en') return path;
+  if (path === '/') return '/' + lang;
+  if (path.startsWith('/?') || path.startsWith('/#')) return '/' + lang + path.slice(1);
+  return '/' + lang + path;
+}
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const latest = (...dates: (Date | null | undefined)[]) =>
   dates.reduce<Date>((m, d) => (d && d > m ? d : m), new Date(0));
@@ -59,12 +71,24 @@ export class SeoService {
     return out;
   }
 
+  /**
+   * One <url> per page per language (/explore, /fr/explore, /de/explore,
+   * /it/explore), each listing all its language versions as hreflang
+   * alternates with English as x-default, as Google documents for
+   * multilingual sites.
+   */
   async sitemapXml(siteUrl: string): Promise<string> {
     const urls = await this.urls();
     const body = urls
-      .map((u) => `  <url>\n    <loc>${escapeXml(siteUrl + u.path)}</loc>\n    <lastmod>${iso(u.lastmod)}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority.toFixed(1)}</priority>\n  </url>`)
+      .flatMap((u) => SITE_LANGS.map((lang) => {
+        const alternates = [...SITE_LANGS, 'x-default' as const]
+          .map((l) => `    <xhtml:link rel="alternate" hreflang="${l}" href="${escapeXml(siteUrl + localizePath(u.path, l === 'x-default' ? 'en' : l))}"/>`)
+          .join('\n');
+        const priority = lang === 'en' ? u.priority : Math.max(0.1, u.priority - 0.1);
+        return `  <url>\n    <loc>${escapeXml(siteUrl + localizePath(u.path, lang))}</loc>\n    <lastmod>${iso(u.lastmod)}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${priority.toFixed(1)}</priority>\n${alternates}\n  </url>`;
+      }))
       .join('\n');
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${body}\n</urlset>\n`;
   }
 
   /**
