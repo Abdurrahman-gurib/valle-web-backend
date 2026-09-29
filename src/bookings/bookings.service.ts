@@ -11,6 +11,8 @@ import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { ChatGateway } from '../chat/chat.gateway';
 import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../entities';
 import { BookingNotifierService } from '../notifications/booking-notifier.service';
+import { GuestMessagingService } from '../notifications/guest-messaging.service';
+import { TicketService } from '../tickets/ticket.service';
 import { toBookingRow } from '../staff/bookings/booking-row';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { computeBooking, PricedBooking } from './pricing';
@@ -21,6 +23,9 @@ export interface BookingResponse {
   discount: number;
   lines: { label: string; amount: number }[];
   status: string;
+  /** The guest's ticket page (QR inside); also e-mailed / WhatsApped. */
+  ticketUrl?: string;
+  qrUrl?: string;
 }
 
 const REF_MAX_TRIES = 20;
@@ -66,6 +71,8 @@ export class BookingsService {
     private readonly settingRepo: Repository<Setting>,
     @Optional() private readonly notifier?: BookingNotifierService,
     @Optional() private readonly gateway?: ChatGateway,
+    @Optional() private readonly guest?: GuestMessagingService,
+    @Optional() private readonly tickets?: TicketService,
     @Optional() config?: ConfigService,
   ) {
     const cap = Number(config?.get<string>('BOOKING_SLOT_CAPACITY') ?? '');
@@ -225,6 +232,8 @@ export class BookingsService {
 
     // After the commit, so the desk is never told about a booking that rolled back.
     void this.notifyStaff(saved, lines);
+    // The guest's ticket (e-mail with QR, WhatsApp when configured). Never blocks the response.
+    void this.guest?.sendTicket(saved, lines).catch((e: Error) => this.logger.warn(`Ticket for ${saved.refCode} not sent: ${e.message}`));
 
     return {
       refCode: saved.refCode,
@@ -232,6 +241,8 @@ export class BookingsService {
       discount: saved.discount,
       lines: priced.lines.map((l) => ({ label: l.label, amount: l.amount })),
       status: saved.status,
+      ticketUrl: this.tickets?.ticketUrl(saved.refCode),
+      qrUrl: this.tickets?.qrUrl(saved.refCode),
     };
   }
 

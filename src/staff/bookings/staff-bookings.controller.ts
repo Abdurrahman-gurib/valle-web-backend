@@ -80,6 +80,13 @@ export class StaffBookingsController {
     return this.staffBookings.update(refCode, dto, staff);
   }
 
+  @Post('bookings/:refCode/resend-ticket')
+  @ApiOperation({ summary: "Re-send the guest's ticket by e-mail and WhatsApp" })
+  @ApiResponse({ status: 404, description: 'Unknown reference code' })
+  resendTicket(@Param('refCode') refCode: string): Promise<{ email: boolean; whatsapp: boolean }> {
+    return this.staffBookings.resendTicket(refCode);
+  }
+
   @Get('quotes')
   @ApiOperation({ summary: 'Team-building quote requests, newest first' })
   quotes(@Query() query: PageQueryDto): Promise<Paged<QuoteRow>> {

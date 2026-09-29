@@ -120,9 +120,11 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `CORS_ORIGIN`       | `https://${{web.RAILWAY_PUBLIC_DOMAIN}}` | Exact https origin(s), comma separated; add a custom domain here too   |
 | `TRUST_PROXY`       | `true`                                   | One hop: the nginx container                                           |
 | `SITE_URL`          | public origin                            | Named in the sitemap and robots.txt (see Search engines below)         |
-| `SMTP_URL`          | `smtps://user:pass@host:465`             | Optional. New-booking e-mails to the desk; unset = no e-mail (the dashboard is still told live over the staff socket) |
+| `SMTP_URL`          | `smtps://resend:<api key>@smtp.resend.com:465` | Set 2026-09-29 (Resend, domain vallepark.com verified). Guest tickets, reminders and the desk alert. Unset = no e-mail; `json` = test transport |
 | `BOOKING_NOTIFY_TO` | `sales@vallepark.com`                    | Optional, default shown. Comma-separated recipients of the new-booking e-mail |
-| `MAIL_FROM`         | `VALLÉ bookings <no-reply@vallepark.com>`| Optional, default shown. Must be a sender the SMTP account may use     |
+| `MAIL_FROM`         | `VALLÉ Advenature Park <bookings@vallepark.com>` | Set. Must be on a domain verified in Resend                      |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | see notes | Optional. WhatsApp tickets and reminders to guests through Twilio's WhatsApp API (`whatsapp:+2306604477` once the sender is approved by Meta; the sandbox number while testing). Unset = e-mail only, guests can add the ticket to WhatsApp from the ticket page |
+| `GUEST_REMINDERS`   | `1`                                      | Optional. `0` switches off the evening-before reminder sweep          |
 | `BOOKING_RATE_LIMIT` | `10`                                     | Optional, default shown. Bookings per IP per 10 minutes; the compose stack raises it for the e2e suite. Leave unset in production |
 | `BOOKING_SLOT_CAPACITY` | `150`                                | Optional, default shown. Guests per arrival slot behind the quiet / busy / very busy / full dots on the booking date picker (35 %, 70 %, 100 %) |
 
@@ -132,6 +134,14 @@ bookings (`POST /api/staff/bookings`) need no configuration. Chat attachments
 (photos, GIFs, voice notes, documents, 8 MB each) are stored in Postgres
 (`chat_attachments`, migration 004, applied by the api pre-deploy); nginx
 allows 10 MB bodies on `/api/`.
+
+Guests receive a ticket the moment they book: an e-mail with the QR code
+inline and attached, a link to `/ticket/<ref>?t=<token>` (the token is an HMAC
+of the reference with `JWT_SECRET`, so tickets cannot be browsed by guessing
+codes), and the same by WhatsApp when Twilio is configured. The evening
+before the visit (from 17:00 park time) a reminder goes out once; migration
+005 adds `ticket_sent_at` / `reminder_sent_at`. The desk can re-send a ticket
+from the booking drawer.
 
 New bookings reach the back office three ways: the row is written to Postgres,
 every open `/staff` tab receives it over the staff websocket (toast, banner and

@@ -35,6 +35,8 @@ import {
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { CreateStaffBookingDto } from './dto/create-staff-booking.dto';
 import { BookingsService } from '../../bookings/bookings.service';
+import { TicketService } from '../../tickets/ticket.service';
+import { GuestMessagingService } from '../../notifications/guest-messaging.service';
 
 /** The park's wall clock: "today" is whatever day it is on site, not on the server. */
 const PARK_TZ = 'Indian/Mauritius';
@@ -71,6 +73,10 @@ export interface BookingAuditRow {
  */
 export type BookingDetail = BookingRow & {
   staffNote: string;
+  /** The guest's ticket page; what the desk forwards by WhatsApp / e-mail. */
+  ticketUrl?: string;
+  ticketSentAt?: string | null;
+  reminderSentAt?: string | null;
   lines: BookingLineRow[];
   /** Most recent first, at most AUDIT_LIMIT entries. */
   audit: BookingAuditRow[];
@@ -145,6 +151,8 @@ export class StaffBookingsService {
     @InjectRepository(ChatConversation)
     private readonly chatRepo: Repository<ChatConversation>,
     private readonly bookings: BookingsService,
+    private readonly tickets: TicketService,
+    private readonly guest: GuestMessagingService,
   ) {}
 
   // ----------------------------------------------------------------- bookings
@@ -234,7 +242,18 @@ export class StaffBookingsService {
       }),
     ]);
 
-    return toBookingDetail(booking, lines, audit);
+    return this.withTicket(toBookingDetail(booking, lines, audit));
+  }
+
+  /** Re-send the guest's ticket (e-mail + WhatsApp) after a change of contact details, or on request. */
+  async resendTicket(refCode: string): Promise<{ email: boolean; whatsapp: boolean }> {
+    const booking = await this.bookingRepo.findOne({ where: { refCode } });
+    if (!booking) throw new NotFoundException(`No booking ${refCode}`);
+    return this.guest.sendTicket(booking);
+  }
+
+  private withTicket(detail: BookingDetail): BookingDetail {
+    return { ...detail, ticketUrl: this.tickets.ticketUrl(detail.refCode) };
   }
 
   /**
@@ -397,7 +416,7 @@ export class StaffBookingsService {
         take: AUDIT_LIMIT,
       }),
     ]);
-    return toBookingDetail(booking, lines, audit);
+    return this.withTicket(toBookingDetail(booking, lines, audit));
   }
 
   // ------------------------------------------------------------------- quotes
@@ -617,6 +636,8 @@ function toBookingDetail(
   return {
     ...toBookingRow(booking),
     staffNote: booking.staffNote ?? '',
+    ticketSentAt: booking.ticketSentAt ? toIso(booking.ticketSentAt) : null,
+    reminderSentAt: booking.reminderSentAt ? toIso(booking.reminderSentAt) : null,
     lines: lines.map((l) => ({
       label: l.label,
       adults: l.adults,

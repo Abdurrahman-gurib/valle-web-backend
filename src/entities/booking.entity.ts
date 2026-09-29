@@ -80,6 +80,14 @@ export class Booking {
   @Column({ name: 'updated_by', type: 'uuid', nullable: true })
   updatedBy: string | null;
 
+  /** When the ticket (e-mail / WhatsApp) last went out; null = never delivered. */
+  @Column({ name: 'ticket_sent_at', type: 'timestamptz', nullable: true })
+  ticketSentAt: Date | null;
+
+  /** When the evening-before reminder went out. */
+  @Column({ name: 'reminder_sent_at', type: 'timestamptz', nullable: true })
+  reminderSentAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

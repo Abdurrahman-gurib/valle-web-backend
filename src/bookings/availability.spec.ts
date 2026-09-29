@@ -26,7 +26,7 @@ function service(rows: unknown[], capacity?: string) {
   const config = { get: (k: string) => (k === 'BOOKING_SLOT_CAPACITY' ? capacity : undefined) } as unknown as ConfigService;
   const svc = new BookingsService(
     {} as DataSource, bookingRepo, none as Repository<BookingLine>, none as Repository<Experience>,
-    none as Repository<PriceListEntry>, none as Repository<Setting>, undefined, undefined, config,
+    none as Repository<PriceListEntry>, none as Repository<Setting>, undefined, undefined, undefined, undefined, config,
   );
   return { svc, qb };
 }

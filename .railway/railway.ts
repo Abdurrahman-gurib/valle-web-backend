@@ -57,8 +57,12 @@ export default defineRailway(() => {
     env: {
       NODE_ENV: "production",
       PORT: "3001",
-      // Origin named in /api/sitemap.xml and /api/robots.txt.
+      // Origin named in /api/sitemap.xml, robots.txt and the guest ticket links.
       SITE_URL: "https://web-production-ff60b.up.railway.app",
+      // Guest tickets, reminders and the desk alert go out through Resend
+      // (SMTP_URL holds the API key and is set as a secret, not here).
+      MAIL_FROM: "VALLÉ Advenature Park <bookings@vallepark.com>",
+      BOOKING_NOTIFY_TO: "sales@vallepark.com",
       DB_HOST: Postgres.env.RAILWAY_PRIVATE_DOMAIN,
       DB_PORT: "5432",
       DB_USER: Postgres.env.PGUSER,

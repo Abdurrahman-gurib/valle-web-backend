@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import nodemailer, { type Transporter } from 'nodemailer';
 import type { Booking, BookingLine } from '../entities';
+import { MailService } from './mail.service';
 
 /**
  * E-mails the reservations desk about every new booking.
@@ -17,28 +17,14 @@ import type { Booking, BookingLine } from '../entities';
  */
 @Injectable()
 export class BookingNotifierService {
-  private readonly logger = new Logger(BookingNotifierService.name);
-  private readonly transporter: Transporter | null;
   private readonly to: string;
-  private readonly from: string;
 
-  constructor(config: ConfigService) {
-    const url = (config.get<string>('SMTP_URL') ?? '').trim();
+  constructor(private readonly mail: MailService, config: ConfigService) {
     this.to = (config.get<string>('BOOKING_NOTIFY_TO') ?? 'sales@vallepark.com').trim();
-    this.from = (config.get<string>('MAIL_FROM') ?? 'VALLÉ bookings <no-reply@vallepark.com>').trim();
-    if (url === 'json') {
-      // Test transport: renders the message without sending it.
-      this.transporter = nodemailer.createTransport({ jsonTransport: true });
-    } else if (url) {
-      this.transporter = nodemailer.createTransport(url);
-    } else {
-      this.transporter = null;
-      this.logger.warn('SMTP_URL is not set: new-booking e-mails are disabled (the staff dashboard is still notified live)');
-    }
   }
 
   get enabled(): boolean {
-    return this.transporter !== null;
+    return this.mail.enabled;
   }
 
   /** Builds the message; exported for tests and for the send below. */
@@ -69,14 +55,8 @@ export class BookingNotifierService {
 
   /** Never throws: a mail problem is logged, the booking stands. */
   async notifyNewBooking(booking: Booking, lines: BookingLine[]): Promise<boolean> {
-    if (!this.transporter) return false;
+    if (!this.mail.enabled) return false;
     const { subject, text } = this.render(booking, lines);
-    try {
-      await this.transporter.sendMail({ from: this.from, to: this.to, subject, text });
-      return true;
-    } catch (e) {
-      this.logger.error(`Could not e-mail booking ${booking.refCode} to ${this.to}: ${(e as Error).message}`);
-      return false;
-    }
+    return this.mail.send({ to: this.to, subject, text });
   }
 }

@@ -16,6 +16,7 @@ import { SeoModule } from './seo/seo.module';
 import { FxModule } from './fx/fx.module';
 import { ReportsModule } from './staff/reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { TicketsModule } from './tickets/tickets.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
@@ -61,6 +62,7 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     FxModule,
     ReportsModule,
     NotificationsModule,
+    TicketsModule,
   ],
   providers: [
     // Reports unhandled (5xx) exceptions to Sentry; expected HttpExceptions are not noise.

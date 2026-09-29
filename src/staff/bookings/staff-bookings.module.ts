@@ -10,6 +10,8 @@ import {
   Setting, PriceListEntry } from '../../entities';
 import { StaffAuthModule } from '../auth/staff-auth.module';
 import { BookingsModule } from '../../bookings/bookings.module';
+import { TicketsModule } from '../../tickets/tickets.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 import { StaffBookingsController } from './staff-bookings.controller';
 import { StaffBookingsService } from './staff-bookings.service';
 
@@ -34,6 +36,8 @@ import { StaffBookingsService } from './staff-bookings.service';
     StaffAuthModule,
     // createForGuest prices and validates through the very same public service.
     BookingsModule,
+    TicketsModule,
+    NotificationsModule,
   ],
   controllers: [StaffBookingsController],
   providers: [StaffBookingsService],

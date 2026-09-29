@@ -6,6 +6,8 @@ import {
 import { DataSource, EntityManager, ObjectLiteral, Repository } from 'typeorm';
 import { computeBooking } from '../../bookings/pricing';
 import { BookingsService } from '../../bookings/bookings.service';
+import { TicketService } from '../../tickets/ticket.service';
+import { GuestMessagingService } from '../../notifications/guest-messaging.service';
 import {
   Booking,
   BookingAudit,
@@ -298,6 +300,8 @@ function build(repos: {
     repos.quote ?? makeRepo<Quote>(),
     repos.chat ?? makeRepo<ChatConversation>(),
     { create: jest.fn() } as unknown as BookingsService,
+    { ticketUrl: (ref: string) => 'https://example.test/ticket/' + ref + '?t=tok' } as unknown as TicketService,
+    { sendTicket: jest.fn() } as unknown as GuestMessagingService,
   );
 }
 
