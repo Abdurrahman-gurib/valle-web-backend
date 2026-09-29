@@ -23,8 +23,8 @@ function build(vars: Record<string, string> = { SMTP_URL: 'json' }) {
   const sendMail = jest.fn().mockResolvedValue({});
   if (vars.SMTP_URL) (mail as unknown as { transporter: { sendMail: jest.Mock } }).transporter = { sendMail };
   const wa = new WhatsAppService(config(vars));
-  const posted: URLSearchParams[] = [];
-  wa.post = async (_u, _a, body) => { posted.push(body); return { ok: true, status: 201, text: async () => '' }; };
+  const posted: { url: string; headers: Record<string, string>; body: string }[] = [];
+  wa.post = async (url, headers, body) => { posted.push({ url, headers, body }); return { ok: true, status: 201, text: async () => '' }; };
   const svc = new GuestMessagingService(mail, wa, tickets, bookingRepo as unknown as Repository<Booking>, lineRepo as unknown as Repository<BookingLine>, config(vars));
   return { svc, sendMail, posted, bookingRepo, tickets };
 }
@@ -53,9 +53,40 @@ describe('GuestMessagingService', () => {
     expect(mail.to).toBe('asha@example.com');
     expect(mail.attachments[0]).toMatchObject({ cid: 'ticket-qr', contentType: 'image/png' });
     expect(mail.attachments[0].content.length).toBeGreaterThan(200);
-    expect(posted[0].get('To')).toBe('whatsapp:+23052928841');
-    expect(posted[0].get('Body')).toContain('/ticket/VAL-1234-26?t=');
+    const form = new URLSearchParams(posted[0].body);
+    expect(form.get('To')).toBe('whatsapp:+23052928841');
+    expect(form.get('Body')).toContain('/ticket/VAL-1234-26?t=');
     expect(bookingRepo.update).toHaveBeenCalledWith({ id: 'b1' }, { ticketSentAt: expect.any(Date) });
+  });
+
+  it('through 360dialog the ticket is the approved template, with the ticket path on the button', async () => {
+    const { svc, posted, tickets } = build({ D360_API_KEY: 'k360' });
+    const r = await svc.sendTicket(booking, lines);
+    expect(r.whatsapp).toBe(true);
+    expect(posted[0].url).toBe('https://waba-v2.360dialog.io/messages');
+    expect(posted[0].headers['D360-API-KEY']).toBe('k360');
+    const p = JSON.parse(posted[0].body);
+    expect(p).toMatchObject({ messaging_product: 'whatsapp', to: '23052928841', type: 'template', template: { name: 'valle_booking_ticket', language: { code: 'en' } } });
+    const [body, button] = p.template.components;
+    expect(body.parameters.map((x: { text: string }) => x.text)).toEqual([
+      'Asha', 'VAL-1234-26', 'Friday, 2 October 2026, morning arrival, 09:00 to 12:00', '2 adults and 1 child', 'Rs 6,200 to pay on arrival',
+    ]);
+    expect(button).toEqual({ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: `VAL-1234-26?t=${tickets.token('VAL-1234-26')}` }] });
+  });
+
+  it('the reminder uses its own template', async () => {
+    const { svc, posted } = build({ D360_API_KEY: 'k360' });
+    await svc.sendReminder(booking);
+    const p = JSON.parse(posted[0].body);
+    expect(p.template.name).toBe('valle_visit_reminder');
+    expect(p.template.components[0].parameters).toHaveLength(3);
+  });
+
+  it('a refused template (e.g. not yet approved) is logged and returns false', async () => {
+    const { svc } = build({ D360_API_KEY: 'k360' });
+    (svc as unknown as { whatsapp: WhatsAppService }).whatsapp.post = async () => ({ ok: false, status: 400, text: async () => '{"error":"template not approved"}' });
+    const r = await svc.sendTicket({ ...booking, email: '' } as Booking, lines);
+    expect(r).toEqual({ email: false, whatsapp: false });
   });
 
   it('without mail or WhatsApp configured nothing is sent and nothing is stamped', async () => {

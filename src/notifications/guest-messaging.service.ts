@@ -5,7 +5,7 @@ import { IsNull, Repository } from 'typeorm';
 import { Booking, BookingLine } from '../entities';
 import { TicketService } from '../tickets/ticket.service';
 import { MailService } from './mail.service';
-import { WhatsAppService } from './whatsapp.service';
+import { WhatsAppService, type BookingMessage } from './whatsapp.service';
 
 const PARK_TZ = 'Indian/Mauritius';
 const REMINDER_HOUR = 17; // sent between 17:00 and midnight, park time, the evening before
@@ -65,13 +65,39 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     const items = lines ?? (await this.lineRepo.find({ where: { bookingId: booking.id }, order: { sortOrder: 'ASC' } }));
     const [email, whatsapp] = await Promise.all([
       booking.email ? this.sendTicketEmail(booking, items) : Promise.resolve(false),
-      booking.phone ? this.whatsapp.send(booking.phone, this.ticketWhatsAppText(booking)) : Promise.resolve(false),
+      booking.phone ? this.whatsapp.sendBooking('ticket', booking.phone, this.ticketWhatsApp(booking)) : Promise.resolve(false),
     ]);
     if (email || whatsapp) {
       await this.bookingRepo.update({ id: booking.id }, { ticketSentAt: new Date() });
     }
     this.logger.log(`Ticket ${booking.refCode}: e-mail ${email ? 'sent' : booking.email ? 'failed/off' : 'no address'}, WhatsApp ${whatsapp ? 'sent' : booking.phone ? 'failed/off' : 'no number'}`);
     return { email, whatsapp };
+  }
+
+  /** Visit line shared by the WhatsApp templates: "Friday 2 October 2026, morning arrival 09:00 to 12:00". */
+  private visitLine(b: Booking): string {
+    return `${longDate(dateStr(b.visitDate))}, ${slotLabel(b.slot).replace('Morning arrival', 'morning arrival').replace('Afternoon arrival', 'afternoon arrival')}`;
+  }
+
+  private payLine(b: Booking): string {
+    return b.payMode === 'online' ? `${rs(b.total)} paid online` : `${rs(b.total)} to pay on arrival`;
+  }
+
+  /** Template parameters (360dialog) plus the full text (Twilio fallback) for the ticket. */
+  ticketWhatsApp(b: Booking): BookingMessage {
+    return {
+      params: [b.guestName.split(' ')[0] || b.guestName, b.refCode, this.visitLine(b), party(b), this.payLine(b)],
+      ticketPath: `${b.refCode}?t=${this.tickets.token(b.refCode)}`,
+      text: this.ticketWhatsAppText(b),
+    };
+  }
+
+  reminderWhatsApp(b: Booking): BookingMessage {
+    return {
+      params: [b.guestName.split(' ')[0] || b.guestName, this.visitLine(b), this.payLine(b)],
+      ticketPath: `${b.refCode}?t=${this.tickets.token(b.refCode)}`,
+      text: this.reminderText(b),
+    };
   }
 
   ticketWhatsAppText(b: Booking): string {
@@ -180,7 +206,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     const text = this.reminderText(b);
     const [email, wa] = await Promise.all([
       b.email ? this.mail.send({ to: b.email, subject: `Tomorrow at VALLÉ · ${b.refCode}`, text }) : Promise.resolve(false),
-      b.phone ? this.whatsapp.send(b.phone, text) : Promise.resolve(false),
+      b.phone ? this.whatsapp.sendBooking('reminder', b.phone, this.reminderWhatsApp(b)) : Promise.resolve(false),
     ]);
     if (email || wa) await this.bookingRepo.update({ id: b.id }, { reminderSentAt: new Date() });
     return email || wa;

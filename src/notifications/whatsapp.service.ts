@@ -2,38 +2,72 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 /**
- * WhatsApp messages to guests through Twilio's WhatsApp API (Meta requires a
- * business provider; Twilio is the simplest to set up in Mauritius).
+ * WhatsApp messages to guests.
  *
- *   TWILIO_ACCOUNT_SID    ACxxxxxxxx
- *   TWILIO_AUTH_TOKEN     the account's auth token
- *   TWILIO_WHATSAPP_FROM  whatsapp:+2306604477 (the approved sender), or the
- *                         sandbox number whatsapp:+14155238886 while testing
+ * Primary provider: 360dialog (the park's WABA "Vallé Advenature Park",
+ * +230 5292 8841, COEX: the WhatsApp Business app keeps working on the phone).
  *
- * Unset: disabled, logged once; the guest still gets the ticket by e-mail and
- * can add it to WhatsApp from the ticket page. Business-initiated messages
- * outside a 24-hour window need an approved template on the Meta side; the
- * sandbox accepts free text.
+ *   D360_API_KEY            the channel's API key (360dialog Hub > Channels > the number > API key)
+ *   D360_BASE_URL           default https://waba-v2.360dialog.io
+ *   WA_TEMPLATE_LANG        default en
+ *   WA_TICKET_TEMPLATE      default valle_booking_ticket   (see scripts/whatsapp-templates.js)
+ *   WA_REMINDER_TEMPLATE    default valle_visit_reminder
+ *
+ * A business may only open a conversation with an approved template, so the
+ * ticket and the reminder are UTILITY templates whose "Open my ticket" button
+ * carries the ticket path. Free text is only allowed inside the 24 hours after
+ * the guest last wrote, which the park answers from the WhatsApp Business app.
+ *
+ * Fallback provider: Twilio (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN /
+ * TWILIO_WHATSAPP_FROM), which sends the plain text instead of a template.
+ * Neither configured: disabled, logged once; tickets still go by e-mail.
  */
+export interface BookingMessage {
+  /** Template body parameters, in order. */
+  params: string[];
+  /** Dynamic part of the "Open my ticket" URL button: "<ref>?t=<token>". */
+  ticketPath: string;
+  /** Full text, used by the Twilio fallback. */
+  text: string;
+}
+
+type Post = (url: string, headers: Record<string, string>, body: string) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>;
+
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
-  private readonly sid: string;
-  private readonly token: string;
-  private readonly from: string;
+  private readonly d360Key: string;
+  private readonly d360Base: string;
+  private readonly lang: string;
+  readonly templates: { ticket: string; reminder: string };
+  private readonly twSid: string;
+  private readonly twToken: string;
+  private readonly twFrom: string;
+
   /** Overridable in tests. */
-  post: (url: string, auth: string, body: URLSearchParams) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }> =
-    (url, auth, body) => fetch(url, { method: 'POST', headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(10_000) });
+  post: Post = (url, headers, body) => fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(10_000) });
 
   constructor(config: ConfigService) {
-    this.sid = (config.get<string>('TWILIO_ACCOUNT_SID') ?? '').trim();
-    this.token = (config.get<string>('TWILIO_AUTH_TOKEN') ?? '').trim();
-    this.from = (config.get<string>('TWILIO_WHATSAPP_FROM') ?? '').trim();
-    if (!this.enabled) this.logger.warn('TWILIO_* not set: WhatsApp messages to guests are disabled (tickets still go by e-mail)');
+    const get = (k: string) => (config.get<string>(k) ?? '').trim();
+    this.d360Key = get('D360_API_KEY');
+    this.d360Base = (get('D360_BASE_URL') || 'https://waba-v2.360dialog.io').replace(/\/+$/, '');
+    this.lang = get('WA_TEMPLATE_LANG') || 'en';
+    this.templates = { ticket: get('WA_TICKET_TEMPLATE') || 'valle_booking_ticket', reminder: get('WA_REMINDER_TEMPLATE') || 'valle_visit_reminder' };
+    this.twSid = get('TWILIO_ACCOUNT_SID');
+    this.twToken = get('TWILIO_AUTH_TOKEN');
+    this.twFrom = get('TWILIO_WHATSAPP_FROM');
+    if (!this.enabled) this.logger.warn('WhatsApp is off (no D360_API_KEY / TWILIO_*): tickets go by e-mail only');
+    else this.logger.log(`WhatsApp via ${this.provider}`);
+  }
+
+  get provider(): '360dialog' | 'twilio' | null {
+    if (this.d360Key) return '360dialog';
+    if (this.twSid && this.twToken && this.twFrom) return 'twilio';
+    return null;
   }
 
   get enabled(): boolean {
-    return Boolean(this.sid && this.token && this.from);
+    return this.provider !== null;
   }
 
   /** "+230 5292 8841" / "5292 8841" / "0033 6 ..." -> E.164; Mauritian numbers get +230. */
@@ -49,21 +83,48 @@ export class WhatsAppService {
     return /^\+\d{9,15}$/.test(digits) ? digits : null;
   }
 
-  /** Never throws. */
-  async send(phone: string, body: string): Promise<boolean> {
+  /** The Cloud API body for a template with body parameters and a dynamic URL button. */
+  templatePayload(to: string, template: string, msg: BookingMessage): Record<string, unknown> {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: to.replace(/^\+/, ''),
+      type: 'template',
+      template: {
+        name: template,
+        language: { code: this.lang },
+        components: [
+          { type: 'body', parameters: msg.params.map((text) => ({ type: 'text', text: text.replace(/\s*\n\s*/g, ' ').slice(0, 1000) })) },
+          { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: msg.ticketPath }] },
+        ],
+      },
+    };
+  }
+
+  /** Ticket or reminder. Never throws. */
+  async sendBooking(kind: 'ticket' | 'reminder', phone: string, msg: BookingMessage): Promise<boolean> {
     if (!this.enabled) return false;
     const to = WhatsAppService.normalise(phone);
     if (!to) { this.logger.warn(`Cannot WhatsApp "${phone}": not a usable number`); return false; }
     try {
-      const res = await this.post(
-        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(this.sid)}/Messages.json`,
-        Buffer.from(`${this.sid}:${this.token}`).toString('base64'),
-        new URLSearchParams({ From: this.from, To: 'whatsapp:' + to, Body: body }),
-      );
-      if (!res.ok) { this.logger.error(`WhatsApp to ${to} refused (${res.status}): ${(await res.text()).slice(0, 200)}`); return false; }
+      const res = this.provider === '360dialog'
+        ? await this.post(
+          `${this.d360Base}/messages`,
+          { 'D360-API-KEY': this.d360Key, 'Content-Type': 'application/json' },
+          JSON.stringify(this.templatePayload(to, this.templates[kind], msg)),
+        )
+        : await this.post(
+          `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(this.twSid)}/Messages.json`,
+          { Authorization: 'Basic ' + Buffer.from(`${this.twSid}:${this.twToken}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+          new URLSearchParams({ From: this.twFrom, To: 'whatsapp:' + to, Body: msg.text }).toString(),
+        );
+      if (!res.ok) {
+        this.logger.error(`WhatsApp ${kind} to ${to} refused by ${this.provider} (${res.status}): ${(await res.text()).slice(0, 300)}`);
+        return false;
+      }
       return true;
     } catch (e) {
-      this.logger.error(`WhatsApp to ${to} failed: ${(e as Error).message}`);
+      this.logger.error(`WhatsApp ${kind} to ${to} failed: ${(e as Error).message}`);
       return false;
     }
   }
