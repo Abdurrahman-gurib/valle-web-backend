@@ -18,7 +18,7 @@ const lines = [{ label: 'Zipline Adventures · The Signature', amount: 4700 }] a
 function build(vars: Record<string, string> = { SMTP_URL: 'json' }) {
   const bookingRepo = { update: jest.fn().mockResolvedValue({}), find: jest.fn().mockResolvedValue([]) };
   const lineRepo = { find: jest.fn().mockResolvedValue(lines) };
-  const tickets = new TicketService(config({ JWT_SECRET: 'x'.repeat(40), SITE_URL: 'https://example.test' }), {} as Repository<Booking>, {} as Repository<BookingLine>);
+  const tickets = new TicketService(config({ JWT_SECRET: 'x'.repeat(40), SITE_URL: 'https://example.test' }), {} as Repository<Booking>, {} as Repository<BookingLine>, {} as never);
   const mail = new MailService(config(vars));
   const sendMail = jest.fn().mockResolvedValue({});
   if (vars.SMTP_URL) (mail as unknown as { transporter: { sendMail: jest.Mock } }).transporter = { sendMail };
@@ -115,7 +115,7 @@ describe('WhatsAppService.normalise', () => {
 });
 
 describe('TicketService', () => {
-  const tickets = new TicketService(config({ JWT_SECRET: 's'.repeat(40), SITE_URL: 'https://example.test/' }), {} as Repository<Booking>, {} as Repository<BookingLine>);
+  const tickets = new TicketService(config({ JWT_SECRET: 's'.repeat(40), SITE_URL: 'https://example.test/' }), {} as Repository<Booking>, {} as Repository<BookingLine>, {} as never);
   it('tokens are stable, unguessable and verified in constant time', () => {
     const t = tickets.token('VAL-1234-26');
     expect(t).toHaveLength(24);

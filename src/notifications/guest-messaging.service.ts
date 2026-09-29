@@ -108,6 +108,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       `${party(b)} · ${b.payMode === 'online' ? 'paid online' : 'to pay on arrival: ' + rs(b.total)}`,
       ``,
       `Your ticket with QR code: ${this.tickets.ticketUrl(b.refCode)}`,
+      `Skip the paper at the gate: sign the safety waiver for everyone in your party now: ${this.tickets.waiverUrl(b.refCode)}`,
       `Show it at the gate. Directions: ${MAPS}`,
       `Questions? Reply here or call ${PARK_PHONE}.`,
     ].join('\n');
@@ -117,6 +118,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   renderTicketEmail(b: Booking, lines: BookingLine[]): { subject: string; text: string; html: string } {
     const visit = longDate(dateStr(b.visitDate));
     const url = this.tickets.ticketUrl(b.refCode);
+    const waiver = this.tickets.waiverUrl(b.refCode);
     const pay = b.payMode === 'online' ? 'Paid online' : `To pay on arrival: ${rs(b.total)} (cash or card at the gate)`;
     const subject = `Your VALLÉ ticket ${b.refCode} · ${visit}`;
     const lineText = lines.map((l) => `  • ${l.label}: ${rs(l.amount)}`).join('\n');
@@ -133,6 +135,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       `Total: ${rs(b.total)} · ${pay}`,
       ``,
       `Your ticket: ${url}`,
+      ``,
+      `Sign the safety waiver before you arrive (one per person, 2 minutes on your phone, it saves queuing at the gate): ${waiver}`,
       ``,
       `Getting here: ${PARK_ADDRESS}. ${MAPS}`,
       `Bring closed shoes, sunscreen, water and a change of clothes for the waterfalls. Zipline, quad and buggy have age, height and weight limits.`,
@@ -165,6 +169,11 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     <p style="margin:8px 0 0;font-size:13px;color:#7333FF;font-weight:700">${esc(pay)}</p>
     <p style="text-align:center;margin:22px 0 6px"><a href="${url}" style="background:#FF3358;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:999px;display:inline-block">Open my ticket</a></p>
     <p style="text-align:center;margin:0;font-size:12px;color:#7A6A93">Save it to your phone, or add it to WhatsApp from the ticket page.</p>
+    <div style="margin:20px 0 0;background:#FFFDE0;border:1.5px solid #FFE94D;border-radius:14px;padding:16px 18px">
+      <p style="margin:0 0 6px;font-size:14px;font-weight:800">Skip the queue: sign your waivers now</p>
+      <p style="margin:0 0 12px;font-size:13px;line-height:1.5">Ziplines, quads and buggies need a signed safety waiver for every participant. Fill it in on your phone before you arrive, one per person, and walk straight past the paperwork at the gate.</p>
+      <a href="${waiver}" style="background:#340057;color:#FFFFFF;text-decoration:none;font-weight:700;padding:10px 20px;border-radius:999px;display:inline-block;font-size:14px">Sign the waivers</a>
+    </div>
     <hr style="border:0;border-top:1px dashed #D9CCF2;margin:20px 0">
     <p style="margin:0 0 8px;font-size:13px;line-height:1.55"><strong>Getting here.</strong> ${esc(PARK_ADDRESS)}. <a href="${MAPS}" style="color:#7333FF">Open in Google Maps</a>. Free parking at the gate.</p>
     <p style="margin:0 0 8px;font-size:13px;line-height:1.55"><strong>Bring.</strong> Closed shoes, sunscreen, water and a change of clothes for the waterfalls. Zipline, quad and buggy have age, height and weight limits.</p>
@@ -197,6 +206,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       b.payMode === 'online' ? 'Already paid online.' : `To pay on arrival: ${rs(b.total)} (cash or card).`,
       ``,
       `Your ticket: ${this.tickets.ticketUrl(b.refCode)}`,
+      `Waivers: sign them tonight and skip the queue at the gate: ${this.tickets.waiverUrl(b.refCode)}`,
       `Directions: ${MAPS}`,
       `Bring closed shoes, sunscreen and water. Reply here or call ${PARK_PHONE} if anything changes.`,
     ].join('\n');

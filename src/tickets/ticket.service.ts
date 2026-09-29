@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import QRCode from 'qrcode';
-import { Booking, BookingLine } from '../entities';
+import { Booking, BookingLine, Waiver } from '../entities';
 import { resolveJwtSecret } from '../staff/auth/jwt.config';
 
 /** What the guest's ticket page shows. No internal note, no money breakdown beyond the lines. */
@@ -22,6 +22,10 @@ export interface TicketView {
   lines: { label: string; amount: number }[];
   ticketUrl: string;
   qrUrl: string;
+  /** Digital waiver page for the party, and how many have signed. */
+  waiverUrl: string;
+  waiversSigned: number;
+  waiversRequired: number;
 }
 
 const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
@@ -41,6 +45,7 @@ export class TicketService {
     config: ConfigService,
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     @InjectRepository(BookingLine) private readonly lineRepo: Repository<BookingLine>,
+    @InjectRepository(Waiver) private readonly waiverRepo: Repository<Waiver>,
   ) {
     this.secret = resolveJwtSecret(config);
     this.siteUrl = (config.get<string>('SITE_URL') ?? 'https://vallepark.com').trim().replace(/\/+$/, '');
@@ -62,6 +67,11 @@ export class TicketService {
     return `${this.siteUrl}/ticket/${encodeURIComponent(refCode)}?t=${this.token(refCode)}`;
   }
 
+  /** The waiver form, opened with the same token as the ticket. */
+  waiverUrl(refCode: string): string {
+    return `${this.siteUrl}/waiver/${encodeURIComponent(refCode)}?t=${this.token(refCode)}`;
+  }
+
   qrUrl(refCode: string): string {
     return `${this.apiUrl}/tickets/${encodeURIComponent(refCode)}/qr.png?t=${this.token(refCode)}`;
   }
@@ -80,11 +90,14 @@ export class TicketService {
 
   async view(refCode: string, token: string | undefined): Promise<TicketView> {
     const b = await this.requireBooking(refCode, token);
-    const lines = await this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } });
-    return this.toView(b, lines);
+    const [lines, signed] = await Promise.all([
+      this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } }),
+      this.waiverRepo.count({ where: { bookingId: b.id } }),
+    ]);
+    return this.toView(b, lines, signed);
   }
 
-  toView(b: Booking, lines: BookingLine[]): TicketView {
+  toView(b: Booking, lines: BookingLine[], waiversSigned = 0): TicketView {
     return {
       refCode: b.refCode,
       guestName: b.guestName,
@@ -99,6 +112,9 @@ export class TicketService {
       lines: lines.map((l) => ({ label: l.label, amount: l.amount })),
       ticketUrl: this.ticketUrl(b.refCode),
       qrUrl: this.qrUrl(b.refCode),
+      waiverUrl: this.waiverUrl(b.refCode),
+      waiversSigned,
+      waiversRequired: b.adults + b.kids,
     };
   }
 }

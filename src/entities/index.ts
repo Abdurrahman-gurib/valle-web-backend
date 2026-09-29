@@ -38,3 +38,5 @@ export { ChatMessage } from './chat-message.entity';
 export { ChatAttachment } from './chat-attachment.entity';
 export { JobVacancy } from './job-vacancy.entity';
 export { JobApplication } from './job-application.entity';
+export { Waiver } from './waiver.entity';
+export type { WaiverDeclarations } from './waiver.entity';
