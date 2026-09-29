@@ -2,6 +2,8 @@ import { FALLBACK, FxService, parseBomTable } from './fx.service';
 
 const row = (country: string, code: string, tt: string, date = '28-09-2026') =>
   `<tr><td>${country}</td><td>${code}</td><td>${tt}</td><td>1</td><td>1</td><td>1</td><td>1</td><td>${date}</td></tr>`;
+/** The small undated "notes" table under the consolidated one. */
+const notesRow = (code: string, buy: string) => `<tr><td>${code}</td><td>${buy}</td><td>99</td></tr>`;
 
 const PAGE = `<html><table>
   <tr><th></th><th>Buying</th><th>Selling</th></tr>
@@ -27,7 +29,24 @@ describe('parseBomTable', () => {
 
   it('returns null for a page without the table, so the old rates are kept', () => {
     expect(parseBomTable('<html><p>Maintenance</p></html>')).toBeNull();
-    expect(parseBomTable(row('EMU', 'EUR 1', '53'))).toBeNull(); // USD missing
+    expect(parseBomTable(notesRow('USD 1', '46.6'))).toBeNull(); // undated rows alone are not trusted
+  });
+
+  it('ignores the undated notes table and takes the newest dated table', () => {
+    const page = `<table>${row('U.S.A.', 'USD 1', '46.7878', '28-09-2026')}${row('EMU', 'EUR 1', '53.2771', '28-09-2026')}
+      ${row('U.S.A.', 'USD 1', '46.9146', '29-09-2026')}${row('EMU', 'EUR 1', '53.2981', '29-09-2026')}
+      ${notesRow('USD 1', '46.6124')}</table>`;
+    const t = parseBomTable(page)!;
+    expect(t.asOf).toBe('2026-09-29');
+    expect(t.ttBuying.USD).toBeCloseTo(46.9146, 4);
+  });
+
+  it('skips a half-updated row (empty T.T. cell) instead of yielding 0', () => {
+    const page = `<table>${row('U.S.A.', 'USD 1', '', '29-09-2026')}${row('EMU', 'EUR 1', '53.2981', '29-09-2026')}${notesRow('USD 1', '46.6124')}</table>`;
+    const t = parseBomTable(page)!;
+    expect(t.asOf).toBe('2026-09-29');
+    expect(t.ttBuying.USD).toBeUndefined();
+    expect(t.ttBuying.EUR).toBeCloseTo(53.2981, 4);
   });
 });
 
@@ -51,6 +70,21 @@ describe('FxService.rates', () => {
     const t = await svc.rates();
     expect(t.rates.USD).toMatchObject({ mur: FALLBACK.ttBuying.USD, source: 'fallback' });
     expect(t.asOf).toBe(FALLBACK.asOf);
+  });
+
+  it("keeps a currency's previous rate when today's table lacks it, and retries sooner", async () => {
+    const svc = new FxService();
+    svc.fetchPage = async () => PAGE; // 28-09, USD 46.7878
+    await svc.rates();
+    svc.fetchPage = async () => `<table>${row('U.S.A.', 'USD 1', '', '29-09-2026')}${row('EMU', 'EUR 1', '53.2981', '29-09-2026')}${notesRow('USD 1', '46.6124')}</table>`;
+    (svc as unknown as { nextFetch: number }).nextFetch = 0;
+    await svc.rates();
+    await new Promise((r) => setTimeout(r, 0));
+    const t = await svc.rates();
+    expect(t.asOf).toBe('2026-09-29');
+    expect(t.rates.EUR.mur).toBeCloseTo(53.2981, 4);
+    expect(t.rates.USD.mur).toBeCloseTo(46.7878, 4); // yesterday's T.T., never the notes table's 46.6124
+    expect((svc as unknown as { nextFetch: number }).nextFetch - Date.now()).toBeLessThan(11 * 60 * 1000);
   });
 
   it('keeps the last good table when a later fetch fails or the page changes shape', async () => {

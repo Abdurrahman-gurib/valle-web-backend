@@ -7,11 +7,14 @@ import { Injectable, Logger } from '@nestjs/common';
  * (https://www.bom.mu/markets/foreign-exchange/consolidated-indicative-exchange-rates),
  * the T.T. buying rate: what a bank pays in rupees for one unit of the foreign
  * currency, i.e. what a guest paying with that currency effectively gets. The
- * page is fetched at most every REFRESH_MS; when it is unreachable or changes
- * shape, the last good table stays in use, and before the first successful
- * fetch the FALLBACK snapshot (BoM, 28-09-2026) is served. AED and SAR are not
- * quoted by the BoM; both are pegged to the US dollar, so they are derived
- * from the USD rate at the official pegs.
+ * page is re-read every hour (the BoM publishes a new table each working
+ * morning, sometimes in stages); when it is unreachable or changes shape, the
+ * last good table stays in use, and before the first successful fetch the
+ * FALLBACK snapshot (BoM, 28-09-2026) is served. Only rows that carry the
+ * table date are trusted, and a currency missing from today's table keeps its
+ * previous rate rather than borrowing a figure from another table on the
+ * page. AED and SAR are not quoted by the BoM; both are pegged to the US
+ * dollar, so they are derived from the USD rate at the official pegs.
  *
  * Every payment is still in rupees: these are display conversions only.
  */
@@ -39,8 +42,8 @@ export interface FxTable {
 }
 
 const BOM_URL = 'https://www.bom.mu/markets/foreign-exchange/consolidated-indicative-exchange-rates';
-const REFRESH_MS = 6 * 60 * 60 * 1000;
-const RETRY_MS = 15 * 60 * 1000;
+const REFRESH_MS = 60 * 60 * 1000;
+const RETRY_MS = 10 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 
 /** Currency metadata; the order here is the order in the picker. */
@@ -75,31 +78,39 @@ export const FALLBACK: { asOf: string; ttBuying: Record<string, number> } = {
 };
 
 /**
- * Pull "CODE N" + the first numeric column (T.T. buying) + the row date out of
- * the BoM HTML table. Returns null when nothing recognisable is found, so a
- * redesigned page never replaces good rates with an empty table.
+ * Pull "CODE N" + the T.T. buying column + the row date out of the BoM HTML.
+ * Only rows that carry a date are trusted: the page also shows a small undated
+ * "notes" table, and while the bank is updating (it does so in stages each
+ * morning) that table can lag a day behind. The newest date wins; rows whose
+ * T.T. cell is empty are skipped, so a half-updated row never yields 0.
+ * Returns null when nothing recognisable is found, so a redesigned page never
+ * replaces good rates with an empty table.
  */
 export function parseBomTable(html: string): { asOf: string; ttBuying: Record<string, number> } | null {
   const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) ?? [];
-  const ttBuying: Record<string, number> = {};
-  let asOf = '';
+  const byDate = new Map<string, Record<string, number>>();
   for (const row of rows) {
     const cells = [...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((m) =>
       m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(),
     );
     const code = cells.find((c) => /^[A-Z]{3} \d+$/.test(c));
-    if (!code) continue;
+    const rawDate = cells.find((c) => /^\d{2}-\d{2}-\d{4}$/.test(c));
+    if (!code || !rawDate) continue;
     const [ccy, unitsStr] = code.split(' ');
     const units = Number(unitsStr);
-    const idx = cells.indexOf(code);
-    const tt = Number(cells[idx + 1]);
-    if (!Number.isFinite(tt) || tt <= 0 || !units) continue;
-    if (ccy in CURRENCIES && !(ccy in ttBuying)) ttBuying[ccy] = tt / units;
-    const date = cells.find((c) => /^\d{2}-\d{2}-\d{4}$/.test(c));
-    if (date && !asOf) asOf = date.split('-').reverse().join('-');
+    const tt = Number(cells[cells.indexOf(code) + 1]);
+    if (!Number.isFinite(tt) || tt <= 0 || !units || !(ccy in CURRENCIES)) continue;
+    const date = rawDate.split('-').reverse().join('-');
+    const table = byDate.get(date) ?? {};
+    if (!(ccy in table)) table[ccy] = tt / units;
+    byDate.set(date, table);
   }
-  if (!ttBuying.USD || !ttBuying.EUR) return null;
-  return { asOf: asOf || new Date().toISOString().slice(0, 10), ttBuying };
+  const dates = [...byDate.keys()].sort();
+  if (dates.length === 0) return null;
+  const asOf = dates[dates.length - 1];
+  const ttBuying = byDate.get(asOf)!;
+  if (!ttBuying.USD && !ttBuying.EUR) return null;
+  return { asOf, ttBuying };
 }
 
 @Injectable()
@@ -137,9 +148,18 @@ export class FxService {
       try {
         const parsed = parseBomTable(await this.fetchPage());
         if (!parsed) throw new Error('no rate table recognised in the BoM page');
-        this.table = buildTable(parsed.asOf, parsed.ttBuying, 'bom', new Date().toISOString());
-        this.nextFetch = Date.now() + REFRESH_MS;
-        this.logger.log(`BoM rates refreshed (as of ${parsed.asOf}, ${Object.keys(parsed.ttBuying).length} currencies)`);
+        // A currency the new table lacks (half-updated page) keeps its last good rate.
+        const merged: Record<string, number> = {};
+        for (const ccy of Object.keys(CURRENCIES)) {
+          if (ccy === 'MUR' || USD_PEGS[ccy]) continue;
+          const prev = this.table.rates[ccy]?.source === 'bom' ? this.table.rates[ccy].mur : undefined;
+          const next = parsed.ttBuying[ccy] ?? prev ?? FALLBACK.ttBuying[ccy];
+          if (next) merged[ccy] = next;
+        }
+        const missing = Object.keys(merged).filter((c) => !(c in parsed.ttBuying));
+        this.table = buildTable(parsed.asOf, merged, 'bom', new Date().toISOString());
+        this.nextFetch = Date.now() + (missing.length ? RETRY_MS : REFRESH_MS);
+        this.logger.log(`BoM rates refreshed (as of ${parsed.asOf}, ${Object.keys(parsed.ttBuying).length} currencies${missing.length ? ', kept previous for ' + missing.join('/') : ''})`);
       } catch (e) {
         this.nextFetch = Date.now() + RETRY_MS;
         this.logger.warn(`BoM rates not refreshed, keeping ${this.table.rates.USD.source} table: ${(e as Error).message}`);
