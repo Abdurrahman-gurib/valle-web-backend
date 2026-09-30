@@ -12,6 +12,19 @@ import { IsCalendarDate } from '../common/validation';
 import { CheckInDto, SignWaiverDto } from './waiver.dto';
 import { GateDayRow, GateView, WaiverPublicView, WaiversService, parkToday } from './waivers.service';
 
+/** Query classes come before the controllers: decorators read them when the class body is evaluated. */
+class SampleQueryDto {
+  @IsOptional()
+  @IsIn(['en', 'fr', 'de', 'it', 'ar'])
+  lang?: string;
+}
+
+class GateDayQueryDto {
+  @IsOptional()
+  @IsCalendarDate()
+  date?: string;
+}
+
 function sendPdf(res: Response, pdf: Buffer, filename: string): void {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
@@ -63,18 +76,6 @@ export class WaiversController {
   ): Promise<WaiverPublicView> {
     return this.waivers.sign(refCode.toUpperCase(), q.t, dto, { ip: ip ?? '', userAgent: userAgent ?? '' });
   }
-}
-
-class SampleQueryDto {
-  @IsOptional()
-  @IsIn(['en', 'fr', 'de', 'it', 'ar'])
-  lang?: string;
-}
-
-class GateDayQueryDto {
-  @IsOptional()
-  @IsCalendarDate()
-  date?: string;
 }
 
 @ApiTags('staff')
