@@ -157,6 +157,35 @@ export class WhatsAppService {
     }
   }
 
+  /**
+   * A plain text message. Meta only delivers it inside the 24-hour window
+   * after the guest last wrote to the number; outside it the API refuses and
+   * this returns false (the e-mail still goes). Never throws.
+   */
+  async sendText(phone: string, text: string): Promise<boolean> {
+    if (!this.enabled) return false;
+    const to = WhatsAppService.normalise(phone);
+    if (!to) return false;
+    try {
+      const res = this.provider === '360dialog'
+        ? await this.post(`${this.d360Base}/messages`, { 'D360-API-KEY': this.d360Key, 'Content-Type': 'application/json' },
+          JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: to.replace(/^\+/, ''), type: 'text', text: { body: text.slice(0, 4000), preview_url: true } }))
+        : await this.post(
+          `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(this.twSid)}/Messages.json`,
+          { Authorization: 'Basic ' + Buffer.from(`${this.twSid}:${this.twToken}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+          new URLSearchParams({ From: this.twFrom, To: 'whatsapp:' + to, Body: text }).toString(),
+        );
+      if (!res.ok) {
+        this.logger.warn(`WhatsApp text to ${to} refused by ${this.provider} (${res.status}): ${(await res.text()).slice(0, 200)}`);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      this.logger.error(`WhatsApp text to ${to} failed: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
   /** Ticket or reminder. Never throws. */
   async sendBooking(kind: 'ticket' | 'reminder', phone: string, msg: BookingMessage): Promise<boolean> {
     if (!this.enabled) return false;

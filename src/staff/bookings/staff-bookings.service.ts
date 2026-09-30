@@ -252,6 +252,12 @@ export class StaffBookingsService {
     return this.guest.sendTicket(booking);
   }
 
+  async resendWaiverLink(refCode: string): Promise<{ email: boolean; whatsapp: boolean }> {
+    const booking = await this.bookingRepo.findOne({ where: { refCode } });
+    if (!booking) throw new NotFoundException(`No booking ${refCode}`);
+    return this.guest.sendWaiverLink(booking);
+  }
+
   private withTicket(detail: BookingDetail): BookingDetail {
     return { ...detail, ticketUrl: this.tickets.ticketUrl(detail.refCode) };
   }

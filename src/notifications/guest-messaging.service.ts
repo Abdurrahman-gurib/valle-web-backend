@@ -197,6 +197,46 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  // ---------------------------------------------------------------- waiver link
+
+  /** Text of the "please sign your waivers" message (exported for tests). */
+  waiverLinkText(b: Booking): string {
+    return [
+      `Hi ${b.guestName.split(' ')[0] || b.guestName}, one thing before your visit to VALLÉ Advenature™ Park on ${longDate(dateStr(b.visitDate))}:`,
+      `each participant needs a signed safety waiver (Disclaimer Form). Sign it on your phone now, one per person, and skip the paperwork at the gate:`,
+      this.tickets.waiverUrl(b.refCode),
+      ``,
+      `Booking ${b.refCode} · questions? Reply here or call ${PARK_PHONE}.`,
+    ].join('\n');
+  }
+
+  /** Staff re-sends the waiver link: e-mail always, WhatsApp when the 24-hour window allows a plain message. */
+  async sendWaiverLink(b: Booking): Promise<{ email: boolean; whatsapp: boolean }> {
+    const text = this.waiverLinkText(b);
+    const url = this.tickets.waiverUrl(b.refCode);
+    const html = `<!doctype html><html><body style="margin:0;background:#F7F3FF;font-family:Arial,Helvetica,sans-serif;color:#340057">
+<div style="max-width:560px;margin:0 auto;padding:24px 16px">
+  <div style="background:#340057;color:#FFFFFF;border-radius:18px 18px 0 0;padding:22px 24px">
+    <div style="font-size:11px;letter-spacing:.16em;opacity:.7">VALLÉ ADVENATURE™ PARK</div>
+    <div style="font-size:24px;font-weight:900;font-style:italic;margin-top:6px">Sign your waivers before you arrive</div>
+  </div>
+  <div style="height:8px;background:repeating-linear-gradient(-45deg,#33FF74 0 12px,#340057 12px 24px)"></div>
+  <div style="background:#FFFFFF;padding:24px;border-radius:0 0 18px 18px;font-size:15px;line-height:1.5">
+    <p style="margin:0 0 12px">Hi ${esc(b.guestName)}, one thing before your visit on <strong>${esc(longDate(dateStr(b.visitDate)))}</strong>:</p>
+    <p style="margin:0 0 18px">Each participant needs a signed safety waiver (Disclaimer Form). Fill it in on your phone now, one per person, and walk straight past the paperwork at the gate.</p>
+    <p style="text-align:center;margin:0 0 18px"><a href="${url}" style="background:#FF3358;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:999px;display:inline-block">Sign the waivers</a></p>
+    <p style="margin:0;font-size:12px;color:#7A6A93;word-break:break-all">${esc(url)}</p>
+  </div>
+  <p style="text-align:center;font-size:11px;color:#7A6A93;margin:16px 0 0">Booking ${esc(b.refCode)} · ${esc(PARK_PHONE)} · sales@vallepark.com</p>
+</div></body></html>`;
+    const [email, whatsapp] = await Promise.all([
+      b.email ? this.mail.send({ to: b.email, subject: `Sign your safety waivers · ${b.refCode}`, text, html }) : Promise.resolve(false),
+      b.phone ? this.whatsapp.sendText(b.phone, text) : Promise.resolve(false),
+    ]);
+    this.logger.log(`Waiver link ${b.refCode}: e-mail ${email ? 'sent' : 'not sent'}, WhatsApp ${whatsapp ? 'sent' : 'not sent'}`);
+    return { email, whatsapp };
+  }
+
   // ---------------------------------------------------------------- reminder
 
   reminderText(b: Booking): string {

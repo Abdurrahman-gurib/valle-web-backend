@@ -80,6 +80,13 @@ export class StaffBookingsController {
     return this.staffBookings.update(refCode, dto, staff);
   }
 
+  @Post('bookings/:refCode/resend-waiver')
+  @ApiOperation({ summary: 'Send the guest the link to sign their waivers (e-mail, and WhatsApp when allowed)' })
+  @ApiResponse({ status: 404, description: 'Unknown reference code' })
+  resendWaiver(@Param('refCode') refCode: string): Promise<{ email: boolean; whatsapp: boolean }> {
+    return this.staffBookings.resendWaiverLink(refCode);
+  }
+
   @Post('bookings/:refCode/resend-ticket')
   @ApiOperation({ summary: "Re-send the guest's ticket by e-mail and WhatsApp" })
   @ApiResponse({ status: 404, description: 'Unknown reference code' })
