@@ -6,6 +6,7 @@ import { ageOn } from './waiver-rules';
 const PURPLE = '#340057';
 const VIOLET = '#7333FF';
 const GREY = '#6B5B85';
+const VISIT: Record<TermsLang, string> = { en: 'Visit', fr: 'Visite', de: 'Besuch', it: 'Visita', ar: 'Visit' };
 
 /**
  * PDF copy of a signed Disclaimer Form: what the guest gets by e-mail and
@@ -38,14 +39,21 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     const signedAt = w.signedAt instanceof Date ? w.signedAt : new Date(w.signedAt);
     const stamp = `${signedAt.toLocaleString('en-GB', { timeZone: 'Indian/Mauritius', hour12: false })} (Mauritius) · IP ${w.ip || '-'} · ${w.termsVersion} · ${w.lang.toUpperCase()}`;
 
-    // header
-    doc.font('Helvetica-BoldOblique').fontSize(24).fillColor(PURPLE).text('VALLÉ', { continued: true }).font('Helvetica').fontSize(9).fillColor(GREY).text('  ADVENATURE™ PARK');
-    doc.moveDown(0.6);
-    doc.font('Helvetica').fontSize(8).fillColor(GREY).text(stamp);
-    doc.moveDown(0.8);
-    doc.font('Helvetica-Bold').fontSize(16).fillColor(PURPLE).text(L.title, { align: 'center' });
-    doc.font('Helvetica').fontSize(9).fillColor(PURPLE).text(L.company, { align: 'center' });
-    doc.moveDown(0.8);
+    // header band in the site's colours, drawn at fixed positions so nothing overlaps
+    const W = doc.page.width;
+    const M = doc.page.margins.left;
+    doc.save();
+    doc.rect(0, 0, W, 84).fill(PURPLE);
+    doc.rect(0, 84, W, 8).fill(PURPLE);
+    for (let x = -24; x < W + 24; x += 24) doc.polygon([x, 92], [x + 12, 92], [x + 24, 84], [x + 12, 84]).fill('#33FF74');
+    doc.restore();
+    doc.font('Helvetica-BoldOblique').fontSize(26).fillColor('#FFFFFF').text('VALLÉ', M, 22, { lineBreak: false });
+    doc.font('Helvetica').fontSize(8).fillColor('#FFFFFF').opacity(0.8).text('ADVENATURE™ PARK', M + 2, 54, { characterSpacing: 2, lineBreak: false }).opacity(1);
+    doc.font('Helvetica-Bold').fontSize(16).fillColor('#FFFFFF').text(L.title, M, 26, { width: W - 2 * M, align: 'right', lineBreak: false });
+    doc.font('Helvetica').fontSize(8.5).fillColor('#FFFFFF').opacity(0.85).text(L.company, M, 50, { width: W - 2 * M, align: 'right', lineBreak: false }).opacity(1);
+    doc.font('Helvetica').fontSize(8).fillColor(GREY).text(stamp, M, 104, { width: W - 2 * M, lineBreak: false });
+    doc.y = 124;
+    doc.x = M;
 
     // participant block first, as on the paper form's summary
     const row = (label: string, value: string) => {
@@ -70,7 +78,7 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     row(L.emName, w.emergencyName);
     row(L.emPhone, w.emergencyPhone);
     row(L.medical, w.medicalNotes);
-    row('Visit', `${visit} · ${b.slot}`);
+    row(VISIT[lang], `${visit} · ${b.slot}`);
     doc.moveDown(0.4);
 
     // clauses
