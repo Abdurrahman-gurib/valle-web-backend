@@ -2,6 +2,34 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ageOn, flagsFor, parseAgeLabel, parseLimitsSetting } from './waiver-rules';
 import { WaiversService, parkToday } from './waivers.service';
 import type { SignWaiverDto } from './waiver.dto';
+import { renderWaiverPdf } from './waiver-pdf';
+import { WhatsAppService } from '../notifications/whatsapp.service';
+
+describe('waiver PDF and WhatsApp copy', () => {
+  it('renders a PDF with the clauses in the language read, and English for Arabic', async () => {
+    const b = { refCode: 'VAL-1111-26', visitDate: '2026-10-02', slot: 'morning' } as never;
+    const base = {
+      id: 'w1', participantName: 'Eric Fransen', birthDate: '1970-09-22', heightCm: 180, weightKg: 82, isMinor: false, guardianName: '',
+      address: 'Lux Le Morne', email: 'e@example.be', phone: '+32 477 59 26 59', nationality: 'Belgium', idNumber: '', marketingConsent: true,
+      emergencyName: 'Annemie', emergencyPhone: '+32 479 09 80 61', medicalNotes: '',
+      signaturePng: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      signedBy: 'Eric Fransen', termsVersion: 'VAL-DISCLAIMER-2026-09-30', ip: '1.2.3.4', signedAt: new Date('2026-09-30T06:09:19Z'),
+    };
+    for (const lang of ['en', 'fr', 'ar']) {
+      const pdf = await renderWaiverPdf({ ...base, lang } as never, b, { siteUrl: 'https://example.test' });
+      expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+      expect(pdf.length).toBeGreaterThan(5000);
+    }
+  });
+
+  it('builds a document template payload with the PDF as header', () => {
+    const wa = new WhatsAppService({ get: (k: string) => (k === 'D360_API_KEY' ? 'key' : undefined) } as never);
+    const p = wa.documentPayload('+23059086131', 'valle_waiver_copy', { link: 'https://x/a.pdf', filename: 'a.pdf', params: ['Eric', 'VAL-1'], ticketPath: 'VAL-1?t=abc', text: '' }) as { to: string; template: { components: { type: string; parameters: unknown[] }[] } };
+    expect(p.to).toBe('23059086131');
+    expect(p.template.components[0]).toEqual({ type: 'header', parameters: [{ type: 'document', document: { link: 'https://x/a.pdf', filename: 'a.pdf' } }] });
+    expect(p.template.components[2].parameters).toEqual([{ type: 'text', text: 'VAL-1?t=abc' }]);
+  });
+});
 
 describe('waiver rules', () => {
   it('reads the catalog age labels', () => {
@@ -72,8 +100,10 @@ function build(booking: Record<string, unknown>, existing: Record<string, unknow
     save: jest.fn(async (x: unknown) => x),
   };
   const tickets = { requireBooking: jest.fn(async () => b), waiverUrl: () => 'https://example.test/waiver/X' };
+  const copies = { send: jest.fn(async () => ({ email: true, whatsapp: false })), pdf: jest.fn(async () => Buffer.from('%PDF')) };
   const svc = new WaiversService(
     tickets as never,
+    copies as never,
     waiverRepo as never,
     bookingRepo as never,
     { find: jest.fn(async () => [{ experienceId: 'zipline' }]) } as never,
@@ -81,7 +111,7 @@ function build(booking: Record<string, unknown>, existing: Record<string, unknow
     { find: jest.fn(async () => [{ id: 'zipline', name: 'Zipline Adventures', ageLabel: '8+' }]) } as never,
     { findOne: jest.fn(async () => null) } as never,
   );
-  return { svc, b, saved, audits, rows };
+  return { svc, b, saved, audits, rows, copies };
 }
 
 const dto = (over: Partial<SignWaiverDto> = {}): SignWaiverDto => ({
@@ -108,6 +138,7 @@ describe('WaiversService.sign', () => {
     expect(view.required).toBe(3);
     expect(view.signed).toHaveLength(1);
     expect(JSON.stringify(view)).not.toContain('base64');
+    expect(view.copy).toEqual({ email: true, whatsapp: false });
   });
 
   it('needs a guardian for a participant under 18', async () => {

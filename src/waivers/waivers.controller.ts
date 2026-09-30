@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Header, Headers, Ip, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Headers, Ip, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { IsOptional } from 'class-validator';
@@ -11,12 +12,34 @@ import { IsCalendarDate } from '../common/validation';
 import { CheckInDto, SignWaiverDto } from './waiver.dto';
 import { GateDayRow, GateView, WaiverPublicView, WaiversService, parkToday } from './waivers.service';
 
+function sendPdf(res: Response, pdf: Buffer, filename: string): void {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  res.send(pdf);
+}
+
 const WAIVER_LIMIT = Number(process.env.BOOKING_RATE_LIMIT) > 0 ? Number(process.env.BOOKING_RATE_LIMIT) * 3 : 30;
 
 @ApiTags('waivers')
 @Controller('tickets')
 export class WaiversController {
   constructor(private readonly waivers: WaiversService) {}
+
+  @Get('sample/waiver.pdf')
+  @ApiOperation({ summary: 'A filled-in example of the Disclaimer Form PDF' })
+  @Header('Cache-Control', 'public, max-age=86400')
+  async sample(@Res() res: Response): Promise<void> {
+    sendPdf(res, await this.waivers.samplePdf(), 'valle-disclaimer-sample.pdf');
+  }
+
+  @Get(':refCode/waivers/:id.pdf')
+  @ApiOperation({ summary: "PDF copy of one signed waiver (needs the ticket token)" })
+  @ApiResponse({ status: 403, description: 'Bad or missing token' })
+  async pdf(@Param('refCode') refCode: string, @Param('id') id: string, @Query() q: TicketQueryDto, @Res() res: Response): Promise<void> {
+    const { w, b } = await this.waivers.waiverOf(refCode.toUpperCase(), id, q.t);
+    res.setHeader('Cache-Control', 'private, no-store');
+    sendPdf(res, await this.waivers.pdf(w, b), `valle-disclaimer-${b.refCode}.pdf`);
+  }
 
   @Get(':refCode/waivers')
   @ApiOperation({ summary: 'Who in the party has signed the waiver (needs the ticket token)' })
@@ -65,6 +88,14 @@ export class GateController {
   @ApiOperation({ summary: 'Gate scan: booking, waivers and activity warnings' })
   view(@Param('refCode') refCode: string): Promise<GateView> {
     return this.waivers.gateView(refCode);
+  }
+
+  @Get(':refCode/waivers/:id.pdf')
+  @ApiOperation({ summary: 'PDF copy of a signed waiver, for the gate' })
+  async pdf(@Param('refCode') refCode: string, @Param('id') id: string, @Res() res: Response): Promise<void> {
+    const { w, b } = await this.waivers.waiverOf(refCode, id);
+    res.setHeader('Cache-Control', 'private, no-store');
+    sendPdf(res, await this.waivers.pdf(w, b), `valle-disclaimer-${b.refCode}.pdf`);
   }
 
   @Post(':refCode/check-in')

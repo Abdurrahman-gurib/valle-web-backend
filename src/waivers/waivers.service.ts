@@ -5,6 +5,7 @@ import { Booking, BookingAudit, BookingLine, Experience, Setting, Waiver } from 
 import type { StaffPrincipal } from '../staff/auth/staff-auth.types';
 import { TicketService } from '../tickets/ticket.service';
 import { CheckInDto, SignWaiverDto } from './waiver.dto';
+import { CopySent, WaiverCopyService } from './waiver-copy.service';
 import {
   GateActivity,
   WAIVER_TERMS_VERSION,
@@ -25,10 +26,12 @@ export interface WaiverPublicView {
   visitDate: string;
   slot: 'morning' | 'afternoon';
   required: number;
-  signed: { participantName: string; isMinor: boolean; signedAt: string }[];
+  signed: { id: string; participantName: string; isMinor: boolean; signedAt: string }[];
   /** false once the visit date has passed or the booking is cancelled */
   open: boolean;
   termsVersion: string;
+  /** After a POST: whether the guest's copy went out. */
+  copy?: CopySent;
   activities: { name: string; minAge?: number; maxAge?: number; driveMinAge?: number; maxWeightKg?: number; minWeightKg?: number; minHeightCm?: number; maxHeightCm?: number }[];
 }
 
@@ -93,6 +96,7 @@ export interface GateDayRow {
 export class WaiversService {
   constructor(
     private readonly tickets: TicketService,
+    private readonly copies: WaiverCopyService,
     @InjectRepository(Waiver) private readonly waiverRepo: Repository<Waiver>,
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     @InjectRepository(BookingLine) private readonly lineRepo: Repository<BookingLine>,
@@ -137,7 +141,7 @@ export class WaiversService {
       visitDate: dateStr(b.visitDate),
       slot: b.slot,
       required: WaiversService.required(b),
-      signed: waivers.map((w) => ({ participantName: w.participantName, isMinor: w.isMinor, signedAt: w.signedAt.toISOString() })),
+      signed: waivers.map((w) => ({ id: w.id, participantName: w.participantName, isMinor: w.isMinor, signedAt: w.signedAt.toISOString() })),
       open: this.isOpen(b),
       termsVersion: WAIVER_TERMS_VERSION,
       activities: activities.map((a) => ({ name: a.name, ...a.limits })),
@@ -194,13 +198,41 @@ export class WaiversService {
       userAgent: meta.userAgent.slice(0, 300),
       signedAt: new Date(),
     });
-    await this.waiverRepo.save(row);
-    return this.publicView(refCode, token);
+    const saved = await this.waiverRepo.save(row);
+    const copy = await this.copies.send(saved, b);
+    return { ...(await this.publicView(refCode, token)), copy };
   }
 
   /** Signed / required for a booking (ticket page, back office list). */
   async counts(b: Booking): Promise<{ signed: number; required: number }> {
     return { signed: await this.waiverRepo.count({ where: { bookingId: b.id } }), required: WaiversService.required(b) };
+  }
+
+  /** A signed waiver of this booking, for the PDF copy (guest with token, or staff). */
+  async waiverOf(refCode: string, id: string, token?: string): Promise<{ w: Waiver; b: Booking }> {
+    const b = token !== undefined
+      ? await this.tickets.requireBooking(refCode, token)
+      : await this.bookingRepo.findOne({ where: { refCode: refCode.toUpperCase() } });
+    if (!b) throw new NotFoundException(`No booking ${refCode}`);
+    const w = await this.waiverRepo.findOne({ where: { id, bookingId: b.id } });
+    if (!w) throw new NotFoundException('No such waiver');
+    return { w, b };
+  }
+
+  pdf(w: Waiver, b: Booking): Promise<Buffer> {
+    return this.copies.pdf(w, b);
+  }
+
+  /** A filled-in example for previews and for the WhatsApp template sample. */
+  samplePdf(): Promise<Buffer> {
+    const b = { refCode: 'VAL-1234-26', visitDate: '2026-10-02', slot: 'morning' } as Booking;
+    const w = {
+      id: 'sample', participantName: 'Asha Rahman', birthDate: '1990-04-12', heightCm: 165, weightKg: 60, isMinor: false, guardianName: '',
+      address: 'Lux Le Morne', email: 'asha@example.com', phone: '+230 5123 4567', nationality: 'Mauritius', idNumber: '',
+      emergencyName: 'Omar Rahman', emergencyPhone: '+230 5765 4321', medicalNotes: '', marketingConsent: false,
+      signaturePng: '', signedBy: 'Asha Rahman', lang: 'en', termsVersion: 'sample', ip: '', signedAt: new Date('2026-09-30T08:00:00Z'),
+    } as unknown as Waiver;
+    return this.copies.pdf(w, b);
   }
 
   // ---------------------------------------------------------------- gate
