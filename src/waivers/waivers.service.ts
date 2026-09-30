@@ -41,6 +41,12 @@ export interface GateWaiver {
   weightKg: number;
   isMinor: boolean;
   guardianName: string;
+  address: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  idNumber: string;
+  marketingConsent: boolean;
   emergencyName: string;
   emergencyPhone: string;
   medicalNotes: string;
@@ -169,10 +175,16 @@ export class WaiversService {
       weightKg: dto.weightKg,
       isMinor,
       guardianName: isMinor ? guardian : '',
+      address: (dto.address ?? '').trim(),
+      email: (dto.email ?? '').trim(),
+      phone: dto.phone.trim(),
+      nationality: dto.nationality.trim(),
+      idNumber: (dto.idNumber ?? '').trim(),
+      marketingConsent: !!dto.marketingConsent,
       emergencyName: dto.emergencyName.trim(),
       emergencyPhone: dto.emergencyPhone.trim(),
       medicalNotes: (dto.medicalNotes ?? '').trim(),
-      declarations: { risks: true, health: true, sober: true, rules: true, data: true },
+      declarations: { terms: true, health: true, consent: true },
       photoConsent: !!dto.photoConsent,
       signaturePng: dto.signature,
       signedBy: isMinor ? guardian : name,
@@ -211,6 +223,12 @@ export class WaiversService {
       weightKg: w.weightKg,
       isMinor: w.isMinor,
       guardianName: w.guardianName,
+      address: w.address,
+      email: w.email,
+      phone: w.phone,
+      nationality: w.nationality,
+      idNumber: w.idNumber,
+      marketingConsent: w.marketingConsent,
       emergencyName: w.emergencyName,
       emergencyPhone: w.emergencyPhone,
       medicalNotes: w.medicalNotes,

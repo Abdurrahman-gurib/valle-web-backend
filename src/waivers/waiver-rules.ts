@@ -5,7 +5,7 @@
  */
 
 /** Version of the waiver wording; bump when the text in the frontend changes. */
-export const WAIVER_TERMS_VERSION = 'VAL-WAIVER-2026-09';
+export const WAIVER_TERMS_VERSION = 'VAL-DISCLAIMER-2026-09-30';
 
 export interface ActivityLimits {
   minAge?: number;

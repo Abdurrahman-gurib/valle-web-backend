@@ -91,7 +91,9 @@ const dto = (over: Partial<SignWaiverDto> = {}): SignWaiverDto => ({
   weightKg: 60,
   emergencyName: 'Omar Rahman',
   emergencyPhone: '+971 50 123 4567',
-  declarations: { risks: true, health: true, sober: true, rules: true, data: true },
+  phone: '+32 477 59 26 59',
+  nationality: 'Belgium',
+  declarations: { terms: true, health: true, consent: true },
   signature: 'data:image/png;base64,' + 'A'.repeat(300),
   lang: 'ar',
   ...over,
@@ -102,7 +104,7 @@ describe('WaiversService.sign', () => {
   it('stores a waiver against the booking with the terms version and language', async () => {
     const { svc, saved } = build({});
     const view = await svc.sign('VAL-1111-26', 't', dto(), meta);
-    expect(saved[0]).toMatchObject({ bookingId: 'b1', isMinor: false, signedBy: 'Aisha Rahman', lang: 'ar', termsVersion: 'VAL-WAIVER-2026-09' });
+    expect(saved[0]).toMatchObject({ bookingId: 'b1', isMinor: false, signedBy: 'Aisha Rahman', lang: 'ar', termsVersion: 'VAL-DISCLAIMER-2026-09-30' });
     expect(view.required).toBe(3);
     expect(view.signed).toHaveLength(1);
     expect(JSON.stringify(view)).not.toContain('base64');

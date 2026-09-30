@@ -2,11 +2,12 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 /** The statements every participant (or their guardian) ticks before signing. */
 export interface WaiverDeclarations {
-  risks: boolean;
+  /** read and accepts all clauses of the Disclaimer Form */
+  terms: boolean;
+  /** clauses 9 and 10: fit, sober, not pregnant */
   health: boolean;
-  sober: boolean;
-  rules: boolean;
-  data: boolean;
+  /** clause 8: guardian's consent (minors) or own voluntary participation */
+  consent: boolean;
 }
 
 /**
@@ -39,6 +40,26 @@ export class Waiver {
 
   @Column({ name: 'guardian_name', type: 'text', default: '' })
   guardianName: string;
+
+  /** Address or hotel, contact details and papers, as on the paper Disclaimer Form. */
+  @Column({ name: 'address', type: 'text', default: '' })
+  address: string;
+
+  @Column({ name: 'email', type: 'text', default: '' })
+  email: string;
+
+  @Column({ name: 'phone', type: 'text', default: '' })
+  phone: string;
+
+  @Column({ name: 'nationality', type: 'text', default: '' })
+  nationality: string;
+
+  @Column({ name: 'id_number', type: 'text', default: '' })
+  idNumber: string;
+
+  /** Clause 18: future promotions by e-mail / phone. Optional. */
+  @Column({ name: 'marketing_consent', type: 'boolean', default: false })
+  marketingConsent: boolean;
 
   @Column({ name: 'emergency_name', type: 'text' })
   emergencyName: string;

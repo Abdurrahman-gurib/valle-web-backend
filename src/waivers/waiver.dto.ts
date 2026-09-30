@@ -18,11 +18,9 @@ import { IsCalendarDate, IsSafeText } from '../common/validation';
 
 /** Every statement must be ticked; the form cannot be sent otherwise. */
 export class WaiverDeclarationsDto {
-  @ApiProperty() @IsBoolean() @Equals(true) risks: boolean;
+  @ApiProperty() @IsBoolean() @Equals(true) terms: boolean;
   @ApiProperty() @IsBoolean() @Equals(true) health: boolean;
-  @ApiProperty() @IsBoolean() @Equals(true) sober: boolean;
-  @ApiProperty() @IsBoolean() @Equals(true) rules: boolean;
-  @ApiProperty() @IsBoolean() @Equals(true) data: boolean;
+  @ApiProperty() @IsBoolean() @Equals(true) consent: boolean;
 }
 
 export class SignWaiverDto {
@@ -46,6 +44,25 @@ export class SignWaiverDto {
   @ApiPropertyOptional({ example: 'Omar Rahman' })
   @IsOptional() @IsString() @IsSafeText() @MaxLength(80)
   guardianName?: string;
+
+  @ApiPropertyOptional({ example: 'Lux Le Morne' })
+  @IsOptional() @IsString() @IsSafeText() @MaxLength(160)
+  address?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120)
+  email?: string;
+
+  @ApiProperty() @IsString() @Matches(/^[+0-9 ()-]{6,24}$/)
+  phone: string;
+
+  @ApiProperty({ example: 'Belgium' }) @IsString() @IsSafeText() @IsNotEmpty() @MaxLength(60)
+  nationality: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsSafeText() @MaxLength(40)
+  idNumber?: string;
+
+  @ApiPropertyOptional({ description: 'Clause 18: promotions by e-mail / phone' }) @IsOptional() @IsBoolean()
+  marketingConsent?: boolean;
 
   @ApiProperty() @IsString() @IsSafeText() @IsNotEmpty() @MaxLength(80)
   emergencyName: string;
