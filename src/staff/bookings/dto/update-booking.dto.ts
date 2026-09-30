@@ -13,7 +13,11 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, ValidateNested } from 'class-validator';
 import { BOOKING_STATUSES, BookingStatus } from './list-bookings.dto';
+import { BookingItemDto } from '../../../bookings/dto/create-booking.dto';
+import { ADJUSTMENT_KINDS, type AdjustmentKind } from '../../../bookings/pricing';
 
 /**
  * A staff edit of one reservation. Every field is optional, but the service
@@ -113,4 +117,38 @@ export class UpdateBookingDto {
   @IsString()
   @MaxLength(2000)
   staffNote?: string;
+
+  /** The full new list of experience lines (a top-up on the day adds to it); re-priced server-side. */
+  @ApiPropertyOptional({ type: [BookingItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BookingItemDto)
+  items?: BookingItemDto[];
+
+  /** FOC pass, percentage / amount off, free entry; 'none' clears it. */
+  @ApiPropertyOptional({ enum: ADJUSTMENT_KINDS })
+  @IsOptional()
+  @IsIn(ADJUSTMENT_KINDS)
+  adjustmentKind?: AdjustmentKind;
+
+  @ApiPropertyOptional({ description: 'percent (1-100) or rupees, per kind' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  adjustmentValue?: number;
+
+  @ApiPropertyOptional({ example: 'FOC pass #12, hotel partner' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  adjustmentNote?: string;
+
+  /** Apply a coupon code (its offer becomes the adjustment); empty string removes it. */
+  @ApiPropertyOptional({ example: 'HOTEL10' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  couponCode?: string;
 }

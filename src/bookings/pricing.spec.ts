@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  adjustmentAmount,
   computeBooking,
   partyLabel,
   PricingExperience,
@@ -374,5 +375,18 @@ describe('computeBooking', () => {
     expect(() =>
       computeBooking(EXPS, SETTINGS, input([{ id: 'kaz', adults: 1 }])),
     ).toThrow(BadRequestException);
+  });
+});
+
+describe('adjustmentAmount', () => {
+  const priced = { subtotal: 10000, discount: 1500, entry: 1100 };
+  it('takes the right amount off for each kind, never more than what is due', () => {
+    expect(adjustmentAmount('none', 0, priced)).toBe(0);
+    expect(adjustmentAmount('percent', 10, priced)).toBe(850);
+    expect(adjustmentAmount('percent', 250, priced)).toBe(8500);
+    expect(adjustmentAmount('amount', 500, priced)).toBe(500);
+    expect(adjustmentAmount('amount', 99999, priced)).toBe(8500);
+    expect(adjustmentAmount('foc', 0, priced)).toBe(8500);
+    expect(adjustmentAmount('entry_free', 0, priced)).toBe(1100);
   });
 });

@@ -92,6 +92,25 @@ export function priceFor(
   return rate === 'nr' ? exp.priceNr ?? exp.priceRr : exp.priceRr;
 }
 
+/** How a booking's price is adjusted after the Explorer Pass discount. */
+export type AdjustmentKind = 'none' | 'percent' | 'amount' | 'foc' | 'entry_free';
+export const ADJUSTMENT_KINDS: AdjustmentKind[] = ['none', 'percent', 'amount', 'foc', 'entry_free'];
+
+/**
+ * Rupees taken off by an FOC pass, a percentage or fixed discount, or free
+ * park entry. Never more than what is left to pay.
+ */
+export function adjustmentAmount(kind: AdjustmentKind, value: number, priced: { subtotal: number; discount: number; entry: number }): number {
+  const due = Math.max(0, priced.subtotal - priced.discount);
+  switch (kind) {
+    case 'foc': return due;
+    case 'percent': return Math.min(due, Math.round((due * Math.max(0, Math.min(100, value))) / 100));
+    case 'amount': return Math.min(due, Math.max(0, Math.round(value)));
+    case 'entry_free': return Math.min(due, priced.entry);
+    default: return 0;
+  }
+}
+
 export function computeBooking(
   experiences: PricingExperience[],
   settings: PricingSettings,

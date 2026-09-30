@@ -55,10 +55,10 @@ describe('BookingsService.availability', () => {
     expect(days[0].afternoon).toEqual({ bookings: 0, guests: 0, level: 'quiet' });
     expect(days[1].afternoon).toEqual({ bookings: 9, guests: 160, level: 'full' });
     expect(days[2].morning.level).toBe('quiet');
-    // cancelled bookings never count, and the range is bound as parameters
+    // cancelled and postponed bookings never count, and the range is bound as parameters
     expect(qb.wheres).toEqual([
       ['b.visitDate BETWEEN :from AND :to', { from: '2026-10-02', to: '2026-10-04' }],
-      ['b.status <> :cancelled', { cancelled: 'cancelled' }],
+      ['b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] }],
     ]);
     expect(qb.groups).toEqual(['b.visitDate', 'b.slot']);
   });

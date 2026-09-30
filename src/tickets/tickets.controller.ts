@@ -17,6 +17,16 @@ export class TicketsController {
     return this.tickets.view(refCode.toUpperCase(), q.t);
   }
 
+  @Get(':refCode/receipt.pdf')
+  @ApiOperation({ summary: "The guest's receipt as PDF (needs the token)" })
+  async receipt(@Param('refCode') refCode: string, @Query() q: TicketQueryDto, @Res() res: Response): Promise<void> {
+    const pdf = await this.tickets.receiptPdf(refCode.toUpperCase(), q.t);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="valle-receipt-${refCode.toUpperCase()}.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(pdf);
+  }
+
   @Get(':refCode/qr.png')
   @ApiOperation({ summary: 'QR code of the ticket link, as PNG' })
   async qr(@Param('refCode') refCode: string, @Query() q: TicketQueryDto, @Res() res: Response): Promise<void> {

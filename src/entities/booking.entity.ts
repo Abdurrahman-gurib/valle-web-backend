@@ -88,6 +88,43 @@ export class Booking {
   @Column({ name: 'reminder_sent_at', type: 'timestamptz', nullable: true })
   reminderSentAt: Date | null;
 
+  // ---- cashier ----
+  /** Rupees collected so far (gate payments and online). */
+  @Column({ name: 'paid_amount', type: 'int', default: 0 })
+  paidAmount: number;
+
+  @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
+  paidAt: Date | null;
+
+  /** cash | card | juice | online | other */
+  @Column({ name: 'payment_method', type: 'text', default: '' })
+  paymentMethod: string;
+
+  @Column({ name: 'receipt_no', type: 'text', default: '' })
+  receiptNo: string;
+
+  // ---- adjustments: FOC passes, discounts, coupons ----
+  /** none | percent | amount | foc | entry_free */
+  @Column({ name: 'adjustment_kind', type: 'text', default: 'none' })
+  adjustmentKind: string;
+
+  @Column({ name: 'adjustment_value', type: 'int', default: 0 })
+  adjustmentValue: number;
+
+  /** Rupees actually taken off the total. */
+  @Column({ name: 'adjustment_amount', type: 'int', default: 0 })
+  adjustmentAmount: number;
+
+  @Column({ name: 'adjustment_note', type: 'text', default: '' })
+  adjustmentNote: string;
+
+  @Column({ name: 'coupon_code', type: 'text', default: '' })
+  couponCode: string;
+
+  /** Original visit date when a weather day was postponed. */
+  @Column({ name: 'postponed_from', type: 'date', nullable: true })
+  postponedFrom: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

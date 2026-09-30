@@ -6,8 +6,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import { PostponeDto, RecordPaymentDto } from './dto/front-office.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentStaff } from '../auth/current-staff.decorator';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -78,6 +81,28 @@ export class StaffBookingsController {
     @CurrentStaff() staff: StaffPrincipal,
   ): Promise<BookingDetail> {
     return this.staffBookings.update(refCode, dto, staff);
+  }
+
+  @Post('bookings/:refCode/payment')
+  @ApiOperation({ summary: 'Cashier: record money taken for this booking (cash, card, Juice...)' })
+  recordPayment(@Param('refCode') refCode: string, @Body() dto: RecordPaymentDto, @CurrentStaff() staff: StaffPrincipal): Promise<BookingDetail> {
+    return this.staffBookings.recordPayment(refCode, dto, staff);
+  }
+
+  @Post('bookings/:refCode/postpone')
+  @ApiOperation({ summary: 'Weather day: postpone the visit, keep the payment, the guest picks a new date later' })
+  postpone(@Param('refCode') refCode: string, @Body() dto: PostponeDto, @CurrentStaff() staff: StaffPrincipal): Promise<BookingDetail> {
+    return this.staffBookings.postpone(refCode, dto.reason ?? '', staff);
+  }
+
+  @Get('bookings/:refCode/receipt.pdf')
+  @ApiOperation({ summary: 'Receipt PDF for the cashier / the guest' })
+  async receipt(@Param('refCode') refCode: string, @Res() res: Response): Promise<void> {
+    const pdf = await this.staffBookings.receiptPdf(refCode);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="valle-receipt-${refCode}.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(pdf);
   }
 
   @Post('bookings/:refCode/resend-waiver')

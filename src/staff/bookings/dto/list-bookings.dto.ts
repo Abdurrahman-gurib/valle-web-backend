@@ -15,7 +15,7 @@ import {
   MAX_PAGE,
 } from '../../../common/validation';
 
-export const BOOKING_STATUSES = ['confirmed', 'arrived', 'cancelled'] as const;
+export const BOOKING_STATUSES = ['confirmed', 'arrived', 'cancelled', 'postponed'] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 export const DEFAULT_PAGE_SIZE = 25;

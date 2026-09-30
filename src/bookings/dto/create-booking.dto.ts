@@ -125,4 +125,11 @@ export class CreateBookingDto {
   @ApiProperty({ enum: ['gate', 'online'] })
   @IsIn(['gate', 'online'])
   payMode: 'gate' | 'online';
+
+  /** Promo / partner code typed on the booking form; checked and applied server-side. */
+  @ApiPropertyOptional({ example: 'HOTEL10' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  couponCode?: string;
 }

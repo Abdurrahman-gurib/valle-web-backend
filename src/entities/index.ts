@@ -40,3 +40,4 @@ export { JobVacancy } from './job-vacancy.entity';
 export { JobApplication } from './job-application.entity';
 export { Waiver } from './waiver.entity';
 export type { WaiverDeclarations } from './waiver.entity';
+export { Coupon } from './coupon.entity';

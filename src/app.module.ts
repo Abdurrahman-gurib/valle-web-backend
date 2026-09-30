@@ -18,6 +18,7 @@ import { ReportsModule } from './staff/reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { WaiversModule } from './waivers/waivers.module';
+import { CouponsModule } from './coupons/coupons.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
@@ -65,6 +66,7 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     NotificationsModule,
     TicketsModule,
     WaiversModule,
+    CouponsModule,
   ],
   providers: [
     // Reports unhandled (5xx) exceptions to Sentry; expected HttpExceptions are not noise.

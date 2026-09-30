@@ -14,6 +14,8 @@ import {
   flagsFor,
   parseAgeLabel,
   parseLimitsSetting,
+  parseWaiverActivities,
+  waiverRequiredCount,
 } from './waiver-rules';
 
 const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
@@ -72,6 +74,10 @@ export interface GateView {
   status: string;
   payMode: string;
   total: number;
+  paidAmount: number;
+  balance: number;
+  adjustmentAmount: number;
+  adjustmentNote: string;
   isToday: boolean;
   lines: { label: string; amount: number }[];
   activities: GateActivity[];
@@ -90,6 +96,7 @@ export interface GateDayRow {
   party: number;
   status: string;
   signed: number;
+  balance: number;
 }
 
 @Injectable()
@@ -105,9 +112,13 @@ export class WaiversService {
     @InjectRepository(Setting) private readonly settingRepo: Repository<Setting>,
   ) {}
 
-  /** Everyone in the party signs: adults plus children (under-6s ride free and are not counted). */
-  static required(b: Booking): number {
-    return b.adults + b.kids;
+  /** Who must sign: the party on the booking's zipline / quad / buggy / luge lines (see waiverRequiredCount). */
+  async required(b: Booking): Promise<number> {
+    const [lines, setting] = await Promise.all([
+      this.lineRepo.find({ where: { bookingId: b.id } }),
+      this.settingRepo.findOne({ where: { key: 'waiver_activities' } }),
+    ]);
+    return waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b);
   }
 
   private isOpen(b: Booking): boolean {
@@ -140,7 +151,7 @@ export class WaiversService {
       guestName: b.guestName,
       visitDate: dateStr(b.visitDate),
       slot: b.slot,
-      required: WaiversService.required(b),
+      required: await this.required(b),
       signed: waivers.map((w) => ({ id: w.id, participantName: w.participantName, isMinor: w.isMinor, signedAt: w.signedAt.toISOString() })),
       open: this.isOpen(b),
       termsVersion: WAIVER_TERMS_VERSION,
@@ -151,6 +162,7 @@ export class WaiversService {
   async sign(refCode: string, token: string | undefined, dto: SignWaiverDto, meta: { ip: string; userAgent: string }): Promise<WaiverPublicView> {
     const b = await this.tickets.requireBooking(refCode, token);
     if (!this.isOpen(b)) throw new ConflictException('This booking can no longer take waivers');
+    if ((await this.required(b)) === 0) throw new ConflictException('Nothing on this booking needs a waiver');
     const visit = dateStr(b.visitDate);
     const age = ageOn(dto.birthDate, visit);
     if (age < 0 || age > 110) throw new BadRequestException('Please check the date of birth');
@@ -166,7 +178,7 @@ export class WaiversService {
       .getOne();
     if (!existing) {
       const count = await this.waiverRepo.count({ where: { bookingId: b.id } });
-      if (count >= WaiversService.required(b)) {
+      if (count >= (await this.required(b))) {
         throw new ConflictException('Everyone in this booking has already signed. To correct a waiver, sign again under the same name.');
       }
     }
@@ -205,7 +217,7 @@ export class WaiversService {
 
   /** Signed / required for a booking (ticket page, back office list). */
   async counts(b: Booking): Promise<{ signed: number; required: number }> {
-    return { signed: await this.waiverRepo.count({ where: { bookingId: b.id } }), required: WaiversService.required(b) };
+    return { signed: await this.waiverRepo.count({ where: { bookingId: b.id } }), required: await this.required(b) };
   }
 
   /** A signed waiver of this booking, for the PDF copy (guest with token, or staff). */
@@ -271,7 +283,7 @@ export class WaiversService {
       signedAt: w.signedAt.toISOString(),
       flags: flagsFor({ birthDate: dateStr(w.birthDate), heightCm: w.heightCm, weightKg: w.weightKg }, visit, activities),
     }));
-    const required = WaiversService.required(b);
+    const required = await this.required(b);
     return {
       refCode: b.refCode,
       guestName: b.guestName,
@@ -283,6 +295,10 @@ export class WaiversService {
       status: b.status,
       payMode: b.payMode,
       total: b.total,
+      paidAmount: b.paidAmount,
+      balance: Math.max(0, b.total - b.paidAmount),
+      adjustmentAmount: b.adjustmentAmount,
+      adjustmentNote: b.adjustmentNote,
       isToday: visit === parkToday(),
       lines: lines.map((l) => ({ label: l.label, amount: l.amount })),
       activities,
@@ -300,14 +316,22 @@ export class WaiversService {
     const rows = await this.bookingRepo
       .createQueryBuilder('b')
       .leftJoin(Waiver, 'w', 'w.booking_id = b.id')
-      .select(['b.ref_code AS "refCode"', 'b.guest_name AS "guestName"', 'b.slot AS slot', 'b.adults + b.kids AS party', 'b.status AS status', 'COUNT(w.id)::int AS signed'])
+      .select(['b.ref_code AS "refCode"', 'b.guest_name AS "guestName"', 'b.slot AS slot', 'b.adults + b.kids AS party', 'b.status AS status', 'b.total - b.paid_amount AS balance', 'COUNT(w.id)::int AS signed'])
       .where('b.visit_date = :date', { date })
-      .andWhere('b.status <> :cancelled', { cancelled: 'cancelled' })
+      .andWhere('b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] })
       .groupBy('b.id')
       .orderBy('b.slot', 'DESC')
       .addOrderBy('b.guest_name', 'ASC')
       .getRawMany<GateDayRow>();
-    return rows.map((r) => ({ ...r, party: Number(r.party), signed: Number(r.signed) }));
+    const setting = await this.settingRepo.findOne({ where: { key: 'waiver_activities' } });
+    const acts = parseWaiverActivities(setting?.value);
+    const out: GateDayRow[] = [];
+    for (const r of rows) {
+      const b = await this.bookingRepo.findOne({ where: { refCode: r.refCode } });
+      const lines = b ? await this.lineRepo.find({ where: { bookingId: b.id } }) : [];
+      out.push({ ...r, party: b ? waiverRequiredCount(lines, acts, b) : Number(r.party), signed: Number(r.signed), balance: Math.max(0, Number(r.balance)) });
+    }
+    return out;
   }
 
   async checkIn(refCode: string, dto: CheckInDto, staff: StaffPrincipal): Promise<GateView> {

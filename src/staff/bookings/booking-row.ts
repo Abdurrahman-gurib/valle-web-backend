@@ -25,6 +25,19 @@ export interface BookingRow {
   discount: number;
   total: number;
   currency: string;
+  /** cashier */
+  paidAmount: number;
+  balance: number;
+  paidAt: string | null;
+  paymentMethod: string;
+  receiptNo: string;
+  /** FOC pass / discount / coupon */
+  adjustmentKind: string;
+  adjustmentValue: number;
+  adjustmentAmount: number;
+  adjustmentNote: string;
+  couponCode: string;
+  postponedFrom: string | null;
   createdAt: string;
 }
 
@@ -55,6 +68,17 @@ export function toBookingRow(b: Booking): BookingRow {
     subtotal: b.subtotal,
     discount: b.discount,
     total: b.total,
+    paidAmount: b.paidAmount ?? 0,
+    balance: Math.max(0, b.total - (b.paidAmount ?? 0)),
+    paidAt: b.paidAt ? toIso(b.paidAt) : null,
+    paymentMethod: b.paymentMethod ?? '',
+    receiptNo: b.receiptNo ?? '',
+    adjustmentKind: b.adjustmentKind ?? 'none',
+    adjustmentValue: b.adjustmentValue ?? 0,
+    adjustmentAmount: b.adjustmentAmount ?? 0,
+    adjustmentNote: b.adjustmentNote ?? '',
+    couponCode: b.couponCode ?? '',
+    postponedFrom: b.postponedFrom ? toDateString(b.postponedFrom) : null,
     currency: b.currency,
     createdAt: toIso(b.createdAt),
   };

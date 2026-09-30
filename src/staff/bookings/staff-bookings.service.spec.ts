@@ -302,6 +302,7 @@ function build(repos: {
     { create: jest.fn() } as unknown as BookingsService,
     { ticketUrl: (ref: string) => 'https://example.test/ticket/' + ref + '?t=tok' } as unknown as TicketService,
     { sendTicket: jest.fn() } as unknown as GuestMessagingService,
+    { resolve: jest.fn(), consume: jest.fn() } as never,
   );
 }
 
@@ -398,6 +399,17 @@ describe('StaffBookingsService.list', () => {
       discount: 0,
       total: 4250,
       currency: 'MUR',
+      paidAmount: 0,
+      balance: 4250,
+      paidAt: null,
+      paymentMethod: '',
+      receiptNo: '',
+      adjustmentKind: 'none',
+      adjustmentValue: 0,
+      adjustmentAmount: 0,
+      adjustmentNote: '',
+      couponCode: '',
+      postponedFrom: null,
       createdAt: '2026-08-06T09:30:00.000Z',
     });
   });
@@ -469,7 +481,7 @@ describe('StaffBookingsService.detail', () => {
     expect(detail.rate).toBe('rr');
     expect(detail.staffNote).toBe('Wheelchair access');
     expect(detail.lines).toEqual([
-      { label: 'Park entry', adults: 2, kids: 1, units: 0, amount: 1250 },
+      { experienceId: null, variant: '', label: 'Park entry', adults: 2, kids: 1, units: 0, amount: 1250 },
     ]);
     expect(detail.audit).toEqual([
       {
@@ -567,6 +579,8 @@ describe('StaffBookingsService.update: re-pricing', () => {
     expect(detail.total).toBe(fresh.total);
     expect(detail.lines).toEqual(
       fresh.lines.map((l) => ({
+        experienceId: l.experienceId,
+        variant: l.variant,
         label: l.label,
         adults: l.adults,
         kids: l.kids,

@@ -4,7 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import QRCode from 'qrcode';
-import { Booking, BookingLine, Waiver } from '../entities';
+import { Booking, BookingLine, Setting, Waiver } from '../entities';
+import { parseWaiverActivities, waiverRequiredCount } from '../waivers/waiver-rules';
+import { renderReceiptPdf } from './receipt-pdf';
 import { resolveJwtSecret } from '../staff/auth/jwt.config';
 
 /** What the guest's ticket page shows. No internal note, no money breakdown beyond the lines. */
@@ -26,6 +28,14 @@ export interface TicketView {
   waiverUrl: string;
   waiversSigned: number;
   waiversRequired: number;
+  /** money, for the guest's receipt */
+  paidAmount: number;
+  balance: number;
+  adjustmentAmount: number;
+  adjustmentNote: string;
+  couponCode: string;
+  receiptUrl: string;
+  postponedFrom: string | null;
 }
 
 const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
@@ -38,7 +48,7 @@ const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString
 @Injectable()
 export class TicketService {
   private readonly secret: string;
-  private readonly siteUrl: string;
+  readonly siteUrl: string;
   private readonly apiUrl: string;
 
   constructor(
@@ -46,6 +56,7 @@ export class TicketService {
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     @InjectRepository(BookingLine) private readonly lineRepo: Repository<BookingLine>,
     @InjectRepository(Waiver) private readonly waiverRepo: Repository<Waiver>,
+    @InjectRepository(Setting) private readonly settingRepo: Repository<Setting>,
   ) {
     this.secret = resolveJwtSecret(config);
     this.siteUrl = (config.get<string>('SITE_URL') ?? 'https://vallepark.com').trim().replace(/\/+$/, '');
@@ -72,6 +83,10 @@ export class TicketService {
     return `${this.siteUrl}/waiver/${encodeURIComponent(refCode)}?t=${this.token(refCode)}`;
   }
 
+  receiptUrl(refCode: string): string {
+    return `${this.apiUrl}/tickets/${encodeURIComponent(refCode)}/receipt.pdf?t=${this.token(refCode)}`;
+  }
+
   qrUrl(refCode: string): string {
     return `${this.apiUrl}/tickets/${encodeURIComponent(refCode)}/qr.png?t=${this.token(refCode)}`;
   }
@@ -90,14 +105,22 @@ export class TicketService {
 
   async view(refCode: string, token: string | undefined): Promise<TicketView> {
     const b = await this.requireBooking(refCode, token);
-    const [lines, signed] = await Promise.all([
+    const [lines, signed, setting] = await Promise.all([
       this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } }),
       this.waiverRepo.count({ where: { bookingId: b.id } }),
+      this.settingRepo.findOne({ where: { key: 'waiver_activities' } }),
     ]);
-    return this.toView(b, lines, signed);
+    return this.toView(b, lines, signed, waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b));
   }
 
-  toView(b: Booking, lines: BookingLine[], waiversSigned = 0): TicketView {
+  /** The guest's receipt: lines, discounts, what was paid and what is left. */
+  async receiptPdf(refCode: string, token: string | undefined): Promise<Buffer> {
+    const b = await this.requireBooking(refCode, token);
+    const lines = await this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } });
+    return renderReceiptPdf(b, lines, { siteUrl: this.siteUrl });
+  }
+
+  toView(b: Booking, lines: BookingLine[], waiversSigned = 0, waiversRequired = b.adults + b.kids): TicketView {
     return {
       refCode: b.refCode,
       guestName: b.guestName,
@@ -114,7 +137,14 @@ export class TicketService {
       qrUrl: this.qrUrl(b.refCode),
       waiverUrl: this.waiverUrl(b.refCode),
       waiversSigned,
-      waiversRequired: b.adults + b.kids,
+      waiversRequired,
+      paidAmount: b.paidAmount ?? 0,
+      balance: Math.max(0, b.total - (b.paidAmount ?? 0)),
+      adjustmentAmount: b.adjustmentAmount ?? 0,
+      adjustmentNote: b.adjustmentNote ?? '',
+      couponCode: b.couponCode ?? '',
+      receiptUrl: this.receiptUrl(b.refCode),
+      postponedFrom: b.postponedFrom ? String(b.postponedFrom).slice(0, 10) : null,
     };
   }
 }

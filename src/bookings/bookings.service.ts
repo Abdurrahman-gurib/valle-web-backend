@@ -13,14 +13,19 @@ import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../en
 import { BookingNotifierService } from '../notifications/booking-notifier.service';
 import { GuestMessagingService } from '../notifications/guest-messaging.service';
 import { TicketService } from '../tickets/ticket.service';
+import { CouponsService } from '../coupons/coupons.service';
 import { toBookingRow } from '../staff/bookings/booking-row';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { computeBooking, PricedBooking } from './pricing';
+import { adjustmentAmount, computeBooking, PricedBooking } from './pricing';
 
 export interface BookingResponse {
   refCode: string;
   total: number;
   discount: number;
+  /** rupees taken off by a coupon / pass, and why */
+  adjustment?: number;
+  adjustmentNote?: string;
+  couponCode?: string;
   lines: { label: string; amount: number }[];
   status: string;
   /** The guest's ticket page (QR inside); also e-mailed / WhatsApped. */
@@ -74,6 +79,7 @@ export class BookingsService {
     @Optional() private readonly guest?: GuestMessagingService,
     @Optional() private readonly tickets?: TicketService,
     @Optional() config?: ConfigService,
+    @Optional() private readonly coupons?: CouponsService,
   ) {
     const cap = Number(config?.get<string>('BOOKING_SLOT_CAPACITY') ?? '');
     this.slotCapacity = Number.isFinite(cap) && cap > 0 ? cap : DEFAULT_SLOT_CAPACITY;
@@ -97,7 +103,7 @@ export class BookingsService {
       .addSelect('COUNT(*)', 'bookings')
       .addSelect('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
       .where('b.visitDate BETWEEN :from AND :to', { from, to })
-      .andWhere('b.status <> :cancelled', { cancelled: 'cancelled' })
+      .andWhere('b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] })
       .groupBy('b.visitDate')
       .addGroupBy('b.slot')
       .getRawMany<{ date: unknown; slot: string; bookings: string; guests: string }>();
@@ -167,10 +173,14 @@ export class BookingsService {
       priceRows,
     );
 
+    // A promo / partner code: validated now, counted inside the booking transaction.
+    const offer = dto.couponCode && this.coupons ? await this.coupons.resolve(dto.couponCode) : null;
+    const adjustment = offer ? { kind: offer.kind, value: offer.value, amount: adjustmentAmount(offer.kind, offer.value, priced), note: offer.note, code: offer.code } : null;
+
     for (let attempt = 0; attempt < REF_MAX_TRIES; attempt++) {
       const refCode = this.generateRefCode();
       try {
-        return await this.persist(dto, priced, refCode, email, phone, visitDate);
+        return await this.persist(dto, priced, refCode, email, phone, visitDate, adjustment);
       } catch (err) {
         if (this.isUniqueViolation(err)) continue; // ref collision, retry
         throw err;
@@ -190,6 +200,7 @@ export class BookingsService {
     email: string,
     phone: string,
     visitDate: string,
+    adjustment: { kind: string; value: number; amount: number; note: string; code: string } | null = null,
   ): Promise<BookingResponse> {
     const { saved, lines } = await this.dataSource.transaction(async (manager) => {
       const booking = manager.create(Booking, {
@@ -208,10 +219,16 @@ export class BookingsService {
         entryAmount: priced.entry,
         subtotal: priced.subtotal,
         discount: priced.discount,
-        total: priced.total,
+        total: priced.total - (adjustment?.amount ?? 0),
         currency: 'MUR',
+        adjustmentKind: adjustment?.kind ?? 'none',
+        adjustmentValue: adjustment?.value ?? 0,
+        adjustmentAmount: adjustment?.amount ?? 0,
+        adjustmentNote: adjustment?.note ?? '',
+        couponCode: adjustment?.code ?? '',
       });
       const saved = await manager.save(booking);
+      if (adjustment && this.coupons) await this.coupons.consume(adjustment.code, manager);
 
       const lines = priced.lines.map((l, i) =>
         manager.create(BookingLine, {
@@ -239,6 +256,9 @@ export class BookingsService {
       refCode: saved.refCode,
       total: saved.total,
       discount: saved.discount,
+      adjustment: saved.adjustmentAmount,
+      adjustmentNote: saved.adjustmentNote,
+      couponCode: saved.couponCode,
       lines: priced.lines.map((l) => ({ label: l.label, amount: l.amount })),
       status: saved.status,
       ticketUrl: this.tickets?.ticketUrl(saved.refCode),

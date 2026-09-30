@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { ageOn, flagsFor, parseAgeLabel, parseLimitsSetting } from './waiver-rules';
+import { ageOn, flagsFor, parseAgeLabel, parseLimitsSetting, waiverRequiredCount } from './waiver-rules';
 import { WaiversService, parkToday } from './waivers.service';
 import type { SignWaiverDto } from './waiver.dto';
 import { pdfLang, renderWaiverPdf } from './waiver-pdf';
@@ -83,6 +83,17 @@ describe('waiver rules', () => {
     ]);
     const heavy = flagsFor({ birthDate: '1980-01-01', heightCm: 185, weightKg: 112 }, '2026-10-01', acts);
     expect(heavy).toEqual([{ level: 'stop', activity: 'Bicycle Zipline', message: '112 kg, maximum 100 kg' }]);
+  });
+
+  it('counts who must sign from the lines that need a waiver, not the whole party', () => {
+    const acts = ['zipline', 'quad', 'buggy', 'luge', 'bicycle', 'nepalese'];
+    const party = { adults: 2, kids: 2 };
+    // walk + restaurant only: nobody signs
+    expect(waiverRequiredCount([{ experienceId: null, adults: 2, kids: 2, units: 0 }, { experienceId: 'waterfalls', adults: 2, kids: 2, units: 0 }], acts, party)).toBe(0);
+    // two adults on the zipline, the kids only in the Kids Park
+    expect(waiverRequiredCount([{ experienceId: 'zipline', adults: 2, kids: 0, units: 0 }, { experienceId: 'pirate', adults: 0, kids: 2, units: 0 }], acts, party)).toBe(2);
+    // a flat-priced buggy carries the whole party
+    expect(waiverRequiredCount([{ experienceId: 'buggy', adults: 0, kids: 0, units: 1 }], acts, party)).toBe(4);
   });
 
   it('keeps only numeric limits from the settings row', () => {

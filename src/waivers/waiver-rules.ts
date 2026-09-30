@@ -69,6 +69,38 @@ export function flagsFor(
   return out;
 }
 
+/** Default set of activities that need a signed Disclaimer Form (settings row `waiver_activities` overrides). */
+export const DEFAULT_WAIVER_ACTIVITIES = ['zipline', 'bicycle', 'nepalese', 'quad', 'buggy', 'luge'];
+
+export function parseWaiverActivities(value: string | undefined): string[] {
+  if (!value) return DEFAULT_WAIVER_ACTIVITIES;
+  try {
+    const v = JSON.parse(value) as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : DEFAULT_WAIVER_ACTIVITIES;
+  } catch {
+    return DEFAULT_WAIVER_ACTIVITIES;
+  }
+}
+
+/**
+ * How many people must sign: the largest party on any line that needs a
+ * waiver (a flat-priced line such as a buggy counts the whole party). Walks,
+ * expeditions, restaurants, Kids Park, animal feeding and park entry need none.
+ */
+export function waiverRequiredCount(
+  lines: { experienceId: string | null; adults: number; kids: number; units: number }[],
+  waiverActivities: string[],
+  party: { adults: number; kids: number },
+): number {
+  let n = 0;
+  for (const l of lines) {
+    if (!l.experienceId || !waiverActivities.includes(l.experienceId)) continue;
+    const people = l.adults + l.kids > 0 ? l.adults + l.kids : party.adults + party.kids;
+    n = Math.max(n, people);
+  }
+  return Math.min(n, party.adults + party.kids);
+}
+
 /** Settings row `waiver_limits` (JSON), tolerant of a missing or broken value. */
 export function parseLimitsSetting(value: string | undefined): Record<string, ActivityLimits> {
   if (!value) return {};

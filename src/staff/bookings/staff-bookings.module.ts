@@ -12,6 +12,7 @@ import { StaffAuthModule } from '../auth/staff-auth.module';
 import { BookingsModule } from '../../bookings/bookings.module';
 import { TicketsModule } from '../../tickets/tickets.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { CouponsModule } from '../../coupons/coupons.module';
 import { StaffBookingsController } from './staff-bookings.controller';
 import { StaffBookingsService } from './staff-bookings.service';
 
@@ -38,6 +39,7 @@ import { StaffBookingsService } from './staff-bookings.service';
     BookingsModule,
     TicketsModule,
     NotificationsModule,
+    CouponsModule,
   ],
   controllers: [StaffBookingsController],
   providers: [StaffBookingsService],

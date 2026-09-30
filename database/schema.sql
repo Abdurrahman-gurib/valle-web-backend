@@ -12,7 +12,7 @@ BEGIN;
 DROP TABLE IF EXISTS ride_order,
   job_applications, job_vacancies,
   chat_messages, chat_conversations,
-  waivers, booking_audit, booking_lines, bookings, staff_users, quotes,
+  coupons, waivers, booking_audit, booking_lines, bookings, staff_users, quotes,
   gallery_shots, experience_galleries, experience_facts,
   map_pins, menu_items, menu_groups, restaurant_gallery, restaurants,
   package_tier_items, package_tiers, package_addons, vip_items,

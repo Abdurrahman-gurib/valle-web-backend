@@ -13,7 +13,9 @@ import {
   SelectQueryBuilder,
   MoreThan,
 } from 'typeorm';
-import { computeBooking, PricedBooking } from '../../bookings/pricing';
+import { adjustmentAmount, computeBooking, PricedBooking, type AdjustmentKind } from '../../bookings/pricing';
+import { CouponsService } from '../../coupons/coupons.service';
+import { renderReceiptPdf } from '../../tickets/receipt-pdf';
 import {
   Booking,
   BookingAudit,
@@ -42,7 +44,7 @@ import { GuestMessagingService } from '../../notifications/guest-messaging.servi
 const PARK_TZ = 'Indian/Mauritius';
 
 /** Editing any of these re-prices the booking from its own experience lines. */
-const MONEY_FIELDS = ['adults', 'kids', 'rate'] as const;
+const MONEY_FIELDS = ['adults', 'kids', 'rate', 'items', 'adjustmentKind', 'adjustmentValue', 'adjustmentNote', 'couponCode'] as const;
 
 /** How many audit entries the drawer shows. */
 const AUDIT_LIMIT = 20;
@@ -51,6 +53,9 @@ export { toBookingRow, type BookingRow } from './booking-row';
 import { toBookingRow, toDateString, toIso, type BookingRow } from './booking-row';
 
 export interface BookingLineRow {
+  /** null for the park-entry line */
+  experienceId: string | null;
+  variant: string;
   label: string;
   adults: number;
   kids: number;
@@ -132,6 +137,12 @@ interface BookingPatch {
   payMode?: 'gate' | 'online';
   status?: BookingStatus;
   staffNote?: string;
+  /** JSON of the requested experience lines (compared as text for the audit trail). */
+  items?: string;
+  adjustmentKind?: AdjustmentKind;
+  adjustmentValue?: number;
+  adjustmentNote?: string;
+  couponCode?: string;
 }
 
 type PatchField = keyof BookingPatch;
@@ -153,6 +164,7 @@ export class StaffBookingsService {
     private readonly bookings: BookingsService,
     private readonly tickets: TicketService,
     private readonly guest: GuestMessagingService,
+    private readonly coupons: CouponsService,
   ) {}
 
   // ----------------------------------------------------------------- bookings
@@ -250,6 +262,59 @@ export class StaffBookingsService {
     const booking = await this.bookingRepo.findOne({ where: { refCode } });
     if (!booking) throw new NotFoundException(`No booking ${refCode}`);
     return this.guest.sendTicket(booking);
+  }
+
+  /** The cashier took money: adds to what was paid, keeps the receipt number, writes the trail. */
+  async recordPayment(refCode: string, input: { amount: number; method: string; receiptNo?: string }, staff: StaffPrincipal): Promise<BookingDetail> {
+    return this.dataSource.transaction(async (manager) => {
+      const booking = await manager.findOne(Booking, { where: { refCode }, lock: { mode: 'pessimistic_write' } });
+      if (!booking) throw new NotFoundException(`No booking ${refCode}`);
+      if (booking.status === 'cancelled') throw new BadRequestException('This booking is cancelled');
+      const from = booking.paidAmount;
+      booking.paidAmount = from + input.amount;
+      booking.paidAt = new Date();
+      booking.paymentMethod = input.method;
+      if (input.receiptNo?.trim()) booking.receiptNo = input.receiptNo.trim();
+      booking.updatedAt = new Date();
+      booking.updatedBy = staff.id;
+      await manager.save(Booking, booking);
+      await manager.save(manager.create(BookingAudit, {
+        bookingId: booking.id, staffId: staff.id, staffEmail: staff.email, action: 'edit',
+        changes: {
+          paidAmount: { from, to: booking.paidAmount },
+          paymentMethod: { from: null, to: input.method },
+          ...(input.receiptNo?.trim() ? { receiptNo: { from: null, to: input.receiptNo.trim() } } : {}),
+        },
+      }));
+      return this.readDetail(manager, booking);
+    });
+  }
+
+  /** Weather day: the visit is postponed, money stays on the booking, the guest picks a new date later. */
+  async postpone(refCode: string, reason: string, staff: StaffPrincipal): Promise<BookingDetail> {
+    return this.dataSource.transaction(async (manager) => {
+      const booking = await manager.findOne(Booking, { where: { refCode }, lock: { mode: 'pessimistic_write' } });
+      if (!booking) throw new NotFoundException(`No booking ${refCode}`);
+      if (booking.status === 'cancelled') throw new BadRequestException('This booking is cancelled');
+      const from = booking.status;
+      booking.postponedFrom = toDateString(booking.visitDate);
+      booking.status = 'postponed';
+      booking.updatedAt = new Date();
+      booking.updatedBy = staff.id;
+      await manager.save(Booking, booking);
+      await manager.save(manager.create(BookingAudit, {
+        bookingId: booking.id, staffId: staff.id, staffEmail: staff.email, action: 'status',
+        changes: { status: { from, to: 'postponed' }, reason: { from: null, to: reason.trim() || 'weather' } },
+      }));
+      return this.readDetail(manager, booking);
+    });
+  }
+
+  async receiptPdf(refCode: string): Promise<Buffer> {
+    const booking = await this.bookingRepo.findOne({ where: { refCode } });
+    if (!booking) throw new NotFoundException(`No booking ${refCode}`);
+    const lines = await this.lineRepo.find({ where: { bookingId: booking.id }, order: { sortOrder: 'ASC' } });
+    return renderReceiptPdf(booking, lines, { siteUrl: this.tickets.siteUrl });
   }
 
   async resendWaiverLink(refCode: string): Promise<{ email: boolean; whatsapp: boolean }> {
@@ -354,6 +419,9 @@ export class StaffBookingsService {
       where: { bookingId: booking.id, experienceId: Not(IsNull()) },
       order: { sortOrder: 'ASC' },
     });
+    const requestedItems = patch.items !== undefined
+      ? (JSON.parse(patch.items) as { id: string; variant?: string; adults?: number; kids?: number; units?: number }[])
+      : null;
     const [experiences, settings, priceRows] = await Promise.all([
       manager.find(Experience),
       manager.find(Setting),
@@ -371,7 +439,7 @@ export class StaffBookingsService {
         adults,
         kids,
         rate,
-        items: existing.map((line) => ({
+        items: requestedItems ?? existing.map((line) => ({
           // The where clause already excluded the null (park entry) rows.
           id: line.experienceId ?? '',
           variant: line.variant || undefined,
@@ -386,7 +454,29 @@ export class StaffBookingsService {
     booking.entryAmount = priced.entry;
     booking.subtotal = priced.subtotal;
     booking.discount = priced.discount;
-    booking.total = priced.total;
+
+    // FOC pass / discount / coupon: a coupon's offer wins over a manual kind.
+    if (patch.couponCode !== undefined) {
+      if (patch.couponCode) {
+        const offer = await this.coupons.resolve(patch.couponCode, manager);
+        booking.couponCode = offer.code;
+        booking.adjustmentKind = offer.kind;
+        booking.adjustmentValue = offer.value;
+        booking.adjustmentNote = offer.note || `Code ${offer.code}`;
+        await this.coupons.consume(offer.code, manager);
+      } else {
+        booking.couponCode = '';
+        booking.adjustmentKind = 'none';
+        booking.adjustmentValue = 0;
+        booking.adjustmentNote = '';
+      }
+    }
+    if (patch.adjustmentKind !== undefined) booking.adjustmentKind = patch.adjustmentKind;
+    if (patch.adjustmentValue !== undefined) booking.adjustmentValue = patch.adjustmentValue;
+    if (patch.adjustmentNote !== undefined) booking.adjustmentNote = patch.adjustmentNote;
+    if (booking.adjustmentKind === 'none') { booking.adjustmentValue = 0; booking.adjustmentNote = patch.adjustmentNote ?? ''; }
+    booking.adjustmentAmount = adjustmentAmount(booking.adjustmentKind as AdjustmentKind, booking.adjustmentValue, priced);
+    booking.total = priced.total - booking.adjustmentAmount;
 
     await manager.delete(BookingLine, { bookingId: booking.id });
     await manager.save(
@@ -568,6 +658,13 @@ function normalizePatch(dto: UpdateBookingDto): BookingPatch {
   if (dto.payMode !== undefined) patch.payMode = dto.payMode;
   if (dto.status !== undefined) patch.status = dto.status;
   if (dto.staffNote !== undefined) patch.staffNote = dto.staffNote.trim();
+  if (dto.items !== undefined) {
+    patch.items = JSON.stringify(dto.items.map((i) => ({ id: i.id, variant: i.variant || undefined, adults: i.adults || 0, kids: i.kids || 0, units: i.units || 0 })));
+  }
+  if (dto.adjustmentKind !== undefined) patch.adjustmentKind = dto.adjustmentKind;
+  if (dto.adjustmentValue !== undefined) patch.adjustmentValue = dto.adjustmentValue;
+  if (dto.adjustmentNote !== undefined) patch.adjustmentNote = dto.adjustmentNote.trim();
+  if (dto.couponCode !== undefined) patch.couponCode = CouponsService.normalise(dto.couponCode);
   return patch;
 }
 
@@ -598,6 +695,17 @@ function currentValue(b: Booking, field: PatchField): string | number {
       return b.status;
     case 'staffNote':
       return b.staffNote;
+    case 'items':
+      // compared as the requested list; the stored lines are re-read in reprice()
+      return '';
+    case 'adjustmentKind':
+      return b.adjustmentKind ?? 'none';
+    case 'adjustmentValue':
+      return b.adjustmentValue ?? 0;
+    case 'adjustmentNote':
+      return b.adjustmentNote ?? '';
+    case 'couponCode':
+      return b.couponCode ?? '';
   }
 }
 
@@ -621,6 +729,7 @@ function applyPatch(b: Booking, patch: BookingPatch): void {
   if (patch.payMode !== undefined) b.payMode = patch.payMode;
   if (patch.status !== undefined) b.status = patch.status;
   if (patch.staffNote !== undefined) b.staffNote = patch.staffNote;
+  // items and adjustments are applied by reprice(), which owns the money.
 }
 
 /** `edit` unless the operator touched nothing but the status or the note. */
@@ -645,6 +754,8 @@ function toBookingDetail(
     ticketSentAt: booking.ticketSentAt ? toIso(booking.ticketSentAt) : null,
     reminderSentAt: booking.reminderSentAt ? toIso(booking.reminderSentAt) : null,
     lines: lines.map((l) => ({
+      experienceId: l.experienceId,
+      variant: l.variant || '',
       label: l.label,
       adults: l.adults,
       kids: l.kids,
