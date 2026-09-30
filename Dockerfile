@@ -26,6 +26,8 @@ COPY --from=build /app/dist ./dist
 # inside this image: Railway's pre-deploy command (.railway/railway.ts) and any
 # one-off shell (`railway ssh`). `pg` and `bcryptjs` are runtime dependencies.
 COPY scripts ./scripts
+# Fonts for the PDF copies of signed waivers (Arabic needs an embedded font).
+COPY assets ./assets
 COPY database/schema.sql database/seed.sql ./database/
 COPY database/migrations ./database/migrations
 EXPOSE 3001

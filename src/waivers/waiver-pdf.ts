@@ -1,21 +1,31 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import PDFDocument from 'pdfkit';
 import type { Booking, Waiver } from '../entities';
 import { TERMS, type TermsLang } from './terms';
+import { rtlParagraph } from './rtl-text';
 import { ageOn } from './waiver-rules';
 
 const PURPLE = '#340057';
 const VIOLET = '#7333FF';
 const GREY = '#6B5B85';
-const VISIT: Record<TermsLang, string> = { en: 'Visit', fr: 'Visite', de: 'Besuch', it: 'Visita', ar: 'Visit' };
+const VISIT: Record<TermsLang, string> = { en: 'Visit', fr: 'Visite', de: 'Besuch', it: 'Visita', ar: 'الزيارة' };
+
+/** Noto Naskh Arabic, shipped in assets/fonts (SIL OFL); Helvetica cannot draw Arabic. */
+const FONT_DIR = join(process.cwd(), 'assets', 'fonts');
+const AR_REGULAR = join(FONT_DIR, 'NotoNaskhArabic-Regular.ttf');
+const AR_BOLD = join(FONT_DIR, 'NotoNaskhArabic-Bold.ttf');
+export const arabicFontsAvailable = (): boolean => existsSync(AR_REGULAR) && existsSync(AR_BOLD);
 
 /**
  * PDF copy of a signed Disclaimer Form: what the guest gets by e-mail and
  * WhatsApp, and what the gate can print. The clauses appear in the language
- * the guest read them in; Arabic falls back to the binding English text
- * because the PDF fonts cannot shape Arabic script (the e-mail body carries
- * the Arabic wording).
+ * the guest read them in; Arabic is laid out right to left with an embedded
+ * Arabic font (falls back to the binding English text if the font files are
+ * missing on the server).
  */
 export function pdfLang(lang: string): TermsLang {
+  if (lang === 'ar') return arabicFontsAvailable() ? 'ar' : 'en';
   return lang === 'fr' || lang === 'de' || lang === 'it' ? lang : 'en';
 }
 
@@ -28,6 +38,7 @@ const fmtDate = (v: string | Date): string => {
 export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const lang = pdfLang(w.lang);
+    const rtl = lang === 'ar';
     const T = TERMS[lang];
     const L = T.labels;
     const doc = new PDFDocument({ size: 'A4', margins: { top: 48, bottom: 48, left: 52, right: 52 }, info: { Title: `Disclaimer Form ${b.refCode} · ${w.participantName}`, Author: 'Mare Anguilles Farms Ltd' } });
@@ -36,12 +47,28 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
+    if (rtl) {
+      doc.registerFont('Body', AR_REGULAR);
+      doc.registerFont('Bold', AR_BOLD);
+    } else {
+      doc.registerFont('Body', 'Helvetica');
+      doc.registerFont('Bold', 'Helvetica-Bold');
+    }
+
+    const W = doc.page.width;
+    const M = doc.page.margins.left;
+    const CW = W - 2 * M;
     const signedAt = w.signedAt instanceof Date ? w.signedAt : new Date(w.signedAt);
     const stamp = `${signedAt.toLocaleString('en-GB', { timeZone: 'Indian/Mauritius', hour12: false })} (Mauritius) · IP ${w.ip || '-'} · ${w.termsVersion} · ${w.lang.toUpperCase()}`;
 
+    /** A paragraph in the reading direction of the form. */
+    const para = (text: string, o: { size?: number; bold?: boolean; color?: string; gap?: number; prefix?: string; lineGap?: number } = {}) => {
+      doc.font(o.bold ? 'Bold' : 'Body').fontSize(o.size ?? 9.2).fillColor(o.color ?? PURPLE);
+      if (rtl) rtlParagraph(doc, text, { x: M, width: CW, paragraphGap: o.gap ?? 4, prefix: o.prefix, lineGap: o.lineGap ?? 1 });
+      else doc.text((o.prefix ? o.prefix + '  ' : '') + text, M, doc.y, { width: CW, paragraphGap: o.gap ?? 4, lineGap: o.lineGap ?? 1 });
+    };
+
     // header band in the site's colours, drawn at fixed positions so nothing overlaps
-    const W = doc.page.width;
-    const M = doc.page.margins.left;
     doc.save();
     doc.rect(0, 0, W, 84).fill(PURPLE);
     doc.rect(0, 84, W, 8).fill(PURPLE);
@@ -49,25 +76,32 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     doc.restore();
     doc.font('Helvetica-BoldOblique').fontSize(26).fillColor('#FFFFFF').text('VALLÉ', M, 22, { lineBreak: false });
     doc.font('Helvetica').fontSize(8).fillColor('#FFFFFF').opacity(0.8).text('ADVENATURE™ PARK', M + 2, 54, { characterSpacing: 2, lineBreak: false }).opacity(1);
-    doc.font('Helvetica-Bold').fontSize(16).fillColor('#FFFFFF').text(L.title, M, 26, { width: W - 2 * M, align: 'right', lineBreak: false });
-    doc.font('Helvetica').fontSize(8.5).fillColor('#FFFFFF').opacity(0.85).text(L.company, M, 50, { width: W - 2 * M, align: 'right', lineBreak: false }).opacity(1);
-    doc.font('Helvetica').fontSize(8).fillColor(GREY).text(stamp, M, 104, { width: W - 2 * M, lineBreak: false });
+    if (rtl) {
+      doc.y = 18;
+      doc.font('Bold').fontSize(15).fillColor('#FFFFFF');
+      rtlParagraph(doc, L.title, { x: M + 120, width: CW - 120, paragraphGap: 2 });
+      doc.font('Body').fontSize(8.5).fillColor('#FFFFFF').opacity(0.85);
+      rtlParagraph(doc, L.company, { x: M + 120, width: CW - 120 });
+      doc.opacity(1);
+    } else {
+      doc.font('Bold').fontSize(16).fillColor('#FFFFFF').text(L.title, M, 26, { width: CW, align: 'right', lineBreak: false });
+      doc.font('Body').fontSize(8.5).fillColor('#FFFFFF').opacity(0.85).text(L.company, M, 50, { width: CW, align: 'right', lineBreak: false }).opacity(1);
+    }
+    doc.font('Helvetica').fontSize(8).fillColor(GREY).text(stamp, M, 104, { width: CW, lineBreak: false });
     doc.y = 124;
     doc.x = M;
 
     // participant block first, as on the paper form's summary
     const row = (label: string, value: string) => {
       if (!value) return;
-      doc.font('Helvetica-Bold').fontSize(8).fillColor(VIOLET).text(label.toUpperCase());
-      doc.font('Helvetica').fontSize(10.5).fillColor(PURPLE).text(value);
-      doc.moveDown(0.35);
+      para(label.toUpperCase(), { size: 8, bold: true, color: VIOLET, gap: 0 });
+      para(value, { size: 10.5, gap: 5 });
     };
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(PURPLE).text(`${L.participant.toUpperCase()} · ${b.refCode}`);
-    doc.moveDown(0.4);
+    para(`${L.participant.toUpperCase()} · ${b.refCode}`, { size: 11, bold: true, gap: 6 });
     const visit = fmtDate(b.visitDate);
-    row(L.name, w.participantName);
     const age = ageOn(String(w.birthDate).slice(0, 10), String(b.visitDate).slice(0, 10));
-    row(L.birth, `${fmtDate(w.birthDate)}  ·  ${L.age.replace('{n}', String(age))}${w.isMinor ? '  ·  ' + L.underGuardian : ''}`);;
+    row(L.name, w.participantName);
+    row(L.birth, `${fmtDate(w.birthDate)}  ·  ${L.age.replace('{n}', String(age))}${w.isMinor ? '  ·  ' + L.underGuardian : ''}`);
     row(`${L.height} / ${L.weight}`, `${w.heightCm} cm · ${w.weightKg} kg`);
     if (w.isMinor) row(L.guardian, w.guardianName);
     row(L.address, w.address);
@@ -79,47 +113,39 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     row(L.emPhone, w.emergencyPhone);
     row(L.medical, w.medicalNotes);
     row(VISIT[lang], `${visit} · ${b.slot}`);
-    doc.moveDown(0.4);
+    doc.y += 6;
 
     // clauses
-    doc.font('Helvetica').fontSize(9.5).fillColor(PURPLE).text(L.intro);
-    doc.moveDown(0.4);
-    doc.font('Helvetica-Bold').text(L.hereby);
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9.2);
-    T.clauses.forEach((c, i) => {
-      doc.text(`${i + 1}.  ${c}`, { indent: 0, paragraphGap: 4, lineGap: 1 });
-    });
-    doc.moveDown(0.6);
+    para(L.intro, { size: 9.5, gap: 6 });
+    para(L.hereby, { size: 9.5, bold: true, gap: 4 });
+    T.clauses.forEach((c, i) => para(c, { prefix: `${i + 1}.`, gap: 4 }));
+    doc.y += 6;
 
     // confirmations
-    doc.font('Helvetica-Bold').fontSize(10).text(L.confirmations.toUpperCase());
-    doc.moveDown(0.2);
-    doc.font('Helvetica').fontSize(9.2);
-    for (const k of ['c_terms', 'c_health', 'c_consent'] as const) doc.text(`[x]  ${L[k]}`, { paragraphGap: 3 });
-    doc.text(`[${w.marketingConsent ? 'x' : ' '}]  ${L.marketing}`, { paragraphGap: 3 });
-    doc.moveDown(0.8);
+    para(L.confirmations.toUpperCase(), { size: 10, bold: true, gap: 3 });
+    for (const k of ['c_terms', 'c_health', 'c_consent'] as const) para(L[k], { prefix: '[x]', gap: 3 });
+    para(L.marketing, { prefix: w.marketingConsent ? '[x]' : '[ ]', gap: 3 });
+    doc.y += 8;
 
     // signature
     if (doc.y > doc.page.height - 200) doc.addPage();
-    doc.font('Helvetica-Bold').fontSize(10).fillColor(PURPLE).text((w.isMinor ? L.sigGuardian : L.sigParticipant).toUpperCase());
-    doc.moveDown(0.3);
+    para((w.isMinor ? L.sigGuardian : L.sigParticipant).toUpperCase(), { size: 10, bold: true, gap: 4 });
+    const sigX = rtl ? M + CW - 240 : M;
     if (w.signaturePng) {
       try {
-        doc.image(Buffer.from(w.signaturePng.replace(/^data:image\/png;base64,/, ''), 'base64'), { fit: [240, 90] });
+        doc.image(Buffer.from(w.signaturePng.replace(/^data:image\/png;base64,/, ''), 'base64'), sigX, doc.y, { fit: [240, 90] });
+        doc.y += 96;
       } catch {
-        doc.font('Helvetica').fontSize(9).text('[signature image unavailable]');
+        para('[signature image unavailable]', { size: 9 });
       }
     } else {
       // sample / preview: an empty signature line
       const y = doc.y + 60;
-      doc.moveTo(doc.x, y).lineTo(doc.x + 240, y).strokeColor(GREY).stroke();
+      doc.moveTo(sigX, y).lineTo(sigX + 240, y).strokeColor(GREY).stroke();
       doc.y = y + 6;
     }
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9.5).text(`${w.signedBy}  ·  ${fmtDate(signedAt)}`);
-    doc.moveDown(1);
-    doc.font('Helvetica').fontSize(8).fillColor(GREY).text(`${opts.siteUrl}  ·  B102, Mare Anguilles, Chamouny, Mauritius  ·  +230 660 44 77`, { align: 'center' });
+    para(`${w.signedBy}  ·  ${fmtDate(signedAt)}`, { size: 9.5, gap: 10 });
+    doc.font('Helvetica').fontSize(8).fillColor(GREY).text(`${opts.siteUrl}  ·  B102, Mare Anguilles, Chamouny, Mauritius  ·  +230 660 44 77`, M, doc.y, { width: CW, align: 'center' });
 
     doc.end();
   });

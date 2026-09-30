@@ -224,13 +224,13 @@ export class WaiversService {
   }
 
   /** A filled-in example for previews and for the WhatsApp template sample. */
-  samplePdf(): Promise<Buffer> {
+  samplePdf(lang = 'en'): Promise<Buffer> {
     const b = { refCode: 'VAL-1234-26', visitDate: '2026-10-02', slot: 'morning' } as Booking;
     const w = {
       id: 'sample', participantName: 'Asha Rahman', birthDate: '1990-04-12', heightCm: 165, weightKg: 60, isMinor: false, guardianName: '',
       address: 'Lux Le Morne', email: 'asha@example.com', phone: '+230 5123 4567', nationality: 'Mauritius', idNumber: '',
       emergencyName: 'Omar Rahman', emergencyPhone: '+230 5765 4321', medicalNotes: '', marketingConsent: false,
-      signaturePng: '', signedBy: 'Asha Rahman', lang: 'en', termsVersion: 'sample', ip: '', signedAt: new Date('2026-09-30T08:00:00Z'),
+      signaturePng: '', signedBy: 'Asha Rahman', lang, termsVersion: 'sample', ip: '', signedAt: new Date('2026-09-30T08:00:00Z'),
     } as unknown as Waiver;
     return this.copies.pdf(w, b);
   }

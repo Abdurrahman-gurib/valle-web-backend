@@ -2,7 +2,7 @@ import { Body, Controller, Get, Header, Headers, Ip, Param, Post, Query, Res, Us
 import type { Response } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { IsOptional } from 'class-validator';
+import { IsIn, IsOptional } from 'class-validator';
 import { CurrentStaff } from '../staff/auth/current-staff.decorator';
 import { Roles, RolesGuard } from '../staff/auth/roles.guard';
 import { StaffAuthGuard } from '../staff/auth/staff-auth.guard';
@@ -28,8 +28,8 @@ export class WaiversController {
   @Get('sample/waiver.pdf')
   @ApiOperation({ summary: 'A filled-in example of the Disclaimer Form PDF' })
   @Header('Cache-Control', 'public, max-age=86400')
-  async sample(@Res() res: Response): Promise<void> {
-    sendPdf(res, await this.waivers.samplePdf(), 'valle-disclaimer-sample.pdf');
+  async sample(@Query() q: SampleQueryDto, @Res() res: Response): Promise<void> {
+    sendPdf(res, await this.waivers.samplePdf(q.lang ?? 'en'), `valle-disclaimer-sample-${q.lang ?? 'en'}.pdf`);
   }
 
   @Get(':refCode/waivers/:id.pdf')
@@ -63,6 +63,12 @@ export class WaiversController {
   ): Promise<WaiverPublicView> {
     return this.waivers.sign(refCode.toUpperCase(), q.t, dto, { ip: ip ?? '', userAgent: userAgent ?? '' });
   }
+}
+
+class SampleQueryDto {
+  @IsOptional()
+  @IsIn(['en', 'fr', 'de', 'it', 'ar'])
+  lang?: string;
 }
 
 class GateDayQueryDto {

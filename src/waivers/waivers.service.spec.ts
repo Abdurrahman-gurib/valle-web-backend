@@ -2,11 +2,12 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ageOn, flagsFor, parseAgeLabel, parseLimitsSetting } from './waiver-rules';
 import { WaiversService, parkToday } from './waivers.service';
 import type { SignWaiverDto } from './waiver.dto';
-import { renderWaiverPdf } from './waiver-pdf';
+import { pdfLang, renderWaiverPdf } from './waiver-pdf';
+import { rtlParagraph } from './rtl-text';
 import { WhatsAppService } from '../notifications/whatsapp.service';
 
 describe('waiver PDF and WhatsApp copy', () => {
-  it('renders a PDF with the clauses in the language read, and English for Arabic', async () => {
+  it('renders a PDF with the clauses in the language read, Arabic included', async () => {
     const b = { refCode: 'VAL-1111-26', visitDate: '2026-10-02', slot: 'morning' } as never;
     const base = {
       id: 'w1', participantName: 'Eric Fransen', birthDate: '1970-09-22', heightCm: 180, weightKg: 82, isMinor: false, guardianName: '',
@@ -15,11 +16,35 @@ describe('waiver PDF and WhatsApp copy', () => {
       signaturePng: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
       signedBy: 'Eric Fransen', termsVersion: 'VAL-DISCLAIMER-2026-09-30', ip: '1.2.3.4', signedAt: new Date('2026-09-30T06:09:19Z'),
     };
+    const sizes: Record<string, number> = {};
     for (const lang of ['en', 'fr', 'ar']) {
       const pdf = await renderWaiverPdf({ ...base, lang } as never, b, { siteUrl: 'https://example.test' });
       expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
       expect(pdf.length).toBeGreaterThan(5000);
+      sizes[lang] = pdf.length;
     }
+    // the Arabic copy embeds the Arabic font, so it is much larger than the Latin ones
+    expect(pdfLang('ar')).toBe('ar');
+    expect(sizes.ar).toBeGreaterThan(sizes.en * 3);
+  });
+
+  it('lays Arabic lines out from the right edge, keeping Latin runs and numbers readable', () => {
+    const calls: { text: string; x: number; y: number }[] = [];
+    const doc = {
+      y: 100, x: 0, page: { height: 800, margins: { bottom: 48 } },
+      widthOfString: (t: string) => t.length * 5,
+      currentLineHeight: () => 12,
+      text: (text: string, x: number, y: number) => { calls.push({ text, x, y }); },
+      addPage: () => undefined,
+    };
+    rtlParagraph(doc as never, 'أؤكد البندين 9 و10: VALLÉ Park', { x: 0, width: 400 });
+    // one line, all pieces on the same y
+    expect(new Set(calls.map((c) => c.y)).size).toBe(1);
+    // first word sits at the right edge, the Latin run "VALLÉ Park" is one piece, "و10:" split into و / 10 / :
+    expect(calls[0].text).toBe('أؤكد');
+    expect(calls[0].x).toBe(400 - 'أؤكد'.length * 5);
+    expect(calls.map((c) => c.text)).toEqual(['أؤكد', 'البندين', '9', 'و', '10', ':', 'VALLÉ Park']);
+    expect(calls[calls.length - 1].x).toBeLessThan(calls[0].x);
   });
 
   it('builds a document template payload with the PDF as header', () => {
