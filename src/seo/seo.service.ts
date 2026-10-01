@@ -65,6 +65,7 @@ export class SeoService {
       { path: '/packages', lastmod: latest(tierMod, priceMod), changefreq: 'monthly', priority: 0.9 },
       ...restaurants.map((r) => ({ path: `/dine/${r.id}`, lastmod: r.updatedAt, changefreq: 'monthly' as const, priority: 0.7 })),
       { path: '/booking', lastmod: priceMod, changefreq: 'monthly', priority: 0.6 },
+      { path: '/story', lastmod: new Date('2026-10-01'), changefreq: 'yearly', priority: 0.7 },
       { path: '/vacancies', lastmod: vacMod.getTime() ? vacMod : new Date(), changefreq: 'weekly', priority: 0.5 },
       ...vacancies.map((v) => ({ path: `/vacancies/${v.slug}`, lastmod: v.updatedAt, changefreq: 'weekly' as const, priority: 0.5 })),
     ];
