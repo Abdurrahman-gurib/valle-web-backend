@@ -84,8 +84,8 @@ export class SignWaiverDto {
   @ApiProperty() @IsString() @Matches(/^data:image\/png;base64,[A-Za-z0-9+/=]{200,90000}$/)
   signature: string;
 
-  @ApiPropertyOptional({ enum: ['en', 'fr', 'de', 'it', 'ar', 'ru'] })
-  @IsOptional() @IsIn(['en', 'fr', 'de', 'it', 'ar', 'ru'])
+  @ApiPropertyOptional({ enum: ['en', 'fr', 'de', 'it', 'ar', 'ru', 'es', 'hi'] })
+  @IsOptional() @IsIn(['en', 'fr', 'de', 'it', 'ar', 'ru', 'es', 'hi'])
   lang?: string;
 }
 

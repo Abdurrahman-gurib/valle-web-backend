@@ -14,7 +14,7 @@ describe('localizePath', () => {
 });
 
 describe('SeoService.sitemapXml', () => {
-  it('lists every page in the six languages with hreflang alternates and x-default', async () => {
+  it('lists every page in the eight languages with hreflang alternates and x-default', async () => {
     const svc = new SeoService(
       repo([{ id: 'zipline', updatedAt: d }]),
       repo([{ id: 'chamouze', updatedAt: d }]),
@@ -29,7 +29,7 @@ describe('SeoService.sitemapXml', () => {
     }
     expect(xml).toContain('<xhtml:link rel="alternate" hreflang="x-default" href="https://example.test/activities/zipline"/>');
     const urls = xml.match(/<url>/g)!.length;
-    expect(urls % 6).toBe(0);
+    expect(urls % 8).toBe(0);
     expect(xml).toContain('<xhtml:link rel="alternate" hreflang="ru" href="https://example.test/ru/activities/zipline"/>');
   });
 });

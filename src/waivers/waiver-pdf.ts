@@ -9,7 +9,7 @@ import { ageOn } from './waiver-rules';
 const PURPLE = '#340057';
 const VIOLET = '#7333FF';
 const GREY = '#6B5B85';
-const VISIT: Record<TermsLang, string> = { en: 'Visit', fr: 'Visite', de: 'Besuch', it: 'Visita', ar: 'الزيارة', ru: 'Визит' };
+const VISIT: Record<TermsLang, string> = { en: 'Visit', fr: 'Visite', de: 'Besuch', it: 'Visita', ar: 'الزيارة', ru: 'Визит', es: 'Visita', hi: 'यात्रा' };
 
 /** Noto Naskh Arabic, shipped in assets/fonts (SIL OFL); Helvetica cannot draw Arabic. */
 const FONT_DIR = join(process.cwd(), 'assets', 'fonts');
@@ -20,6 +20,10 @@ export const arabicFontsAvailable = (): boolean => existsSync(AR_REGULAR) && exi
 const RU_REGULAR = join(FONT_DIR, 'NotoSans-Regular.ttf');
 const RU_BOLD = join(FONT_DIR, 'NotoSans-Bold.ttf');
 export const cyrillicFontsAvailable = (): boolean => existsSync(RU_REGULAR) && existsSync(RU_BOLD);
+/** Noto Sans Devanagari for Hindi; fontkit shapes the conjuncts and matras. */
+const HI_REGULAR = join(FONT_DIR, 'NotoSansDevanagari-Regular.ttf');
+const HI_BOLD = join(FONT_DIR, 'NotoSansDevanagari-Bold.ttf');
+export const devanagariFontsAvailable = (): boolean => existsSync(HI_REGULAR) && existsSync(HI_BOLD);
 
 /**
  * PDF copy of a signed Disclaimer Form: what the guest gets by e-mail and
@@ -31,7 +35,8 @@ export const cyrillicFontsAvailable = (): boolean => existsSync(RU_REGULAR) && e
 export function pdfLang(lang: string): TermsLang {
   if (lang === 'ar') return arabicFontsAvailable() ? 'ar' : 'en';
   if (lang === 'ru') return cyrillicFontsAvailable() ? 'ru' : 'en';
-  return lang === 'fr' || lang === 'de' || lang === 'it' ? lang : 'en';
+  if (lang === 'hi') return devanagariFontsAvailable() ? 'hi' : 'en';
+  return lang === 'fr' || lang === 'de' || lang === 'it' || lang === 'es' ? lang : 'en';
 }
 
 const fmtDate = (v: string | Date): string => {
@@ -58,6 +63,9 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     } else if (lang === 'ru') {
       doc.registerFont('Body', RU_REGULAR);
       doc.registerFont('Bold', RU_BOLD);
+    } else if (lang === 'hi') {
+      doc.registerFont('Body', HI_REGULAR);
+      doc.registerFont('Bold', HI_BOLD);
     } else {
       doc.registerFont('Body', 'Helvetica');
       doc.registerFont('Bold', 'Helvetica-Bold');

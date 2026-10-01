@@ -1,6 +1,6 @@
 /** The Disclaimer Form wording in every site language, exported from the frontend dictionaries
  *  (Frontend/src/pages/Waiver.tsx + src/i18n/*.json). Regenerate with the export script when the text changes. */
-export type TermsLang = 'en' | 'fr' | 'de' | 'it' | 'ar' | 'ru';
+export type TermsLang = 'en' | 'fr' | 'de' | 'it' | 'ar' | 'ru' | 'es' | 'hi';
 export const TERMS: Record<TermsLang, { clauses: string[]; labels: Record<string, string> }> = {
  "en": {
   "clauses": [
@@ -312,6 +312,110 @@ export const TERMS: Record<TermsLang, { clauses: string[]; labels: Record<string
    "sigParticipant": "Подпись Участника",
    "sigGuardian": "Подпись Законного представителя",
    "underGuardian": "ДО 18 ЛЕТ · ПОДПИСЫВАЕТ ПРЕДСТАВИТЕЛЬ"
+  }
+ },
+ "es": {
+  "clauses": [
+   "Reconoce que él / el Participante menor ha asistido a la sesión introductoria impartida por los empleados/representantes de la Empresa, destinada a familiarizar a los asistentes con el manejo y uso del equipo y los accesorios correspondientes a la actividad seleccionada (el «Equipo»). El Participante / los Tutores Legales declaran estar satisfechos con dicha sesión introductoria.",
+   "Declara que él / el Participante menor es capaz de manejar y operar el Equipo y acepta que el uso del Equipo será bajo su propio riesgo / el del Participante menor.",
+   "Acepta que, durante la actividad, el Equipo estará bajo su cuidado y custodia («garde») hasta su devolución a la Empresa.",
+   "Acepta que la Empresa se reserva el derecho a reclamar cualquier coste derivado de daños en su equipo y/o accesorios como resultado directo de un uso indebido o inadecuado, del incumplimiento de las instrucciones dadas por los empleados/representantes de la Empresa o de un uso distinto del que haría una persona razonable. Acepta además indemnizar a la Empresa con la suma mínima y no negociable de 25.000 rupias siempre que un quad o un buggy resulte dañado por los actos del Participante.",
+   "Se compromete a comunicar de inmediato a la Empresa cualquier defecto observado en el funcionamiento del Equipo antes del inicio de la actividad o tan pronto como el Participante tenga conocimiento de él. En ausencia de dicha comunicación, la Empresa considerará que el Participante / Tutor Legal acepta que el Equipo le ha sido entregado, a él o al Participante menor, en buen estado de funcionamiento.",
+   "Se compromete a garantizar que él / el Participante menor lleve en todo momento el casco que se le haya facilitado para la actividad.",
+   "Reconoce haber sido informado del carácter silvestre del lugar y del nivel de dificultad de las pistas.",
+   "Declara que él / el Participante menor ha aceptado participar en la actividad de forma voluntaria y bajo su propio riesgo / el del Participante menor. El Tutor Legal da por la presente su consentimiento expreso a la participación del Participante menor en la actividad seleccionada y acepta que el Participante menor estará bajo su responsabilidad durante la actividad.",
+   "Garantiza que él / el Participante menor está física y mentalmente capacitado para participar con seguridad en la actividad y que no tiene ningún problema de salud particular ni padece discapacidad alguna que pueda poner en peligro su vida / la del Participante menor o la de cualquier participante durante la actividad. El Participante / Tutor Legal garantiza además que él / el Participante menor no se encuentra bajo los efectos de alcohol, drogas o medicamentos que puedan afectar o poner en peligro su participación / la del Participante menor o la de cualquier otro participante durante la actividad.",
+   "Reconoce que está estrictamente prohibido realizar o participar en cualquier actividad durante el embarazo. Reconoce que él / el Participante menor ha sido informado de las medidas de seguridad que deben cumplirse durante la actividad y acepta la importancia de respetarlas en todo momento. Por tanto, el Participante / Tutor Legal acepta expresamente obedecer / garantizar que el Participante menor obedezca dichas medidas de seguridad y se compromete a cumplir todas las instrucciones del guía o guías / empleados de la Empresa durante la actividad.",
+   "Acepta que el incumplimiento de las instrucciones del guía o guías / empleados de la Empresa durante la actividad puede dar lugar a que estos la den por finalizada de inmediato. En tal caso, el Participante / Tutor Legal acepta que no tendrá derecho a reembolso alguno por parte de la Empresa.",
+   "Toma nota y acepta la estricta política de no reembolso que aplica la Empresa cuando el Participante cancela una actividad después de haberla reservado y pagado, y dicha actividad puede realizarse en ese momento. La lluvia o cualquier condición meteorológica no puede ni debe justificar la cancelación de ninguna actividad.",
+   "Acepta por la presente ser el único responsable de sus pertenencias personales / las del Participante menor durante la actividad.",
+   "Acepta que la Empresa, sus empleados o agentes no serán en ningún caso responsables de daño físico, moral o material alguno que él / el Participante menor pueda sufrir durante la actividad, salvo cuando dicho daño resulte de una «falta grave» de la Empresa, sus empleados o agentes.",
+   "Renuncia expresamente a todos los derechos y acciones que pudiera tener contra la Empresa, sus empleados o agentes respecto de cualquier reclamación que pudiera derivarse de su participación / la del Participante menor en la actividad o en relación con ella, salvo cuando resulte de una «falta grave» de la Empresa, sus empleados o agentes.",
+   "Se compromete a indemnizar y mantener indemne a la Empresa, sus empleados o agentes frente a toda reclamación y acción que en cualquier momento pudiera sufrir o afrontar cualquiera de ellos, o presentarse contra ellos, como resultado de los actos del Participante / Participante menor durante su participación en la actividad o en relación con ellos.",
+   "Reconoce que está estrictamente prohibido bañarse en el parque.",
+   "Concede a la Empresa el derecho a enviar futuras promociones al correo electrónico y/o número de teléfono facilitados con fines publicitarios (opcional: marque la casilla de abajo)."
+  ],
+  "labels": {
+   "title": "FORMULARIO DE EXENCIÓN DE RESPONSABILIDAD",
+   "company": "Mare Anguilles Farms Ltd (en adelante, «la Empresa»)",
+   "intro": "Las actividades reservadas se denominan en adelante la «actividad». Cuando el contexto lo requiera, las palabras en singular incluyen el plural y viceversa.",
+   "hereby": "El Participante / Tutor Legal, por la presente:",
+   "participant": "Participante",
+   "name": "Nombre y apellidos",
+   "birth": "Fecha de nacimiento",
+   "age": "Edad el día de la visita: {n}",
+   "height": "Altura (cm)",
+   "weight": "Peso (kg)",
+   "guardian": "Tutor Legal que firma por este Participante menor (nombre y apellidos)",
+   "address": "Dirección / Hotel",
+   "email": "Correo electrónico",
+   "phone": "Número de teléfono",
+   "nationality": "Nacionalidad",
+   "idNumber": "Número de documento de identidad / pasaporte (opcional)",
+   "emergency": "Contacto de emergencia",
+   "emName": "Nombre de la persona de contacto en caso de emergencia",
+   "emPhone": "Número de teléfono de la persona de contacto en caso de emergencia",
+   "medical": "Problemas médicos, alergias o lesiones que los guías deban conocer (opcional)",
+   "confirmations": "Confirmaciones",
+   "c_terms": "He leído el Formulario de exención de responsabilidad anterior y acepto todas sus cláusulas en mi propio nombre o en nombre del Participante menor.",
+   "c_health": "Confirmo las cláusulas 9 y 10: el Participante está física y mentalmente capacitado para participar, no está embarazado/a y no se encuentra bajo los efectos del alcohol, drogas o medicamentos.",
+   "c_consent": "Confirmo la cláusula 8: la participación es voluntaria y por cuenta y riesgo del Participante; como Tutor Legal consiento la participación del Participante menor y asumo la responsabilidad por él.",
+   "marketing": "Opcional (cláusula 18): la Empresa puede enviar futuras promociones a este correo electrónico y/o número de teléfono.",
+   "sigParticipant": "Firma del Participante",
+   "sigGuardian": "Firma del Tutor Legal",
+   "underGuardian": "MENOR DE 18 · FIRMA EL TUTOR"
+  }
+ },
+ "hi": {
+  "clauses": [
+   "स्वीकार करता है कि वह / नाबालिग प्रतिभागी कंपनी के कर्मचारियों/प्रतिनिधियों द्वारा दिए गए परिचय सत्र में शामिल हुआ है, जिसका उद्देश्य चुनी गई गतिविधि से संबंधित उपकरण और सहायक सामग्री (“उपकरण”) के संचालन और उपयोग से परिचित कराना है। प्रतिभागी / कानूनी अभिभावक घोषित करते हैं कि वे इस परिचय सत्र से संतुष्ट हैं।",
+   "घोषित करता है कि वह / नाबालिग प्रतिभागी उपकरण को सँभालने और चलाने में सक्षम है और स्वीकार करता है कि उपकरण का उपयोग उसके / नाबालिग प्रतिभागी के स्वयं के जोखिम पर होगा।",
+   "स्वीकार करता है कि गतिविधि की अवधि में उपकरण उसकी देखरेख और अभिरक्षा (“garde”) में रहेगा, जब तक उसे कंपनी को लौटा न दिया जाए।",
+   "स्वीकार करता है कि कंपनी अपने उपकरण और/या सहायक सामग्री को हुए किसी भी नुकसान की लागत वसूलने का अधिकार सुरक्षित रखती है, यदि वह नुकसान अनुचित उपयोग, कंपनी के कर्मचारियों/प्रतिनिधियों के निर्देशों के उल्लंघन, या किसी समझदार व्यक्ति की तरह उपयोग न करने का सीधा परिणाम हो। साथ ही सहमत है कि जब भी प्रतिभागी के कृत्यों से कोई क्वाड या बग्गी क्षतिग्रस्त हो, तो वह कंपनी को न्यूनतम और अपरिवर्तनीय 25,000/- रुपये की क्षतिपूर्ति देगा।",
+   "सहमत है कि उपकरण के संचालन में दिखी किसी भी खराबी की सूचना गतिविधि शुरू होने से पहले या प्रतिभागी को पता चलते ही तुरंत कंपनी को देगा। ऐसी सूचना न होने पर कंपनी यह मानेगी कि प्रतिभागी / कानूनी अभिभावक स्वीकार करता है कि उपकरण उसे / नाबालिग प्रतिभागी को अच्छी कार्यशील स्थिति में सौंपा गया था।",
+   "सहमत है कि वह सुनिश्चित करेगा कि वह / नाबालिग प्रतिभागी गतिविधि के लिए दिया गया हेलमेट हर समय पहने रहे।",
+   "स्वीकार करता है कि उसे स्थल की जंगली प्रकृति और ट्रैक की कठिनाई के स्तर से अवगत कराया गया है।",
+   "घोषित करता है कि वह / नाबालिग प्रतिभागी स्वेच्छा से और अपने / नाबालिग प्रतिभागी के स्वयं के जोखिम पर गतिविधि में भाग लेने को सहमत हुआ है। कानूनी अभिभावक इसके द्वारा नाबालिग प्रतिभागी के चुनी गई गतिविधि में भाग लेने की स्पष्ट सहमति देता है और सहमत है कि गतिविधि के दौरान नाबालिग प्रतिभागी उसकी ज़िम्मेदारी में रहेगा।",
+   "आश्वासन देता है कि वह / नाबालिग प्रतिभागी शारीरिक और मानसिक रूप से गतिविधि में सुरक्षित भाग लेने में सक्षम है और उसे / नाबालिग प्रतिभागी को कोई विशेष स्वास्थ्य समस्या या ऐसी कोई अक्षमता नहीं है जो गतिविधि के दौरान उसके / नाबालिग प्रतिभागी के या किसी भी प्रतिभागी के जीवन को ख़तरे में डाल सके। प्रतिभागी / कानूनी अभिभावक यह भी आश्वासन देता है कि वह / नाबालिग प्रतिभागी किसी शराब, नशीले पदार्थ या दवा के प्रभाव में नहीं है जो गतिविधि के दौरान उसकी / नाबालिग प्रतिभागी की या किसी अन्य प्रतिभागी की भागीदारी को बाधित करे या ख़तरे में डाले।",
+   "स्वीकार करता है कि गर्भावस्था में किसी भी गतिविधि में भाग लेना सख़्त मना है। स्वीकार करता है कि उसे / नाबालिग प्रतिभागी को गतिविधि के दौरान पालन किए जाने वाले सुरक्षा उपायों की जानकारी दी गई है और वह हर समय उनके पालन के महत्व को मानता है। इसलिए प्रतिभागी / कानूनी अभिभावक स्पष्ट रूप से सहमत है कि वह इन सुरक्षा उपायों का पालन करेगा / सुनिश्चित करेगा कि नाबालिग प्रतिभागी पालन करे, और गतिविधि के दौरान गाइड / कंपनी के कर्मचारियों के सभी निर्देशों का पालन करेगा।",
+   "स्वीकार करता है कि गतिविधि के दौरान गाइड / कंपनी के कर्मचारियों के निर्देशों का पालन न करने पर वे गतिविधि तुरंत समाप्त कर सकते हैं। ऐसी स्थिति में प्रतिभागी / कानूनी अभिभावक सहमत है कि वह कंपनी से किसी भी प्रकार की प्रतिपूर्ति का हकदार नहीं होगा।",
+   "कंपनी की सख़्त अप्रतिदेय नीति को संज्ञान में लेता है और उससे सहमत है, जो तब लागू होती है जब बुकिंग और भुगतान के बाद प्रतिभागी कोई गतिविधि रद्द करता है, जबकि वह गतिविधि उस समय की जा सकती है। बारिश या कोई भी मौसम की स्थिति किसी गतिविधि को रद्द करने का कारण नहीं हो सकती और नहीं होनी चाहिए।",
+   "इसके द्वारा सहमत है कि गतिविधि के दौरान अपने / नाबालिग प्रतिभागी के निजी सामान के लिए पूरी तरह वही ज़िम्मेदार होगा।",
+   "सहमत है कि कंपनी, उसके कर्मचारी या एजेंट गतिविधि के दौरान उसे / नाबालिग प्रतिभागी को होने वाली किसी भी शारीरिक, नैतिक या भौतिक क्षति के लिए किसी भी तरह उत्तरदायी नहीं होंगे, सिवाय उस स्थिति के जब वह कंपनी, उसके कर्मचारियों या एजेंटों के “गंभीर कदाचार” का परिणाम हो।",
+   "गतिविधि में उसके / नाबालिग प्रतिभागी के भाग लेने से या उसके संबंध में उत्पन्न किसी भी दावे के लिए कंपनी, उसके कर्मचारियों या एजेंटों के विरुद्ध अपने सभी अधिकार और कार्रवाइयाँ स्पष्ट रूप से त्यागता है, सिवाय उस स्थिति के जब वह कंपनी, उसके कर्मचारियों या एजेंटों के “गंभीर कदाचार” का परिणाम हो।",
+   "वचन देता है कि गतिविधि में भागीदारी के दौरान प्रतिभागी / नाबालिग प्रतिभागी के कृत्यों के परिणामस्वरूप या उनके संबंध में कंपनी, उसके कर्मचारियों या एजेंटों में से किसी को भी किसी भी समय होने वाले, उठाने पड़ने वाले या उनके विरुद्ध किए गए सभी दावों और कार्रवाइयों से उन्हें क्षतिपूर्ति देगा और हानि से बचाएगा।",
+   "स्वीकार करता है कि पार्क में तैरना सख़्त मना है।",
+   "कंपनी को दिए गए ईमेल और/या फ़ोन नंबर पर विज्ञापन के उद्देश्य से भविष्य के ऑफ़र भेजने का अधिकार देता है (वैकल्पिक: नीचे का बॉक्स चुनें)।"
+  ],
+  "labels": {
+   "title": "अस्वीकरण फ़ॉर्म",
+   "company": "Mare Anguilles Farms Ltd (आगे “कंपनी” कहा गया है)",
+   "intro": "बुक की गई गतिविधियों को आगे “गतिविधि” कहा गया है। जहाँ संदर्भ की माँग हो, एकवचन शब्दों में बहुवचन शामिल है और इसके विपरीत भी।",
+   "hereby": "प्रतिभागी / कानूनी अभिभावक इसके द्वारा:",
+   "participant": "प्रतिभागी",
+   "name": "पहला और अंतिम नाम",
+   "birth": "जन्म तिथि",
+   "age": "यात्रा के दिन आयु: {n}",
+   "height": "ऊँचाई (सेमी)",
+   "weight": "वज़न (किग्रा)",
+   "guardian": "इस नाबालिग प्रतिभागी के लिए हस्ताक्षर करने वाले कानूनी अभिभावक (पहला और अंतिम नाम)",
+   "address": "पता / होटल",
+   "email": "ईमेल",
+   "phone": "फ़ोन नंबर",
+   "nationality": "राष्ट्रीयता",
+   "idNumber": "राष्ट्रीय पहचान पत्र / पासपोर्ट नंबर (वैकल्पिक)",
+   "emergency": "आपातकालीन संपर्क",
+   "emName": "आपात स्थिति में संपर्क व्यक्ति का नाम",
+   "emPhone": "आपात स्थिति में संपर्क व्यक्ति का फ़ोन नंबर",
+   "medical": "स्वास्थ्य समस्याएँ, एलर्जी या चोटें जिनकी जानकारी गाइडों को होनी चाहिए (वैकल्पिक)",
+   "confirmations": "पुष्टियाँ",
+   "c_terms": "मैंने ऊपर दिया अस्वीकरण फ़ॉर्म पढ़ लिया है और अपनी ओर से या नाबालिग प्रतिभागी की ओर से इसके सभी खंडों से सहमत हूँ।",
+   "c_health": "मैं खंड 9 और 10 की पुष्टि करता/करती हूँ: प्रतिभागी शारीरिक और मानसिक रूप से भाग लेने में सक्षम है, गर्भवती नहीं है, और शराब, नशीले पदार्थ या दवा के प्रभाव में नहीं है।",
+   "c_consent": "मैं खंड 8 की पुष्टि करता/करती हूँ: भागीदारी स्वैच्छिक है और प्रतिभागी के अपने जोखिम पर है; कानूनी अभिभावक के रूप में मैं नाबालिग प्रतिभागी के भाग लेने की सहमति देता/देती हूँ और उसकी ज़िम्मेदारी लेता/लेती हूँ।",
+   "marketing": "वैकल्पिक (खंड 18): कंपनी इस ईमेल पते और/या फ़ोन नंबर पर भविष्य के ऑफ़र भेज सकती है।",
+   "sigParticipant": "प्रतिभागी के हस्ताक्षर",
+   "sigGuardian": "कानूनी अभिभावक के हस्ताक्षर",
+   "underGuardian": "18 से कम · अभिभावक के हस्ताक्षर"
   }
  }
 };

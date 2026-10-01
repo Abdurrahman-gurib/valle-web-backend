@@ -17,7 +17,7 @@ describe('waiver PDF and WhatsApp copy', () => {
       signedBy: 'Eric Fransen', termsVersion: 'VAL-DISCLAIMER-2026-09-30', ip: '1.2.3.4', signedAt: new Date('2026-09-30T06:09:19Z'),
     };
     const sizes: Record<string, number> = {};
-    for (const lang of ['en', 'fr', 'ar', 'ru']) {
+    for (const lang of ['en', 'fr', 'ar', 'ru', 'es', 'hi']) {
       const pdf = await renderWaiverPdf({ ...base, lang } as never, b, { siteUrl: 'https://example.test' });
       expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
       expect(pdf.length).toBeGreaterThan(5000);
