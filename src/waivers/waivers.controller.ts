@@ -15,7 +15,7 @@ import { GateDayRow, GateView, WaiverPublicView, WaiversService, parkToday } fro
 /** Query classes come before the controllers: decorators read them when the class body is evaluated. */
 class SampleQueryDto {
   @IsOptional()
-  @IsIn(['en', 'fr', 'de', 'it', 'ar'])
+  @IsIn(['en', 'fr', 'de', 'it', 'ar', 'ru'])
   lang?: string;
 }
 

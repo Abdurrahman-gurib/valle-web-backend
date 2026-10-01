@@ -7,7 +7,7 @@ import { rtlParagraph } from './rtl-text';
 import { WhatsAppService } from '../notifications/whatsapp.service';
 
 describe('waiver PDF and WhatsApp copy', () => {
-  it('renders a PDF with the clauses in the language read, Arabic included', async () => {
+  it('renders a PDF with the clauses in the language read, Arabic and Russian included', async () => {
     const b = { refCode: 'VAL-1111-26', visitDate: '2026-10-02', slot: 'morning' } as never;
     const base = {
       id: 'w1', participantName: 'Eric Fransen', birthDate: '1970-09-22', heightCm: 180, weightKg: 82, isMinor: false, guardianName: '',
@@ -17,7 +17,7 @@ describe('waiver PDF and WhatsApp copy', () => {
       signedBy: 'Eric Fransen', termsVersion: 'VAL-DISCLAIMER-2026-09-30', ip: '1.2.3.4', signedAt: new Date('2026-09-30T06:09:19Z'),
     };
     const sizes: Record<string, number> = {};
-    for (const lang of ['en', 'fr', 'ar']) {
+    for (const lang of ['en', 'fr', 'ar', 'ru']) {
       const pdf = await renderWaiverPdf({ ...base, lang } as never, b, { siteUrl: 'https://example.test' });
       expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
       expect(pdf.length).toBeGreaterThan(5000);
@@ -26,6 +26,9 @@ describe('waiver PDF and WhatsApp copy', () => {
     // the Arabic copy embeds the Arabic font, so it is much larger than the Latin ones
     expect(pdfLang('ar')).toBe('ar');
     expect(sizes.ar).toBeGreaterThan(sizes.en * 3);
+    // Russian embeds Noto Sans (Latin + Cyrillic subset): Helvetica has no Cyrillic glyphs
+    expect(pdfLang('ru')).toBe('ru');
+    expect(sizes.ru).toBeGreaterThan(sizes.en * 2);
   });
 
   it('lays Arabic lines out from the right edge, keeping Latin runs and numbers readable', () => {

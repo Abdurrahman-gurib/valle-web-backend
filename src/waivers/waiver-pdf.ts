@@ -9,13 +9,17 @@ import { ageOn } from './waiver-rules';
 const PURPLE = '#340057';
 const VIOLET = '#7333FF';
 const GREY = '#6B5B85';
-const VISIT: Record<TermsLang, string> = { en: 'Visit', fr: 'Visite', de: 'Besuch', it: 'Visita', ar: 'الزيارة' };
+const VISIT: Record<TermsLang, string> = { en: 'Visit', fr: 'Visite', de: 'Besuch', it: 'Visita', ar: 'الزيارة', ru: 'Визит' };
 
 /** Noto Naskh Arabic, shipped in assets/fonts (SIL OFL); Helvetica cannot draw Arabic. */
 const FONT_DIR = join(process.cwd(), 'assets', 'fonts');
 const AR_REGULAR = join(FONT_DIR, 'NotoNaskhArabic-Regular.ttf');
 const AR_BOLD = join(FONT_DIR, 'NotoNaskhArabic-Bold.ttf');
 export const arabicFontsAvailable = (): boolean => existsSync(AR_REGULAR) && existsSync(AR_BOLD);
+/** Noto Sans (Latin + Cyrillic subset) for Russian: Helvetica has no Cyrillic glyphs. */
+const RU_REGULAR = join(FONT_DIR, 'NotoSans-Regular.ttf');
+const RU_BOLD = join(FONT_DIR, 'NotoSans-Bold.ttf');
+export const cyrillicFontsAvailable = (): boolean => existsSync(RU_REGULAR) && existsSync(RU_BOLD);
 
 /**
  * PDF copy of a signed Disclaimer Form: what the guest gets by e-mail and
@@ -26,6 +30,7 @@ export const arabicFontsAvailable = (): boolean => existsSync(AR_REGULAR) && exi
  */
 export function pdfLang(lang: string): TermsLang {
   if (lang === 'ar') return arabicFontsAvailable() ? 'ar' : 'en';
+  if (lang === 'ru') return cyrillicFontsAvailable() ? 'ru' : 'en';
   return lang === 'fr' || lang === 'de' || lang === 'it' ? lang : 'en';
 }
 
@@ -50,6 +55,9 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     if (rtl) {
       doc.registerFont('Body', AR_REGULAR);
       doc.registerFont('Bold', AR_BOLD);
+    } else if (lang === 'ru') {
+      doc.registerFont('Body', RU_REGULAR);
+      doc.registerFont('Bold', RU_BOLD);
     } else {
       doc.registerFont('Body', 'Helvetica');
       doc.registerFont('Bold', 'Helvetica-Bold');

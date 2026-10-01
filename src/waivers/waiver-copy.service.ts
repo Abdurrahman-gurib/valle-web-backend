@@ -20,6 +20,7 @@ const SUBJECT: Record<TermsLang, string> = {
   de: 'Ihre unterschriebene Haftungsausschlusserklärung',
   it: 'Il suo modulo di esonero firmato',
   ar: 'نموذج إخلاء المسؤولية الموقّع',
+  ru: 'Ваша подписанная Форма отказа от ответственности',
 };
 const INTRO: Record<TermsLang, string> = {
   en: 'Thank you. Here is the copy of the Disclaimer Form signed for {name} (booking {ref}). The PDF is attached; keep it for your visit.',
@@ -27,6 +28,7 @@ const INTRO: Record<TermsLang, string> = {
   de: 'Vielen Dank. Hier ist die Kopie der für {name} unterschriebenen Erklärung (Buchung {ref}). Das PDF liegt bei; bitte für Ihren Besuch aufbewahren.',
   it: 'Grazie. Ecco la copia del modulo di esonero firmato per {name} (prenotazione {ref}). Il PDF è allegato; lo conservi per la visita.',
   ar: 'شكرًا لكم. هذه نسخة نموذج إخلاء المسؤولية الموقّع باسم {name} (الحجز {ref}). ملف PDF مرفق؛ احتفظوا به لزيارتكم.',
+  ru: 'Спасибо. Это копия Формы отказа от ответственности, подписанной для {name} (бронирование {ref}). PDF во вложении; сохраните его для визита.',
 };
 
 /**
@@ -58,7 +60,7 @@ export class WaiverCopyService {
   }
 
   renderEmail(w: Waiver, b: Booking): { subject: string; text: string; html: string } {
-    const lang = (['en', 'fr', 'de', 'it', 'ar'].includes(w.lang) ? w.lang : 'en') as TermsLang;
+    const lang = (['en', 'fr', 'de', 'it', 'ar', 'ru'].includes(w.lang) ? w.lang : 'en') as TermsLang;
     const T = TERMS[lang];
     const L = T.labels;
     const rtl = lang === 'ar';
