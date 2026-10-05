@@ -1,0 +1,19 @@
+# Image of the `db-backup` cron service: scripts/db-backup.js plus the
+# PostgreSQL client AND server binaries it needs. pg_dump must be at least as
+# new as the production server (PostgreSQL 18), and the monthly restore test
+# starts a throwaway server from this same image, so production is never used as
+# a restore target. Keep the major version in step with the Railway database.
+FROM postgres:18-alpine
+# su-exec: PostgreSQL refuses to run as root, so the scratch server is started as `postgres`.
+RUN apk add --no-cache nodejs npm su-exec
+WORKDIR /app
+COPY package.json package-lock.json* ./
+# Only what the script imports (pg, nodemailer); no build step, no dev tools.
+RUN npm ci --omit=dev --no-audit --no-fund --ignore-scripts
+COPY scripts ./scripts
+COPY database/migrations ./database/migrations
+ENV NODE_ENV=production BACKUP_DIR=/backups
+# Runs as root on purpose: Railway mounts the volume root-owned. The script
+# drops to the image's `postgres` user (su-exec) for the scratch server.
+ENTRYPOINT []
+CMD ["node", "scripts/db-backup.js"]

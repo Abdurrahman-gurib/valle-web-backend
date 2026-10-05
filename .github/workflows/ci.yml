@@ -79,6 +79,15 @@ jobs:
           tags: valle-api:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # The nightly backup / monthly restore-test image (db-backup cron service).
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.backup
+          push: false
+          tags: valle-db-backup:ci
+          cache-from: type=gha,scope=backup
+          cache-to: type=gha,mode=max,scope=backup
 
   # Continuous deployment fallback. Railway's GitHub integration (preferred)
   # deploys main on its own once the Railway GitHub App has access to this
@@ -107,6 +116,10 @@ jobs:
         run: railway variables --service api --skip-deploys --set "SENTRY_RELEASE=${{ github.sha }}"
       - if: env.RAILWAY_TOKEN != ''
         run: railway up --service api --ci --message "GitHub Actions ${{ github.sha }}"
+      # The backup cron service runs the scripts from this repository: keep its image in
+      # step with the API. A cron service does not start on deploy; it waits for 22:00 UTC.
+      - if: env.RAILWAY_TOKEN != ''
+        run: railway up --service db-backup --ci --message "GitHub Actions ${{ github.sha }}"
       # Deploy tracking in Sentry (needs the SENTRY_AUTH_TOKEN repository secret):
       # marks this commit as deployed to production so issues show "first seen in".
       - if: env.RAILWAY_TOKEN != '' && env.SENTRY_AUTH_TOKEN != ''

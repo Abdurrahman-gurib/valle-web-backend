@@ -14,7 +14,9 @@
     "lint": "tsc --noEmit",
     "db:init": "node scripts/db-init.js",
     "db:reseed": "node scripts/db-init.js --reseed",
-    "staff:password": "node scripts/staff-password.js"
+    "staff:password": "node scripts/staff-password.js",
+    "db:backup": "node scripts/db-backup.js",
+    "db:backup:test": "node scripts/db-backup.js --restore-test"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

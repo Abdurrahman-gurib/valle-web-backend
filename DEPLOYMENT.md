@@ -243,14 +243,68 @@ railway ssh --service api -- node scripts/staff-password.js sales@vallepark.com 
 
 ### Backups
 
-Railway keeps the volume; take logical backups as well:
+The database is backed up every night and the backup is test-restored every
+month, by the `db-backup` cron service (`Dockerfile.backup`,
+`scripts/db-backup.js`, defined in `.railway/railway.ts`).
+
+| What | When | Detail |
+| --- | --- | --- |
+| Nightly backup | 22:00 UTC (02:00 at the park) | `pg_dump` custom format into the `backup-volume` volume, `/backups/nightly`. A manifest next to each dump records its size, SHA-256 and the row count of every table, taken from the same snapshot as the dump. |
+| Retention | every run | The newest 14 nightly dumps. The first dump of each month is also copied to `/backups/monthly` and kept for 12 months. |
+| Restore test | first run of each month | The newest dump is restored into a throwaway PostgreSQL started inside the backup container (never into production) and compared with its manifest: checksum, every table present, every row count equal, no invalid index, same latest booking. A night missed on the 1st is caught up by the next run. |
+
+Where to see the result:
+
+- **Back office**: a manager sees "Database backups" under *Sales & reports*:
+  green when last night's backup exists and a restore test passed within 35
+  days, amber when something is overdue, red when the latest run failed.
+- **E-mail** to `BACKUP_NOTIFY_TO`: immediately when a backup or a restore test
+  fails, and once a month with the restore-test result.
+- **Sentry Crons**: monitors `valle-db-backup` and `valle-db-restore-test`
+  (created by the first check-in) alert on a failed or missed run.
+- **Table** `backup_runs`: one row per backup and per restore test.
+
+Run it by hand (Railway CLI, linked to the project):
 
 ```bash
-railway connect Postgres        # psql over an SSH tunnel to the private database
+railway ssh --service db-backup -- node scripts/db-backup.js --list           # what is stored
+railway ssh --service db-backup -- node scripts/db-backup.js --restore-test   # back up now, then test the restore
+railway ssh --service db-backup -- node scripts/db-backup.js --test-only      # test the newest existing dump
 ```
 
-or, with **Public Networking** temporarily enabled on the Postgres service,
-`pg_dump` against its `DATABASE_PUBLIC_URL`.
+`railway ssh` needs a running container; a cron service only runs for a few
+seconds a night. Outside that window start a run from the Railway dashboard
+(service `db-backup`, *Run now*) and read its logs.
+
+#### Restoring for real
+
+1. Stop writes: put the site in maintenance (`MAINTENANCE=1` on `web`) or stop `api`.
+2. Take one more backup of the current state, even if it is damaged:
+   run the `db-backup` service once.
+3. Copy the dump you want out of the volume, or restore from inside the service:
+
+   ```bash
+   railway ssh --service db-backup
+   ls /backups/nightly /backups/monthly
+   # into a NEW database first, so the damaged one is still there to compare
+   createdb -h "$DB_HOST" -U "$DB_USER" valle_restored
+   pg_restore --exit-on-error --no-owner --no-privileges -h "$DB_HOST" -U "$DB_USER" -d valle_restored /backups/nightly/valle-YYYYMMDD-HHMMSS.dump
+   ```
+
+   (`PGPASSWORD="$DB_PASSWORD"` in front of each command.)
+4. Check `valle_restored` (bookings of the last days, staff logins), then point
+   the API at it (`DB_NAME` on `api`) or rename the databases, and redeploy `api`.
+5. Lift maintenance. Bookings made after the dump was taken are not in it: check
+   the confirmation e-mails sent since (Resend dashboard) and re-enter them.
+
+What these backups do not cover: the dumps live in the same Railway project as
+the database. They protect against bad deploys, mistaken deletes and data
+corruption, not against losing the Railway account. For that, copy
+`/backups/monthly` to storage outside Railway from time to time, or add an
+off-site bucket to the script.
+
+The major version in `Dockerfile.backup` (`postgres:18-alpine`) must stay at or
+above the production server's: `pg_dump` refuses to dump a newer server.
 
 ## Day-two operations
 

@@ -43,6 +43,12 @@ export default defineRailway(() => {
       // enforced by nginx at runtime (see "Search engines" in DEPLOYMENT.md).
       VITE_SITE_URL: "https://web-production-ff60b.up.railway.app",
       CANONICAL_HOST: "web-production-ff60b.up.railway.app",
+      // Set on Railway, kept as they are (browser error monitoring and source maps).
+      // Listing them matters: a variable missing from this file is DELETED by `railway config apply`.
+      VITE_SENTRY_DSN: preserve(),
+      VITE_SENTRY_ENVIRONMENT: preserve(),
+      VITE_SENTRY_RELEASE: preserve(),
+      SENTRY_AUTH_TOKEN: preserve(),
     },
   });
 
@@ -70,13 +76,53 @@ export default defineRailway(() => {
       DB_NAME: Postgres.env.PGDATABASE,
       DB_SSL: "no-verify",
       JWT_SECRET: preserve(),
+      // Secrets and deploy-time values set on Railway, never written here. They must stay
+      // listed: a variable missing from this file is DELETED by `railway config apply`.
+      SMTP_URL: preserve(),          // Resend (guest tickets, reminders, backup alerts)
+      D360_API_KEY: preserve(),      // WhatsApp Business (360dialog)
+      SENTRY_DSN: preserve(),
+      SENTRY_ENVIRONMENT: preserve(),
+      SENTRY_RELEASE: preserve(),    // stamped by CI on every deploy
+      SENTRY_AUTH_TOKEN: preserve(),
       STAFF_COOKIE_NAME: "valle_staff",
       CORS_ORIGIN: "https://${{web.RAILWAY_PUBLIC_DOMAIN}}",
       TRUST_PROXY: "true",
     },
   });
 
+  // Nightly logical backup + monthly restore test (scripts/db-backup.js, see
+  // "Backups" in DEPLOYMENT.md). A cron service: it starts at 22:00 UTC, which
+  // is 02:00 at the park, runs to completion and stops. The dumps live on their
+  // own volume, separate from the database volume they protect. Secrets are
+  // referenced from the api service so each has one home.
+  const backupVolume = volume("backup-volume", {
+    alerts: { usage: { "80": {}, "95": {} } },
+    region: "ams",
+    sizeMB: 5000,
+  });
+  const dbBackup = service("db-backup", {
+    source: github("Abdurrahman-gurib/valle-web-backend", { branch: "main" }),
+    build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile.backup" },
+    deploy: { cronSchedule: "0 22 * * *", restartPolicyType: "NEVER" },
+    volumeMounts: { "/backups": backupVolume },
+    env: {
+      BACKUP_DIR: "/backups",
+      BACKUP_CRON: "0 22 * * *",
+      // Failures, and once a month the restore-test result.
+      BACKUP_NOTIFY_TO: "abdurrahman@vallepark.com",
+      MAIL_FROM: "VALLÉ Advenature Park <bookings@vallepark.com>",
+      SMTP_URL: "${{api.SMTP_URL}}",
+      SENTRY_DSN: "${{api.SENTRY_DSN}}",
+      DB_HOST: Postgres.env.RAILWAY_PRIVATE_DOMAIN,
+      DB_PORT: "5432",
+      DB_USER: Postgres.env.PGUSER,
+      DB_PASSWORD: Postgres.env.PGPASSWORD,
+      DB_NAME: Postgres.env.PGDATABASE,
+      DB_SSL: "no-verify",
+    },
+  });
+
   return project("valle-web", {
-    resources: [web, api, Postgres, postgresVolume],
+    resources: [web, api, Postgres, postgresVolume, dbBackup, backupVolume],
   });
 });
