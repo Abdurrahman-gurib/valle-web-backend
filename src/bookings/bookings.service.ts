@@ -14,6 +14,7 @@ import { BookingNotifierService } from '../notifications/booking-notifier.servic
 import { GuestMessagingService } from '../notifications/guest-messaging.service';
 import { TicketService } from '../tickets/ticket.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { PaymentsService } from '../payments/payments.service';
 import { toBookingRow } from '../staff/bookings/booking-row';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { adjustmentAmount, computeBooking, PricedBooking } from './pricing';
@@ -31,6 +32,9 @@ export interface BookingResponse {
   /** The guest's ticket page (QR inside); also e-mailed / WhatsApped. */
   ticketUrl?: string;
   qrUrl?: string;
+  /** "Pay online now" with a provider configured: send the guest here; the ticket follows the payment. */
+  checkoutUrl?: string;
+  paymentId?: string;
 }
 
 const REF_MAX_TRIES = 20;
@@ -112,6 +116,7 @@ export class BookingsService {
     @Optional() private readonly tickets?: TicketService,
     @Optional() config?: ConfigService,
     @Optional() private readonly coupons?: CouponsService,
+    @Optional() private readonly payments?: PaymentsService,
   ) {
     const cap = Number(config?.get<string>('BOOKING_SLOT_CAPACITY') ?? '');
     this.slotCapacity = Number.isFinite(cap) && cap > 0 ? cap : DEFAULT_SLOT_CAPACITY;
@@ -288,8 +293,23 @@ export class BookingsService {
 
     // After the commit, so the desk is never told about a booking that rolled back.
     void this.notifyStaff(saved, lines);
-    // The guest's ticket (e-mail with QR, WhatsApp when configured). Never blocks the response.
-    void this.guest?.sendTicket(saved, lines).catch((e: Error) => this.logger.warn(`Ticket for ${saved.refCode} not sent: ${e.message}`));
+
+    // "Pay online now" with a gateway configured: open the checkout and hold the
+    // ticket until the money arrives (PaymentsService sends it on the webhook, or
+    // as pay-on-arrival once the checkout is abandoned). Without a gateway the
+    // choice means nothing and the booking is a pay-on-arrival one.
+    let checkout: { paymentId: string; checkoutUrl: string } | null = null;
+    if (dto.payMode === 'online' && this.payments?.enabled) {
+      try {
+        checkout = await this.payments.startCheckout(saved);
+      } catch (e) {
+        this.logger.warn(`Checkout for ${saved.refCode} could not be opened: ${(e as Error).message}`);
+      }
+    }
+    if (!checkout) {
+      // The guest's ticket (e-mail with QR, WhatsApp when configured). Never blocks the response.
+      void this.guest?.sendTicket(saved, lines).catch((e: Error) => this.logger.warn(`Ticket for ${saved.refCode} not sent: ${e.message}`));
+    }
 
     return {
       refCode: saved.refCode,
@@ -302,6 +322,7 @@ export class BookingsService {
       status: saved.status,
       ticketUrl: this.tickets?.ticketUrl(saved.refCode),
       qrUrl: this.tickets?.qrUrl(saved.refCode),
+      ...(checkout ? { checkoutUrl: checkout.checkoutUrl, paymentId: checkout.paymentId } : {}),
     };
   }
 

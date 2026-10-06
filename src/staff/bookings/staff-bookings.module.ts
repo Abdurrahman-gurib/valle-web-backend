@@ -13,6 +13,7 @@ import { BookingsModule } from '../../bookings/bookings.module';
 import { TicketsModule } from '../../tickets/tickets.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { CouponsModule } from '../../coupons/coupons.module';
+import { PaymentsModule } from '../../payments/payments.module';
 import { StaffBookingsController } from './staff-bookings.controller';
 import { StaffBookingsService } from './staff-bookings.service';
 
@@ -40,6 +41,7 @@ import { StaffBookingsService } from './staff-bookings.service';
     TicketsModule,
     NotificationsModule,
     CouponsModule,
+    PaymentsModule,
   ],
   controllers: [StaffBookingsController],
   providers: [StaffBookingsService],

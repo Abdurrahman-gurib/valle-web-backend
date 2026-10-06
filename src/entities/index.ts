@@ -32,6 +32,7 @@ export {
   type BookingAuditValue,
 } from './booking-audit.entity';
 export { Quote } from './quote.entity';
+export { Payment } from './payment.entity';
 export { StaffUser } from './staff-user.entity';
 export { ChatConversation } from './chat-conversation.entity';
 export { ChatMessage } from './chat-message.entity';

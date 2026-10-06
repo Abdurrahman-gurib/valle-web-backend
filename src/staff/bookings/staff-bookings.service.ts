@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Optional,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -37,6 +38,7 @@ import {
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { CreateStaffBookingDto } from './dto/create-staff-booking.dto';
 import { BookingsService, reserveSlotPlaces } from '../../bookings/bookings.service';
+import { PaymentsService } from '../../payments/payments.service';
 import { TicketService } from '../../tickets/ticket.service';
 import { GuestMessagingService } from '../../notifications/guest-messaging.service';
 
@@ -165,6 +167,7 @@ export class StaffBookingsService {
     private readonly tickets: TicketService,
     private readonly guest: GuestMessagingService,
     private readonly coupons: CouponsService,
+    @Optional() private readonly payments?: PaymentsService,
   ) {}
 
   // ----------------------------------------------------------------- bookings
@@ -293,6 +296,20 @@ export class StaffBookingsService {
           ...(input.receiptNo?.trim() ? { receiptNo: { from: null, to: input.receiptNo.trim() } } : {}),
         },
       }));
+      return this.readDetail(manager, booking);
+    });
+  }
+
+  /** Money back through the payment provider; the booking's paid amount follows and the trail says why. */
+  async refund(refCode: string, input: { amount: number; reason?: string }, staff: StaffPrincipal): Promise<BookingDetail> {
+    const payments = this.payments;
+    if (!payments) throw new BadRequestException('Online payment is not available');
+    return this.dataSource.transaction(async (manager) => {
+      const booking = await manager.findOne(Booking, { where: { refCode }, lock: { mode: 'pessimistic_write' } });
+      if (!booking) throw new NotFoundException(`No booking ${refCode}`);
+      await payments.refund(manager, booking, input.amount, (input.reason ?? '').trim(), { id: staff.id, email: staff.email });
+      booking.updatedBy = staff.id;
+      await manager.save(Booking, booking);
       return this.readDetail(manager, booking);
     });
   }

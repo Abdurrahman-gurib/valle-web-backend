@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { PostponeDto, RecordPaymentDto } from './dto/front-office.dto';
+import { PostponeDto, RecordPaymentDto, RefundDto } from './dto/front-office.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentStaff } from '../auth/current-staff.decorator';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -87,6 +87,12 @@ export class StaffBookingsController {
   @ApiOperation({ summary: 'Cashier: record money taken for this booking (cash, card, Juice...)' })
   recordPayment(@Param('refCode') refCode: string, @Body() dto: RecordPaymentDto, @CurrentStaff() staff: StaffPrincipal): Promise<BookingDetail> {
     return this.staffBookings.recordPayment(refCode, dto, staff);
+  }
+
+  @Post('bookings/:refCode/refund')
+  @ApiOperation({ summary: 'Send part or all of an online payment back through the provider' })
+  refund(@Param('refCode') refCode: string, @Body() dto: RefundDto, @CurrentStaff() staff: StaffPrincipal): Promise<BookingDetail> {
+    return this.staffBookings.refund(refCode, dto, staff);
   }
 
   @Post('bookings/:refCode/postpone')
