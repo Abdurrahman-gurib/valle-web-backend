@@ -184,6 +184,8 @@ interface FakeState {
   experiences: Experience[];
   settings: Setting[];
   audit: BookingAudit[];
+  /** Guests other bookings already hold in the target slot (capacity check). */
+  slotGuests?: number;
 }
 
 /**
@@ -194,8 +196,25 @@ interface FakeState {
 class FakeManager {
   readonly deleted: { entity: string; criteria: unknown }[] = [];
   readonly lockModes: unknown[] = [];
+  readonly slotLocks: string[] = [];
 
   constructor(readonly state: FakeState) {}
+
+  /** The advisory lock taken by reserveSlotPlaces. */
+  query(_sql: string, params: unknown[]): Promise<unknown[]> {
+    this.slotLocks.push(String(params[0]));
+    return Promise.resolve([]);
+  }
+
+  /** Only reserveSlotPlaces builds a query here: the guests already in the slot. */
+  createQueryBuilder() {
+    const guests = String(this.state.slotGuests ?? 0);
+    const qb = {
+      select: () => qb, where: () => qb, andWhere: () => qb,
+      getRawOne: () => Promise.resolve({ guests }),
+    };
+    return qb;
+  }
 
   findOne<T extends object>(
     ctor: EntityCtor<T>,
@@ -299,7 +318,7 @@ function build(repos: {
     repos.audit ?? makeRepo<BookingAudit>(),
     repos.quote ?? makeRepo<Quote>(),
     repos.chat ?? makeRepo<ChatConversation>(),
-    { create: jest.fn() } as unknown as BookingsService,
+    { create: jest.fn(), capacity: 150 } as unknown as BookingsService,
     { ticketUrl: (ref: string) => 'https://example.test/ticket/' + ref + '?t=tok' } as unknown as TicketService,
     { sendTicket: jest.fn() } as unknown as GuestMessagingService,
     { resolve: jest.fn(), consume: jest.fn() } as never,
@@ -320,6 +339,7 @@ function harness(state: Partial<FakeState> = {}): Harness {
     experiences: state.experiences ?? [],
     settings: state.settings ?? ENTRY_SETTINGS,
     audit: state.audit ?? [],
+    slotGuests: state.slotGuests,
   });
   const transaction = jest.fn(
     (run: (m: EntityManager) => Promise<unknown>): Promise<unknown> =>
@@ -626,6 +646,22 @@ describe('StaffBookingsService.update: re-pricing', () => {
     expect(manager.lockModes).toEqual([{ mode: 'pessimistic_write' }]);
     expect(manager.state.booking?.updatedBy).toBe('staff-1');
     expect(manager.state.booking?.kids).toBe(0);
+  });
+});
+
+describe('StaffBookingsService.update: slot capacity', () => {
+  it('refuses to move a booking into a slot that has no room for its party', async () => {
+    const { service, manager } = harness({ booking: makeBooking(), slotGuests: 148 });
+    await expect(service.update('VAL-1234-26', { slot: 'afternoon' }, STAFF)).rejects.toMatchObject({ status: 409 });
+    expect(manager.slotLocks).toEqual(['slot:2026-08-20:afternoon']);
+  });
+
+  it('lets a booking move when the slot has room, and never checks a cancellation', async () => {
+    const { service } = harness({ booking: makeBooking(), slotGuests: 148 });
+    await expect(service.update('VAL-1234-26', { status: 'cancelled' }, STAFF)).resolves.toBeDefined();
+    const { service: roomy, manager } = harness({ booking: makeBooking(), slotGuests: 100 });
+    await expect(roomy.update('VAL-1234-26', { slot: 'afternoon' }, STAFF)).resolves.toBeDefined();
+    expect(manager.slotLocks).toHaveLength(1);
   });
 });
 

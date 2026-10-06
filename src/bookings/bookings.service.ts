@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, QueryFailedError, Repository } from 'typeorm';
+import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { ChatGateway } from '../chat/chat.gateway';
 import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../entities';
 import { BookingNotifierService } from '../notifications/booking-notifier.service';
@@ -53,6 +53,38 @@ export function busyLevel(guests: number, capacity: number): BusyLevel {
   return 'quiet';
 }
 
+/** Thrown as 409 when a slot cannot take the party; the page refreshes the picker on it. */
+export const SLOT_FULL_MESSAGE = 'That arrival slot is fully booked on this date. Pick the other slot or another day.';
+
+/**
+ * Guests already holding (date, slot), counted under a transaction-scoped
+ * advisory lock on that slot so two bookings racing for the last places are
+ * serialised: the second one sees the first one's guests and is refused.
+ * Cancelled and postponed bookings free their places; `exceptId` leaves out
+ * the booking being edited.
+ */
+export async function reserveSlotPlaces(
+  manager: EntityManager,
+  visitDate: string,
+  slot: string,
+  party: number,
+  capacity: number,
+  exceptId?: string,
+): Promise<number> {
+  await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`slot:${visitDate}:${slot}`]);
+  const qb = manager
+    .createQueryBuilder(Booking, 'b')
+    .select('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
+    .where('b.visitDate = :visitDate', { visitDate })
+    .andWhere('b.slot = :slot', { slot })
+    .andWhere('b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] });
+  if (exceptId) qb.andWhere('b.id != :exceptId', { exceptId });
+  const row = await qb.getRawOne<{ guests: string }>();
+  const taken = Number(row?.guests) || 0;
+  if (taken + party > capacity) throw new ConflictException(SLOT_FULL_MESSAGE);
+  return taken;
+}
+
 const addDays = (iso: string, n: number): string => {
   const d = new Date(iso + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() + n);
@@ -87,6 +119,11 @@ export class BookingsService {
 
   private readonly logger = new Logger(BookingsService.name);
   private readonly slotCapacity: number;
+
+  /** Guests one arrival slot takes (BOOKING_SLOT_CAPACITY). */
+  get capacity(): number {
+    return this.slotCapacity;
+  }
 
   /**
    * Bookings per arrival slot for the date picker: how many parties and guests
@@ -203,6 +240,8 @@ export class BookingsService {
     adjustment: { kind: string; value: number; amount: number; note: string; code: string } | null = null,
   ): Promise<BookingResponse> {
     const { saved, lines } = await this.dataSource.transaction(async (manager) => {
+      // The slot must really have room: the picker's level is only advisory.
+      await reserveSlotPlaces(manager, visitDate, dto.slot, dto.adults + dto.kids, this.slotCapacity);
       const booking = manager.create(Booking, {
         refCode,
         visitDate,

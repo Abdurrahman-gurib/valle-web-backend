@@ -1,8 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../entities';
-import { BookingsService, busyLevel } from './bookings.service';
+import { BookingsService, busyLevel, reserveSlotPlaces, SLOT_FULL_MESSAGE } from './bookings.service';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 
 /** Records the clauses and returns canned grouped rows. */
@@ -83,5 +83,42 @@ describe('AvailabilityQueryDto', () => {
     await expect(run({ from: '02/10/2026' })).rejects.toThrow();
     await expect(run({ days: '0' })).rejects.toThrow();
     await expect(run({ days: '90' })).rejects.toThrow();
+  });
+});
+
+describe('reserveSlotPlaces', () => {
+  /** A manager that records the advisory lock and answers the guest count. */
+  function fakeManager(guests: number) {
+    const calls: { lock?: unknown[]; wheres: [string, Record<string, unknown>][] } = { wheres: [] };
+    const qb = {
+      select() { return this; },
+      where(sql: string, p: Record<string, unknown> = {}) { calls.wheres.push([sql, p]); return this; },
+      andWhere(sql: string, p: Record<string, unknown> = {}) { calls.wheres.push([sql, p]); return this; },
+      getRawOne: () => Promise.resolve({ guests: String(guests) }),
+    };
+    const manager = {
+      query: (sql: string, params: unknown[]) => { calls.lock = [sql, ...params]; return Promise.resolve([]); },
+      createQueryBuilder: () => qb,
+    } as unknown as EntityManager;
+    return { manager, calls };
+  }
+
+  it('takes a transaction lock on the slot, counts its live guests and lets a party in while there is room', async () => {
+    const { manager, calls } = fakeManager(140);
+    await expect(reserveSlotPlaces(manager, '2026-11-20', 'morning', 10, 150)).resolves.toBe(140);
+    expect(calls.lock).toEqual(['SELECT pg_advisory_xact_lock(hashtext($1))', 'slot:2026-11-20:morning']);
+    expect(calls.wheres).toContainEqual(['b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] }]);
+    expect(calls.wheres).toContainEqual(['b.slot = :slot', { slot: 'morning' }]);
+  });
+
+  it('refuses the party that would take the slot over capacity, with a 409', async () => {
+    const { manager } = fakeManager(140);
+    await expect(reserveSlotPlaces(manager, '2026-11-20', 'morning', 11, 150)).rejects.toMatchObject({ status: 409, message: SLOT_FULL_MESSAGE });
+  });
+
+  it('leaves out the booking being edited so moving it within the slot does not count twice', async () => {
+    const { manager, calls } = fakeManager(0);
+    await reserveSlotPlaces(manager, '2026-11-20', 'afternoon', 4, 150, 'b-1');
+    expect(calls.wheres).toContainEqual(['b.id != :exceptId', { exceptId: 'b-1' }]);
   });
 });

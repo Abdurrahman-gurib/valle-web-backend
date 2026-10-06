@@ -36,7 +36,7 @@ import {
 } from './dto/list-bookings.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { CreateStaffBookingDto } from './dto/create-staff-booking.dto';
-import { BookingsService } from '../../bookings/bookings.service';
+import { BookingsService, reserveSlotPlaces } from '../../bookings/bookings.service';
 import { TicketService } from '../../tickets/ticket.service';
 import { GuestMessagingService } from '../../notifications/guest-messaging.service';
 
@@ -387,6 +387,21 @@ export class StaffBookingsService {
 
       if (MONEY_FIELDS.some((field) => field in changes)) {
         await this.reprice(manager, booking, patch);
+      }
+
+      // Moving a booking into a slot, or growing the party, needs room there too,
+      // the same rule the website applies; the booking's own guests do not count.
+      const movesIntoSlot = ['visitDate', 'slot', 'adults', 'kids', 'status'].some((f) => f in changes);
+      const nextStatus = patch.status ?? booking.status;
+      if (movesIntoSlot && nextStatus !== 'cancelled' && nextStatus !== 'postponed') {
+        await reserveSlotPlaces(
+          manager,
+          patch.visitDate ?? toDateString(booking.visitDate),
+          patch.slot ?? booking.slot,
+          (patch.adults ?? booking.adults) + (patch.kids ?? booking.kids),
+          this.bookings.capacity,
+          booking.id,
+        );
       }
 
       applyPatch(booking, patch);
