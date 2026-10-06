@@ -14,6 +14,7 @@ import {
   ValidateIf,
   ValidateNested,
   IsUUID,
+  Matches,
 } from 'class-validator';
 import {
   IsCalendarDate,
@@ -27,6 +28,12 @@ export class BookingItemDto {
   @IsSafeText()
   @IsNotEmpty()
   id: string;
+
+  /** Session start time, HH:MM, for experiences that run in sessions. */
+  @ApiPropertyOptional({ example: '10:30' })
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  time?: string;
 
   /** A price_list label of this experience (e.g. one zipline tour); omitted = base price. */
   @ApiPropertyOptional({ example: 'Advenature Flight · 5.5 km, 11 lines' })

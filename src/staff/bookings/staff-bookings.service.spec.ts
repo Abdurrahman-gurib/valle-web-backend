@@ -310,7 +310,7 @@ function build(repos: {
     repos.audit ?? makeRepo<BookingAudit>(),
     repos.quote ?? makeRepo<Quote>(),
     repos.chat ?? makeRepo<ChatConversation>(),
-    { create: jest.fn(), calendar: () => Promise.resolve({ slotCapacity: 150, closures: [], activityCapacity: {} }), experienceInfo: () => Promise.resolve(new Map()) } as unknown as BookingsService,
+    { create: jest.fn(), calendar: () => Promise.resolve({ slotCapacity: 150, closures: [], activityCapacity: {}, sessions: {} }), experienceInfo: () => Promise.resolve(new Map()) } as unknown as BookingsService,
     { ticketUrl: (ref: string) => 'https://example.test/ticket/' + ref + '?t=tok' } as unknown as TicketService,
     { sendTicket: jest.fn() } as unknown as GuestMessagingService,
     { resolve: jest.fn(), consume: jest.fn() } as never,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { parseCalendar, type Calendar } from '../bookings/capacity';
+import { parseCalendar, parseSessions, type Calendar } from '../bookings/capacity';
 import { Experience, Setting } from '../entities';
 import type { CalendarDto } from './calendar.dto';
 
@@ -106,6 +106,7 @@ export class OpsService {
       Object.assign(new Setting(), { key: 'activity_capacity', value: JSON.stringify(capacity) }),
     ];
     if (dto.slotCapacity) rows.push(Object.assign(new Setting(), { key: 'slot_capacity', value: String(dto.slotCapacity) }));
+    if (dto.sessions !== undefined) rows.push(Object.assign(new Setting(), { key: 'activity_sessions', value: JSON.stringify(parseSessions(JSON.stringify(dto.sessions))) }));
     await this.settingRepo.save(rows);
     return this.calendar();
   }

@@ -1,7 +1,7 @@
 import type { EntityManager } from 'typeorm';
-import { activityLevel, closureFor, closureMessage, parseActivityCapacity, parseCalendar, parseClosures, reservePlaces, SLOT_FULL_MESSAGE, type Calendar } from './capacity';
+import { activityLevel, closureFor, closureMessage, parseActivityCapacity, parseCalendar, parseClosures, parseSessions, reservePlaces, sessionsForSlot, SLOT_FULL_MESSAGE, type Calendar } from './capacity';
 
-const cal = (over: Partial<Calendar> = {}): Calendar => ({ slotCapacity: 150, closures: [], activityCapacity: {}, ...over });
+const cal = (over: Partial<Calendar> = {}): Calendar => ({ slotCapacity: 150, closures: [], activityCapacity: {}, sessions: {}, ...over });
 const experiences = new Map([
   ['zipline', { name: 'Zipline Adventures', priceMode: 'pp' as const }],
   ['buggy', { name: 'Buggy', priceMode: 'flat' as const }],
@@ -11,12 +11,14 @@ const experiences = new Map([
  * A manager whose query() answers the capacity SQL from canned numbers:
  * guests already in the slot, and per experience what is booked / held.
  */
-function fakeManager(n: { slotBooked?: number; slotHeld?: number; booked?: Record<string, number>; held?: Record<string, number> }) {
+function fakeManager(n: { slotBooked?: number; slotHeld?: number; booked?: Record<string, number>; held?: Record<string, number>; session?: Record<string, number> }) {
   const calls: { sql: string; params: unknown[] }[] = [];
   const manager = {
     query: (sql: string, params: unknown[]) => {
       calls.push({ sql, params });
       if (sql.includes('pg_advisory_xact_lock')) return Promise.resolve([]);
+      if (sql.includes("i->>'time' = $3")) return Promise.resolve([{ n: 0 }]);
+      if (sql.includes('l.session_time = $3')) return Promise.resolve([{ n: n.session?.[`${params[1]}|${params[2]}`] ?? 0 }]);
       if (sql.includes('FROM slot_holds h, jsonb_array_elements')) return Promise.resolve([{ n: n.held?.[String(params[2])] ?? 0 }]);
       if (sql.includes('FROM booking_lines l')) return Promise.resolve([{ n: n.booked?.[String(params[2])] ?? 0 }]);
       if (sql.includes('FROM slot_holds')) return Promise.resolve([{ guests: n.slotHeld ?? 0 }]);
@@ -90,5 +92,27 @@ describe('reservePlaces', () => {
     await expect(reservePlaces(manager, req({ items: [{ id: 'buggy', units: 2 }] }), c, experiences)).rejects.toMatchObject({ status: 409, message: /Buggy is fully booked/ });
     // no limit for the afternoon buggy, and uncapped activities are never queried
     await expect(reservePlaces(manager, req({ slot: 'afternoon', items: [{ id: 'buggy', units: 9 }, { id: 'quad', adults: 50 }] }), c, experiences)).resolves.toBeUndefined();
+  });
+});
+
+describe('timed sessions', () => {
+  const plan = { zipline: { times: ['09:30', '10:30', '14:00'], capacity: 4, durationMin: 90 } };
+
+  it('parses session plans and limits afternoon arrivals to sessions from 12:00', () => {
+    expect(parseSessions('{"zipline":{"times":["14:00","10:30","09:30","9:30","bad","10:30"],"capacity":4,"durationMin":90},"quad":{"times":[]}}')).toEqual(plan);
+    expect(sessionsForSlot(plan.zipline, 'morning')).toEqual(['09:30', '10:30', '14:00']);
+    expect(sessionsForSlot(plan.zipline, 'afternoon')).toEqual(['14:00']);
+    expect(parseCalendar(new Map([['activity_sessions', JSON.stringify(plan)]])).sessions).toEqual(plan);
+  });
+
+  it('a session must exist, suit the arrival slot and have room; unscheduled items are untouched', async () => {
+    const c = cal({ sessions: plan });
+    const { manager } = fakeManager({ session: { 'zipline|09:30': 3 } });
+    await expect(reservePlaces(manager, req({ items: [{ id: 'zipline', adults: 1, time: '09:30' }] }), c, experiences)).resolves.toBeUndefined();
+    await expect(reservePlaces(manager, req({ items: [{ id: 'zipline', adults: 2, time: '09:30' }] }), c, experiences)).rejects.toMatchObject({ status: 409, message: 'The 09:30 Zipline Adventures session is full on this date. Pick another time.' });
+    await expect(reservePlaces(manager, req({ items: [{ id: 'zipline', adults: 1, time: '11:00' }] }), c, experiences)).rejects.toMatchObject({ status: 400, message: /no 11:00 session/ });
+    await expect(reservePlaces(manager, req({ slot: 'afternoon', items: [{ id: 'zipline', adults: 1, time: '09:30' }] }), c, experiences)).rejects.toMatchObject({ status: 400, message: /needs a morning arrival/ });
+    await expect(reservePlaces(manager, req({ slot: 'afternoon', items: [{ id: 'zipline', adults: 1, time: '14:00' }] }), c, experiences)).resolves.toBeUndefined();
+    await expect(reservePlaces(manager, req({ items: [{ id: 'zipline', adults: 9 }] }), c, experiences)).resolves.toBeUndefined();
   });
 });

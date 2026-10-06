@@ -488,8 +488,8 @@ export class StaffBookingsService {
             adults: patch.adults ?? booking.adults,
             kids: patch.kids ?? booking.kids,
             items: patch.items !== undefined
-              ? (JSON.parse(patch.items) as { id: string; adults?: number; kids?: number; units?: number }[])
-              : lines.filter((l) => l.experienceId).map((l) => ({ id: l.experienceId as string, adults: l.adults, kids: l.kids, units: l.units })),
+              ? (JSON.parse(patch.items) as { id: string; adults?: number; kids?: number; units?: number; time?: string }[])
+              : lines.filter((l) => l.experienceId).map((l) => ({ id: l.experienceId as string, adults: l.adults, kids: l.kids, units: l.units, time: l.sessionTime ?? undefined })),
             exceptBookingId: booking.id,
           },
           cal,
@@ -534,8 +534,10 @@ export class StaffBookingsService {
       where: { bookingId: booking.id, experienceId: Not(IsNull()) },
       order: { sortOrder: 'ASC' },
     });
+    // An item sent without a time keeps the time its line already had (desk and guest editors do not pick times).
     const requestedItems = patch.items !== undefined
-      ? (JSON.parse(patch.items) as { id: string; variant?: string; adults?: number; kids?: number; units?: number }[])
+      ? (JSON.parse(patch.items) as { id: string; variant?: string; adults?: number; kids?: number; units?: number; time?: string }[])
+          .map((i) => ({ ...i, time: i.time ?? existing.find((l) => l.experienceId === i.id && (l.variant || '') === (i.variant || ''))?.sessionTime ?? undefined }))
       : null;
     const [experiences, settings, priceRows] = await Promise.all([
       manager.find(Experience),
@@ -561,6 +563,7 @@ export class StaffBookingsService {
           adults: line.adults,
           kids: line.kids,
           units: line.units,
+          time: line.sessionTime ?? undefined,
         })),
       },
       priceRows,
@@ -601,6 +604,7 @@ export class StaffBookingsService {
           experienceId: line.experienceId,
           variant: line.variant,
           label: line.label,
+          sessionTime: line.time,
           adults: line.adults,
           kids: line.kids,
           units: line.units,
@@ -774,7 +778,7 @@ function normalizePatch(dto: UpdateBookingDto): BookingPatch {
   if (dto.status !== undefined) patch.status = dto.status;
   if (dto.staffNote !== undefined) patch.staffNote = dto.staffNote.trim();
   if (dto.items !== undefined) {
-    patch.items = JSON.stringify(dto.items.map((i) => ({ id: i.id, variant: i.variant || undefined, adults: i.adults || 0, kids: i.kids || 0, units: i.units || 0 })));
+    patch.items = JSON.stringify(dto.items.map((i) => ({ id: i.id, variant: i.variant || undefined, adults: i.adults || 0, kids: i.kids || 0, units: i.units || 0, time: i.time || undefined })));
   }
   if (dto.adjustmentKind !== undefined) patch.adjustmentKind = dto.adjustmentKind;
   if (dto.adjustmentValue !== undefined) patch.adjustmentValue = dto.adjustmentValue;

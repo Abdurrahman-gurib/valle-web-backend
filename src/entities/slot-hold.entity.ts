@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-export interface HeldItem { id: string; adults?: number; kids?: number; units?: number }
+export interface HeldItem { id: string; adults?: number; kids?: number; units?: number; time?: string }
 
 /**
  * Places held for a few minutes while a guest fills in their details, so the

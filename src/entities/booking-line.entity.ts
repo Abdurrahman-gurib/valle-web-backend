@@ -31,6 +31,10 @@ export class BookingLine {
   @Column({ name: 'amount', type: 'int' })
   amount: number;
 
+  /** Start time ("10:30") of the session booked, for experiences that run in sessions. */
+  @Column({ name: 'session_time', type: 'text', nullable: true })
+  sessionTime: string | null;
+
   @Column({ name: 'sort_order', type: 'int' })
   sortOrder: number;
 }

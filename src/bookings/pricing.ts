@@ -30,6 +30,8 @@ export interface PricingItem {
   adults?: number;
   kids?: number;
   units?: number;
+  /** Session start time ("10:30") when the experience runs in sessions. */
+  time?: string;
 }
 
 /** A price_list row: one priced option of an experience (group_key = experience id). */
@@ -51,6 +53,7 @@ export interface PricedLine {
   experienceId: string | null;
   variant: string;
   label: string;
+  time: string | null;
   adults: number;
   kids: number;
   units: number;
@@ -135,6 +138,7 @@ export function computeBooking(
       experienceId: null,
       variant: '',
       label: 'Park entry · ' + partyLabel(input.adults, input.kids),
+      time: null,
       adults: input.adults,
       kids: input.kids,
       units: 0,
@@ -217,7 +221,8 @@ export function computeBooking(
     lines.push({
       experienceId: exp.id,
       variant: item.variant || '',
-      label: exp.name + (item.variant ? ' · ' + item.variant : '') + ' · ' + q,
+      label: exp.name + (item.variant ? ' · ' + item.variant : '') + ' · ' + q + (item.time ? ' · ' + item.time : ''),
+      time: item.time || null,
       adults: a,
       kids: k,
       units: u,

@@ -50,6 +50,8 @@ export interface AvailabilityDay {
   afternoon: SlotLoad;
   /** Only experiences with a capacity: how full each slot is for them. */
   activities?: Record<string, { morning: 'quiet' | 'busy' | 'full'; afternoon: 'quiet' | 'busy' | 'full' }>;
+  /** Experiences that run in timed sessions: each start time and how full it is. */
+  sessions?: Record<string, { durationMin: number; times: Record<string, 'quiet' | 'busy' | 'full'> }>;
 }
 
 export const AVAILABILITY_MAX_DAYS = 62;
@@ -183,7 +185,48 @@ export class BookingsService {
         }
       }
     }
+    // timed sessions: one level per start time
+    const sessioned = Object.keys(cal.sessions);
+    if (sessioned.length > 0) {
+      const taken = await this.sessionTakenInRange(from, to, sessioned);
+      const experiences = await this.experienceInfo();
+      for (const day of byDate.values()) {
+        day.sessions = {};
+        for (const id of sessioned) {
+          const plan = cal.sessions[id];
+          const perPerson = experiences.get(id)?.priceMode !== 'flat';
+          const times: Record<string, 'quiet' | 'busy' | 'full'> = {};
+          for (const t of plan.times) times[t] = activityLevel(taken.get(`${day.date}|${id}|${t}|${perPerson ? 'pp' : 'u'}`) ?? 0, plan.capacity);
+          day.sessions[id] = { durationMin: plan.durationMin, times };
+        }
+      }
+    }
     return [...byDate.values()];
+  }
+
+  /** "date|experience|time|pp|u" -> guests or units already in that session (bookings + live holds). */
+  private async sessionTakenInRange(from: string, to: string, ids: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    const add = (k: string, v: number) => out.set(k, (out.get(k) ?? 0) + v);
+    const booked = await this.dataSource.query(
+      `SELECT b.visit_date::text AS date, l.experience_id AS id, l.session_time AS t, COALESCE(SUM(l.adults + l.kids), 0)::int AS pp, COALESCE(SUM(l.units), 0)::int AS u
+       FROM booking_lines l JOIN bookings b ON b.id = l.booking_id
+       WHERE b.visit_date BETWEEN $1 AND $2 AND b.status NOT IN ('cancelled','postponed') AND l.experience_id = ANY($3) AND l.session_time IS NOT NULL
+       GROUP BY b.visit_date, l.experience_id, l.session_time`,
+      [from, to, ids],
+    ) as { date: string; id: string; t: string; pp: number; u: number }[];
+    for (const r of booked) { add(`${r.date.slice(0, 10)}|${r.id}|${r.t}|pp`, Number(r.pp) || 0); add(`${r.date.slice(0, 10)}|${r.id}|${r.t}|u`, Number(r.u) || 0); }
+    const held = await this.dataSource.query(
+      `SELECT h.visit_date::text AS date, i->>'id' AS id, i->>'time' AS t,
+              COALESCE(SUM(COALESCE((i->>'adults')::int, 0) + COALESCE((i->>'kids')::int, 0)), 0)::int AS pp,
+              COALESCE(SUM(COALESCE((i->>'units')::int, 0)), 0)::int AS u
+       FROM slot_holds h, jsonb_array_elements(h.items) i
+       WHERE h.visit_date BETWEEN $1 AND $2 AND h.expires_at > now() AND i->>'id' = ANY($3) AND i->>'time' IS NOT NULL
+       GROUP BY h.visit_date, i->>'id', i->>'time'`,
+      [from, to, ids],
+    ) as { date: string; id: string; t: string; pp: number; u: number }[];
+    for (const r of held) { add(`${r.date.slice(0, 10)}|${r.id}|${r.t}|pp`, Number(r.pp) || 0); add(`${r.date.slice(0, 10)}|${r.id}|${r.t}|u`, Number(r.u) || 0); }
+    return out;
   }
 
   /** "date|slot|experience|pp|u" -> guests or units already taken (bookings + live holds). */
@@ -218,14 +261,14 @@ export class BookingsService {
    * details. Checked like a booking (closures, slot and activity capacity);
    * an earlier hold of the same guest is replaced.
    */
-  async hold(input: { visitDate: string; slot: SlotKey; adults: number; kids: number; items: { id: string; adults?: number; kids?: number; units?: number }[]; holdId?: string }): Promise<{ holdId: string; expiresAt: string }> {
+  async hold(input: { visitDate: string; slot: SlotKey; adults: number; kids: number; items: { id: string; adults?: number; kids?: number; units?: number; time?: string }[]; holdId?: string }): Promise<{ holdId: string; expiresAt: string }> {
     const [cal, experiences] = await Promise.all([this.calendar(), this.experienceInfo()]);
     const visitDate = input.visitDate.slice(0, 10);
     return this.dataSource.transaction(async (manager) => {
       if (input.holdId) await manager.delete(SlotHold, { id: input.holdId });
       await reservePlaces(manager, { ...input, visitDate }, cal, experiences);
       const saved = await manager.save(SlotHold, manager.create(SlotHold, {
-        visitDate, slot: input.slot, adults: input.adults, kids: input.kids, items: input.items.map((i) => ({ id: i.id, adults: i.adults ?? 0, kids: i.kids ?? 0, units: i.units ?? 0 })),
+        visitDate, slot: input.slot, adults: input.adults, kids: input.kids, items: input.items.map((i) => ({ id: i.id, adults: i.adults ?? 0, kids: i.kids ?? 0, units: i.units ?? 0, ...(i.time ? { time: i.time } : {}) })),
         expiresAt: new Date(Date.now() + HOLD_MINUTES * 60_000),
       }));
       return { holdId: saved.id, expiresAt: saved.expiresAt.toISOString() };
@@ -361,6 +404,7 @@ export class BookingsService {
           experienceId: l.experienceId,
           variant: l.variant,
           label: l.label,
+          sessionTime: l.time,
           adults: l.adults,
           kids: l.kids,
           units: l.units,
