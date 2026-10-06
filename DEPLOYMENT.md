@@ -140,6 +140,14 @@ bookings (`POST /api/staff/bookings`) need no configuration. Chat attachments
 (`chat_attachments`, migration 004, applied by the api pre-deploy); nginx
 allows 10 MB bodies on `/api/`.
 
+From the ticket page guests also manage the booking themselves ("Manage my
+booking": date, arrival slot, party, experiences, or cancel; `PATCH
+/api/tickets/:ref/booking?t=` and `POST /api/tickets/:ref/cancel?t=`). The change
+goes through the same re-pricing, capacity check and audit trail as a desk edit,
+under the name `guest`; the desk gets an e-mail and the guest a fresh ticket.
+Allowed while the booking is confirmed or postponed and the visit day has not
+passed; an arrived booking is the desk's.
+
 Guests receive a ticket the moment they book: an e-mail with the QR code
 inline and attached, a link to `/ticket/<ref>?t=<token>` (the token is an HMAC
 of the reference with `TICKET_SECRET`, so tickets cannot be browsed by guessing

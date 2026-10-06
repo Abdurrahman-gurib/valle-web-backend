@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { JobApplication, JobVacancy, Quote } from '../entities';
+import type { Booking, JobApplication, JobVacancy, Quote } from '../entities';
 import { MailService } from './mail.service';
 
 /**
@@ -62,6 +62,24 @@ export class InboxNotifierService {
       `Review it in the back office: /hr (Applicants).`,
     ].filter((l) => l !== '').join('\n');
     return { subject, text };
+  }
+
+  /** A guest changed or cancelled their own booking from the ticket page. Never throws. */
+  async notifyGuestChange(b: Booking, what: string): Promise<boolean> {
+    if (!this.mail.enabled) return false;
+    const subject = `Booking ${b.refCode} ${what.startsWith('Cancelled') ? 'cancelled' : 'changed'} by the guest · ${b.guestName}`;
+    const text = [
+      `${b.guestName} used the link on their ticket.`,
+      ``,
+      `Reference:   ${b.refCode}`,
+      `Change:      ${what}`,
+      `Now:         ${String(b.visitDate).slice(0, 10)}, ${b.slot} · ${b.adults} adult${b.adults === 1 ? '' : 's'}${b.kids ? ` · ${b.kids} child${b.kids === 1 ? '' : 'ren'}` : ''} · ${b.status}`,
+      `Total:       Rs ${b.total.toLocaleString('en-US')} · paid Rs ${(b.paidAmount ?? 0).toLocaleString('en-US')}`,
+      (b.paidAmount ?? 0) > b.total ? `Refund due:  Rs ${((b.paidAmount ?? 0) - b.total).toLocaleString('en-US')} (use Refund online payment in the booking drawer)` : '',
+      ``,
+      `Open it in the back office: /staff (Bookings, search ${b.refCode}).`,
+    ].filter((l) => l !== '').join('\n');
+    return this.mail.send({ to: this.sales, subject, text });
   }
 
   /** Never throws. */

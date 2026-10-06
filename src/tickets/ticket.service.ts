@@ -21,7 +21,7 @@ export interface TicketView {
   payMode: string;
   status: string;
   total: number;
-  lines: { label: string; amount: number }[];
+  lines: { label: string; amount: number; experienceId: string | null; variant: string; adults: number; kids: number; units: number }[];
   ticketUrl: string;
   qrUrl: string;
   /** Digital waiver page for the party, and how many have signed. */
@@ -142,7 +142,7 @@ export class TicketService {
       payMode: b.payMode,
       status: b.status,
       total: b.total,
-      lines: lines.map((l) => ({ label: l.label, amount: l.amount })),
+      lines: lines.map((l) => ({ label: l.label, amount: l.amount, experienceId: l.experienceId, variant: l.variant ?? '', adults: l.adults, kids: l.kids, units: l.units })),
       ticketUrl: this.ticketUrl(b.refCode),
       qrUrl: this.qrUrl(b.refCode),
       waiverUrl: this.waiverUrl(b.refCode),

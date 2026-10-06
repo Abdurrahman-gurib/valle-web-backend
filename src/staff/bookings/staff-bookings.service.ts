@@ -40,6 +40,9 @@ import { CreateStaffBookingDto } from './dto/create-staff-booking.dto';
 import { BookingsService } from '../../bookings/bookings.service';
 import { reservePlaces } from '../../bookings/capacity';
 import { PaymentsService } from '../../payments/payments.service';
+import { InboxNotifierService } from '../../notifications/inbox-notifier.service';
+import type { TicketView } from '../../tickets/ticket.service';
+import type { GuestChangeDto } from './guest-changes.controller';
 import { TicketService } from '../../tickets/ticket.service';
 import { GuestMessagingService } from '../../notifications/guest-messaging.service';
 
@@ -169,6 +172,7 @@ export class StaffBookingsService {
     private readonly guest: GuestMessagingService,
     private readonly coupons: CouponsService,
     @Optional() private readonly payments?: PaymentsService,
+    @Optional() private readonly inbox?: InboxNotifierService,
   ) {}
 
   // ----------------------------------------------------------------- bookings
@@ -313,6 +317,68 @@ export class StaffBookingsService {
       await manager.save(Booking, booking);
       return this.readDetail(manager, booking);
     });
+  }
+
+  // ------------------------------------------------------------ guest self-service
+
+  /** The name the trail shows for a change made from the ticket page. */
+  private static readonly GUEST: StaffPrincipal = { id: null as unknown as string, email: 'guest', name: 'Guest (ticket page)', role: 'agent' };
+
+  /** What a guest may still touch: a confirmed or postponed booking whose day has not passed. */
+  private guestCanChange(b: Booking): void {
+    if (b.status === 'cancelled') throw new BadRequestException('This booking is cancelled');
+    if (b.status === 'arrived') throw new BadRequestException('You have already checked in; ask the desk for any change');
+    if (b.status === 'confirmed' && toDateString(b.visitDate) < parkToday()) throw new BadRequestException('This visit date has passed; call us to rebook');
+  }
+
+  /**
+   * A guest changes their own booking from the ticket link: date, slot, party or
+   * experiences. Same re-pricing, capacity check and audit as a desk edit; a
+   * postponed (weather) booking picking a new date comes back to confirmed.
+   */
+  async guestChange(refCode: string, token: string | undefined, dto: GuestChangeDto): Promise<TicketView> {
+    const booking = await this.tickets.requireBooking(refCode, token);
+    this.guestCanChange(booking);
+    const patch: UpdateBookingDto = {};
+    if (dto.visitDate !== undefined) {
+      if (dto.visitDate < parkToday()) throw new BadRequestException('visitDate cannot be in the past');
+      patch.visitDate = dto.visitDate;
+      if (booking.status === 'postponed') patch.status = 'confirmed';
+    }
+    if (dto.slot !== undefined) patch.slot = dto.slot;
+    if (dto.adults !== undefined) patch.adults = dto.adults;
+    if (dto.kids !== undefined) patch.kids = dto.kids;
+    if (dto.items !== undefined) patch.items = dto.items;
+    if (Object.keys(patch).length === 0) throw new BadRequestException('Nothing to change');
+    const detail = await this.update(refCode, patch, StaffBookingsService.GUEST);
+    const what = [
+      dto.visitDate !== undefined ? `date -> ${dto.visitDate}` : '',
+      dto.slot !== undefined ? `slot -> ${dto.slot}` : '',
+      dto.adults !== undefined || dto.kids !== undefined ? `party -> ${detail.adults} adults, ${detail.kids} children` : '',
+      dto.items !== undefined ? 'experiences changed' : '',
+    ].filter(Boolean).join(', ');
+    void this.afterGuestChange(refCode, what || 'changed');
+    return this.tickets.view(refCode, token);
+  }
+
+  async guestCancel(refCode: string, token: string | undefined, reason: string): Promise<TicketView> {
+    const booking = await this.tickets.requireBooking(refCode, token);
+    this.guestCanChange(booking);
+    const note = `Cancelled by the guest from the ticket page${reason ? `: ${reason}` : ''}`;
+    await this.update(refCode, { status: 'cancelled', staffNote: [booking.staffNote, note].filter(Boolean).join('\n') }, StaffBookingsService.GUEST);
+    void this.afterGuestChange(refCode, note);
+    return this.tickets.view(refCode, token);
+  }
+
+  /** The guest gets a fresh ticket, the desk an e-mail. Never throws. */
+  private async afterGuestChange(refCode: string, what: string): Promise<void> {
+    const booking = await this.bookingRepo.findOne({ where: { refCode } });
+    if (!booking) return;
+    await this.inbox?.notifyGuestChange(booking, what).catch(() => false);
+    if (booking.status !== 'cancelled') {
+      const lines = await this.lineRepo.find({ where: { bookingId: booking.id }, order: { sortOrder: 'ASC' } });
+      await this.guest.sendTicket(booking, lines).catch(() => ({ email: false, whatsapp: false }));
+    }
   }
 
   /** Weather day: the visit is postponed, money stays on the booking, the guest picks a new date later. */

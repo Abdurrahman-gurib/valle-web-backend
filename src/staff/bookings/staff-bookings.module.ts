@@ -15,6 +15,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { CouponsModule } from '../../coupons/coupons.module';
 import { PaymentsModule } from '../../payments/payments.module';
 import { StaffBookingsController } from './staff-bookings.controller';
+import { GuestChangesController } from './guest-changes.controller';
 import { StaffBookingsService } from './staff-bookings.service';
 
 /**
@@ -43,7 +44,7 @@ import { StaffBookingsService } from './staff-bookings.service';
     CouponsModule,
     PaymentsModule,
   ],
-  controllers: [StaffBookingsController],
+  controllers: [StaffBookingsController, GuestChangesController],
   providers: [StaffBookingsService],
 })
 export class StaffBookingsModule {}
