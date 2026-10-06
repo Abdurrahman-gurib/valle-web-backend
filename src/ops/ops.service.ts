@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { parseCalendar, type Calendar } from '../bookings/capacity';
+import { Experience, Setting } from '../entities';
+import type { CalendarDto } from './calendar.dto';
+
+export interface CalendarView extends Calendar {
+  /** Where the slot capacity comes from when no setting is stored. */
+  slotCapacitySource: 'setting' | 'default';
+  experiences: { id: string; name: string; priceMode: string }[];
+}
 
 export interface BackupRun {
   id: string; kind: 'backup' | 'restore_test'; ok: boolean; startedAt: string; finishedAt: string;
@@ -63,7 +72,43 @@ export function backupStatus(runs: BackupRun[], now: Date): BackupStatus {
 
 @Injectable()
 export class OpsService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    @InjectRepository(Setting) private readonly settingRepo: Repository<Setting>,
+    @InjectRepository(Experience) private readonly experienceRepo: Repository<Experience>,
+  ) {}
+
+  // ------------------------------------------------------------- calendar
+
+  async calendar(): Promise<CalendarView> {
+    const [settings, experiences] = await Promise.all([this.settingRepo.find(), this.experienceRepo.find({ order: { sortOrder: 'ASC' } })]);
+    const map = new Map(settings.map((x) => [x.key, x.value]));
+    const env = Number(process.env.BOOKING_SLOT_CAPACITY ?? '');
+    const cal = parseCalendar(map, Number.isFinite(env) && env > 0 ? env : undefined);
+    return {
+      ...cal,
+      slotCapacitySource: map.has('slot_capacity') ? 'setting' : 'default',
+      experiences: experiences.filter((e) => e.priceMode === 'pp' || e.priceMode === 'flat').map((e) => ({ id: e.id, name: e.name, priceMode: e.priceMode })),
+    };
+  }
+
+  /** Stored as the settings rows the booking path reads; parsed back so the UI shows what applies. */
+  async saveCalendar(dto: CalendarDto): Promise<CalendarView> {
+    const closures = dto.closures.map((c) => ({ from: c.from, to: c.to >= c.from ? c.to : c.from, slot: c.slot, kind: c.kind, reason: (c.reason ?? '').trim() }));
+    const capacity: Record<string, { morning: number | null; afternoon: number | null }> = {};
+    for (const [id, v] of Object.entries(dto.activityCapacity ?? {})) {
+      const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? Math.floor(x) : null);
+      const m = n(v?.morning), a = n(v?.afternoon);
+      if (m !== null || a !== null) capacity[id] = { morning: m, afternoon: a };
+    }
+    const rows: Setting[] = [
+      Object.assign(new Setting(), { key: 'closures', value: JSON.stringify(closures) }),
+      Object.assign(new Setting(), { key: 'activity_capacity', value: JSON.stringify(capacity) }),
+    ];
+    if (dto.slotCapacity) rows.push(Object.assign(new Setting(), { key: 'slot_capacity', value: String(dto.slotCapacity) }));
+    await this.settingRepo.save(rows);
+    return this.calendar();
+  }
 
   /** The backup log, newest first, judged against the nightly and monthly expectations. */
   async backups(now = new Date()): Promise<BackupStatus> {

@@ -13,6 +13,7 @@ import {
   Min,
   ValidateIf,
   ValidateNested,
+  IsUUID,
 } from 'class-validator';
 import {
   IsCalendarDate,
@@ -121,6 +122,11 @@ export class CreateBookingDto {
   @IsSafeText()
   @MaxLength(80)
   nationality?: string;
+
+  @ApiPropertyOptional({ description: 'The hold taken while filling in the form; its places become this booking' })
+  @IsOptional()
+  @IsUUID()
+  holdId?: string;
 
   @ApiProperty({ enum: ['gate', 'online'] })
   @IsIn(['gate', 'online'])

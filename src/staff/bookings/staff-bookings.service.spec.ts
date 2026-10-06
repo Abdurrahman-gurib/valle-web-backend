@@ -200,20 +200,12 @@ class FakeManager {
 
   constructor(readonly state: FakeState) {}
 
-  /** The advisory lock taken by reserveSlotPlaces. */
-  query(_sql: string, params: unknown[]): Promise<unknown[]> {
-    this.slotLocks.push(String(params[0]));
+  /** The raw SQL of reservePlaces: the advisory lock, then the guests already in the slot. */
+  query(sql: string, params: unknown[]): Promise<unknown[]> {
+    if (sql.includes('pg_advisory_xact_lock')) { this.slotLocks.push(String(params[0])); return Promise.resolve([]); }
+    if (sql.includes('FROM slot_holds')) return Promise.resolve([{ guests: 0 }]);
+    if (sql.includes('FROM bookings')) return Promise.resolve([{ guests: this.state.slotGuests ?? 0 }]);
     return Promise.resolve([]);
-  }
-
-  /** Only reserveSlotPlaces builds a query here: the guests already in the slot. */
-  createQueryBuilder() {
-    const guests = String(this.state.slotGuests ?? 0);
-    const qb = {
-      select: () => qb, where: () => qb, andWhere: () => qb,
-      getRawOne: () => Promise.resolve({ guests }),
-    };
-    return qb;
   }
 
   findOne<T extends object>(
@@ -318,7 +310,7 @@ function build(repos: {
     repos.audit ?? makeRepo<BookingAudit>(),
     repos.quote ?? makeRepo<Quote>(),
     repos.chat ?? makeRepo<ChatConversation>(),
-    { create: jest.fn(), capacity: 150 } as unknown as BookingsService,
+    { create: jest.fn(), calendar: () => Promise.resolve({ slotCapacity: 150, closures: [], activityCapacity: {} }), experienceInfo: () => Promise.resolve(new Map()) } as unknown as BookingsService,
     { ticketUrl: (ref: string) => 'https://example.test/ticket/' + ref + '?t=tok' } as unknown as TicketService,
     { sendTicket: jest.fn() } as unknown as GuestMessagingService,
     { resolve: jest.fn(), consume: jest.fn() } as never,

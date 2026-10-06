@@ -37,7 +37,8 @@ import {
 } from './dto/list-bookings.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { CreateStaffBookingDto } from './dto/create-staff-booking.dto';
-import { BookingsService, reserveSlotPlaces } from '../../bookings/bookings.service';
+import { BookingsService } from '../../bookings/bookings.service';
+import { reservePlaces } from '../../bookings/capacity';
 import { PaymentsService } from '../../payments/payments.service';
 import { TicketService } from '../../tickets/ticket.service';
 import { GuestMessagingService } from '../../notifications/guest-messaging.service';
@@ -411,13 +412,22 @@ export class StaffBookingsService {
       const movesIntoSlot = ['visitDate', 'slot', 'adults', 'kids', 'status'].some((f) => f in changes);
       const nextStatus = patch.status ?? booking.status;
       if (movesIntoSlot && nextStatus !== 'cancelled' && nextStatus !== 'postponed') {
-        await reserveSlotPlaces(
+        const [cal, experiences] = await Promise.all([this.bookings.calendar(), this.bookings.experienceInfo()]);
+        const lines = await manager.find(BookingLine, { where: { bookingId: booking.id } });
+        await reservePlaces(
           manager,
-          patch.visitDate ?? toDateString(booking.visitDate),
-          patch.slot ?? booking.slot,
-          (patch.adults ?? booking.adults) + (patch.kids ?? booking.kids),
-          this.bookings.capacity,
-          booking.id,
+          {
+            visitDate: patch.visitDate ?? toDateString(booking.visitDate),
+            slot: patch.slot ?? booking.slot,
+            adults: patch.adults ?? booking.adults,
+            kids: patch.kids ?? booking.kids,
+            items: patch.items !== undefined
+              ? (JSON.parse(patch.items) as { id: string; adults?: number; kids?: number; units?: number }[])
+              : lines.filter((l) => l.experienceId).map((l) => ({ id: l.experienceId as string, adults: l.adults, kids: l.kids, units: l.units })),
+            exceptBookingId: booking.id,
+          },
+          cal,
+          experiences,
         );
       }
 

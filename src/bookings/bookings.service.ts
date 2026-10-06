@@ -7,9 +7,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { ChatGateway } from '../chat/chat.gateway';
-import { Booking, BookingLine, Experience, PriceListEntry, Setting } from '../entities';
+import { Booking, BookingLine, Experience, PriceListEntry, Setting, SlotHold } from '../entities';
+import { activityLevel, closureFor, HOLD_MINUTES, parseCalendar, reservePlaces, type Calendar, type ClosureKind, type ExperienceInfo, type SlotKey } from './capacity';
 import { BookingNotifierService } from '../notifications/booking-notifier.service';
 import { GuestMessagingService } from '../notifications/guest-messaging.service';
 import { TicketService } from '../tickets/ticket.service';
@@ -41,12 +42,16 @@ const REF_MAX_TRIES = 20;
 const PG_UNIQUE_VIOLATION = '23505';
 
 /** How busy an arrival slot is, for the date picker. */
-export type BusyLevel = 'quiet' | 'busy' | 'very-busy' | 'full';
-export interface SlotLoad { bookings: number; guests: number; level: BusyLevel }
-export interface AvailabilityDay { date: string; morning: SlotLoad; afternoon: SlotLoad }
+export type BusyLevel = 'quiet' | 'busy' | 'very-busy' | 'full' | 'closed';
+export interface SlotLoad { bookings: number; guests: number; level: BusyLevel; closure?: { kind: ClosureKind; reason: string } }
+export interface AvailabilityDay {
+  date: string;
+  morning: SlotLoad;
+  afternoon: SlotLoad;
+  /** Only experiences with a capacity: how full each slot is for them. */
+  activities?: Record<string, { morning: 'quiet' | 'busy' | 'full'; afternoon: 'quiet' | 'busy' | 'full' }>;
+}
 
-/** Guests one arrival slot comfortably takes; BOOKING_SLOT_CAPACITY overrides. */
-const DEFAULT_SLOT_CAPACITY = 150;
 export const AVAILABILITY_MAX_DAYS = 62;
 
 export function busyLevel(guests: number, capacity: number): BusyLevel {
@@ -55,38 +60,6 @@ export function busyLevel(guests: number, capacity: number): BusyLevel {
   if (share >= 0.7) return 'very-busy';
   if (share >= 0.35) return 'busy';
   return 'quiet';
-}
-
-/** Thrown as 409 when a slot cannot take the party; the page refreshes the picker on it. */
-export const SLOT_FULL_MESSAGE = 'That arrival slot is fully booked on this date. Pick the other slot or another day.';
-
-/**
- * Guests already holding (date, slot), counted under a transaction-scoped
- * advisory lock on that slot so two bookings racing for the last places are
- * serialised: the second one sees the first one's guests and is refused.
- * Cancelled and postponed bookings free their places; `exceptId` leaves out
- * the booking being edited.
- */
-export async function reserveSlotPlaces(
-  manager: EntityManager,
-  visitDate: string,
-  slot: string,
-  party: number,
-  capacity: number,
-  exceptId?: string,
-): Promise<number> {
-  await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`slot:${visitDate}:${slot}`]);
-  const qb = manager
-    .createQueryBuilder(Booking, 'b')
-    .select('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
-    .where('b.visitDate = :visitDate', { visitDate })
-    .andWhere('b.slot = :slot', { slot })
-    .andWhere('b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] });
-  if (exceptId) qb.andWhere('b.id != :exceptId', { exceptId });
-  const row = await qb.getRawOne<{ guests: string }>();
-  const taken = Number(row?.guests) || 0;
-  if (taken + party > capacity) throw new ConflictException(SLOT_FULL_MESSAGE);
-  return taken;
 }
 
 const addDays = (iso: string, n: number): string => {
@@ -110,6 +83,8 @@ export class BookingsService {
     private readonly priceRepo: Repository<PriceListEntry>,
     @InjectRepository(Setting)
     private readonly settingRepo: Repository<Setting>,
+    @InjectRepository(SlotHold)
+    private readonly holdRepo: Repository<SlotHold>,
     @Optional() private readonly notifier?: BookingNotifierService,
     @Optional() private readonly gateway?: ChatGateway,
     @Optional() private readonly guest?: GuestMessagingService,
@@ -119,15 +94,22 @@ export class BookingsService {
     @Optional() private readonly payments?: PaymentsService,
   ) {
     const cap = Number(config?.get<string>('BOOKING_SLOT_CAPACITY') ?? '');
-    this.slotCapacity = Number.isFinite(cap) && cap > 0 ? cap : DEFAULT_SLOT_CAPACITY;
+    this.envSlotCapacity = Number.isFinite(cap) && cap > 0 ? cap : undefined;
   }
 
   private readonly logger = new Logger(BookingsService.name);
-  private readonly slotCapacity: number;
+  private readonly envSlotCapacity: number | undefined;
 
-  /** Guests one arrival slot takes (BOOKING_SLOT_CAPACITY). */
-  get capacity(): number {
-    return this.slotCapacity;
+  /** The capacity calendar as edited in the back office (slot capacity, closures, per-activity limits). */
+  async calendar(): Promise<Calendar> {
+    const settings = await this.settingRepo.find();
+    return parseCalendar(new Map(settings.map((x) => [x.key, x.value])), this.envSlotCapacity);
+  }
+
+  /** name + price mode per experience, for the capacity check's wording and units. */
+  async experienceInfo(): Promise<Map<string, ExperienceInfo>> {
+    const rows = await this.experienceRepo.find();
+    return new Map(rows.map((e) => [e.id, { name: e.name, priceMode: e.priceMode }]));
   }
 
   /**
@@ -138,6 +120,7 @@ export class BookingsService {
   async availability(from: string, days: number): Promise<AvailabilityDay[]> {
     const n = Math.min(Math.max(1, days), AVAILABILITY_MAX_DAYS);
     const to = addDays(from, n - 1);
+    const cal = await this.calendar();
     const rows = await this.bookingRepo
       .createQueryBuilder('b')
       .select('b.visitDate', 'date')
@@ -149,6 +132,17 @@ export class BookingsService {
       .groupBy('b.visitDate')
       .addGroupBy('b.slot')
       .getRawMany<{ date: unknown; slot: string; bookings: string; guests: string }>();
+    // places held mid-form count like bookings until they expire
+    const held = await this.holdRepo
+      .createQueryBuilder('h')
+      .select('h.visitDate', 'date')
+      .addSelect('h.slot', 'slot')
+      .addSelect('COALESCE(SUM(h.adults + h.kids), 0)', 'guests')
+      .where('h.visitDate BETWEEN :from AND :to', { from, to })
+      .andWhere('h.expiresAt > now()')
+      .groupBy('h.visitDate')
+      .addGroupBy('h.slot')
+      .getRawMany<{ date: unknown; slot: string; guests: string }>();
 
     const byDate = new Map<string, AvailabilityDay>();
     const empty = (): SlotLoad => ({ bookings: 0, guests: 0, level: 'quiet' });
@@ -159,10 +153,87 @@ export class BookingsService {
     for (const r of rows) {
       const day = byDate.get(dateOf(r.date));
       if (!day || (r.slot !== 'morning' && r.slot !== 'afternoon')) continue;
-      const guests = Number(r.guests) || 0;
-      day[r.slot] = { bookings: Number(r.bookings) || 0, guests, level: busyLevel(guests, this.slotCapacity) };
+      day[r.slot] = { bookings: Number(r.bookings) || 0, guests: Number(r.guests) || 0, level: 'quiet' };
+    }
+    for (const r of held) {
+      const day = byDate.get(dateOf(r.date));
+      if (!day || (r.slot !== 'morning' && r.slot !== 'afternoon')) continue;
+      day[r.slot].guests += Number(r.guests) || 0;
+    }
+    for (const day of byDate.values()) {
+      for (const slot of ['morning', 'afternoon'] as SlotKey[]) {
+        const closure = closureFor(day.date, slot, cal.closures);
+        day[slot].level = closure ? 'closed' : busyLevel(day[slot].guests, cal.slotCapacity);
+        if (closure) day[slot].closure = { kind: closure.kind, reason: closure.reason };
+      }
+    }
+
+    // per-activity levels, only for experiences that have a capacity
+    const capped = Object.keys(cal.activityCapacity);
+    if (capped.length > 0) {
+      const taken = await this.activityTakenInRange(from, to, capped);
+      const experiences = await this.experienceInfo();
+      for (const day of byDate.values()) {
+        day.activities = {};
+        for (const id of capped) {
+          const cap = cal.activityCapacity[id];
+          const perPerson = experiences.get(id)?.priceMode !== 'flat';
+          const get = (slot: SlotKey) => taken.get(`${day.date}|${slot}|${id}|${perPerson ? 'pp' : 'u'}`) ?? 0;
+          day.activities[id] = { morning: activityLevel(get('morning'), cap.morning), afternoon: activityLevel(get('afternoon'), cap.afternoon) };
+        }
+      }
     }
     return [...byDate.values()];
+  }
+
+  /** "date|slot|experience|pp|u" -> guests or units already taken (bookings + live holds). */
+  private async activityTakenInRange(from: string, to: string, ids: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    const add = (k: string, v: number) => out.set(k, (out.get(k) ?? 0) + v);
+    const booked = await this.dataSource.query(
+      `SELECT b.visit_date::text AS date, b.slot, l.experience_id AS id, COALESCE(SUM(l.adults + l.kids), 0)::int AS pp, COALESCE(SUM(l.units), 0)::int AS u
+       FROM booking_lines l JOIN bookings b ON b.id = l.booking_id
+       WHERE b.visit_date BETWEEN $1 AND $2 AND b.status NOT IN ('cancelled','postponed') AND l.experience_id = ANY($3)
+       GROUP BY b.visit_date, b.slot, l.experience_id`,
+      [from, to, ids],
+    ) as { date: string; slot: string; id: string; pp: number; u: number }[];
+    for (const r of booked) { add(`${r.date.slice(0, 10)}|${r.slot}|${r.id}|pp`, Number(r.pp) || 0); add(`${r.date.slice(0, 10)}|${r.slot}|${r.id}|u`, Number(r.u) || 0); }
+    const held = await this.dataSource.query(
+      `SELECT h.visit_date::text AS date, h.slot, i->>'id' AS id,
+              COALESCE(SUM(COALESCE((i->>'adults')::int, 0) + COALESCE((i->>'kids')::int, 0)), 0)::int AS pp,
+              COALESCE(SUM(COALESCE((i->>'units')::int, 0)), 0)::int AS u
+       FROM slot_holds h, jsonb_array_elements(h.items) i
+       WHERE h.visit_date BETWEEN $1 AND $2 AND h.expires_at > now() AND i->>'id' = ANY($3)
+       GROUP BY h.visit_date, h.slot, i->>'id'`,
+      [from, to, ids],
+    ) as { date: string; slot: string; id: string; pp: number; u: number }[];
+    for (const r of held) { add(`${r.date.slice(0, 10)}|${r.slot}|${r.id}|pp`, Number(r.pp) || 0); add(`${r.date.slice(0, 10)}|${r.slot}|${r.id}|u`, Number(r.u) || 0); }
+    return out;
+  }
+
+  // ------------------------------------------------------------------ holds
+
+  /**
+   * Holds the party's places for HOLD_MINUTES while the guest types their
+   * details. Checked like a booking (closures, slot and activity capacity);
+   * an earlier hold of the same guest is replaced.
+   */
+  async hold(input: { visitDate: string; slot: SlotKey; adults: number; kids: number; items: { id: string; adults?: number; kids?: number; units?: number }[]; holdId?: string }): Promise<{ holdId: string; expiresAt: string }> {
+    const [cal, experiences] = await Promise.all([this.calendar(), this.experienceInfo()]);
+    const visitDate = input.visitDate.slice(0, 10);
+    return this.dataSource.transaction(async (manager) => {
+      if (input.holdId) await manager.delete(SlotHold, { id: input.holdId });
+      await reservePlaces(manager, { ...input, visitDate }, cal, experiences);
+      const saved = await manager.save(SlotHold, manager.create(SlotHold, {
+        visitDate, slot: input.slot, adults: input.adults, kids: input.kids, items: input.items.map((i) => ({ id: i.id, adults: i.adults ?? 0, kids: i.kids ?? 0, units: i.units ?? 0 })),
+        expiresAt: new Date(Date.now() + HOLD_MINUTES * 60_000),
+      }));
+      return { holdId: saved.id, expiresAt: saved.expiresAt.toISOString() };
+    });
+  }
+
+  async releaseHold(holdId: string): Promise<void> {
+    await this.holdRepo.delete({ id: holdId });
   }
 
   /** Tells the back office about a new booking: live socket first, then e-mail. Never throws. */
@@ -219,10 +290,12 @@ export class BookingsService {
     const offer = dto.couponCode && this.coupons ? await this.coupons.resolve(dto.couponCode) : null;
     const adjustment = offer ? { kind: offer.kind, value: offer.value, amount: adjustmentAmount(offer.kind, offer.value, priced), note: offer.note, code: offer.code } : null;
 
+    const [cal, experienceInfo] = await Promise.all([this.calendar(), this.experienceInfo()]);
+
     for (let attempt = 0; attempt < REF_MAX_TRIES; attempt++) {
       const refCode = this.generateRefCode();
       try {
-        return await this.persist(dto, priced, refCode, email, phone, visitDate, adjustment);
+        return await this.persist(dto, priced, refCode, email, phone, visitDate, adjustment, cal, experienceInfo);
       } catch (err) {
         if (this.isUniqueViolation(err)) continue; // ref collision, retry
         throw err;
@@ -243,10 +316,18 @@ export class BookingsService {
     phone: string,
     visitDate: string,
     adjustment: { kind: string; value: number; amount: number; note: string; code: string } | null = null,
+    cal?: Calendar,
+    experienceInfo?: Map<string, ExperienceInfo>,
   ): Promise<BookingResponse> {
     const { saved, lines } = await this.dataSource.transaction(async (manager) => {
-      // The slot must really have room: the picker's level is only advisory.
-      await reserveSlotPlaces(manager, visitDate, dto.slot, dto.adults + dto.kids, this.slotCapacity);
+      // The slot, the day and every capped activity must really have room: the picker is only advisory.
+      await reservePlaces(
+        manager,
+        { visitDate, slot: dto.slot, adults: dto.adults, kids: dto.kids, items: dto.items, holdId: dto.holdId },
+        cal ?? (await this.calendar()),
+        experienceInfo ?? (await this.experienceInfo()),
+      );
+      if (dto.holdId) await manager.delete(SlotHold, { id: dto.holdId });
       const booking = manager.create(Booking, {
         refCode,
         visitDate,

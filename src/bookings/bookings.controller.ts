@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Header, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AvailabilityDay, BookingsService, BookingResponse } from './bookings.service';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { HoldDto } from './dto/hold.dto';
 
 /**
  * Bookings: 10 per 10 minutes per IP, deliberately looser than the quote and
@@ -32,6 +33,22 @@ export class BookingsController {
   availability(@Query() q: AvailabilityQueryDto): Promise<AvailabilityDay[]> {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Indian/Mauritius' });
     return this.bookingsService.availability(q.from ?? today, q.days ?? 14);
+  }
+
+  @Post('hold')
+  @ApiOperation({ summary: 'Hold the party\'s places for a few minutes while the guest fills in their details' })
+  @ApiResponse({ status: 409, description: 'Closed, or no room in that slot / for that activity' })
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: BOOKING_TTL_MS } })
+  hold(@Body() dto: HoldDto): Promise<{ holdId: string; expiresAt: string }> {
+    return this.bookingsService.hold(dto);
+  }
+
+  @Delete('hold/:id')
+  @ApiOperation({ summary: 'Release a hold (the guest left the form)' })
+  @HttpCode(204)
+  async releaseHold(@Param('id', new ParseUUIDPipe()) id: string): Promise<void> {
+    await this.bookingsService.releaseHold(id);
   }
 
   @Post()
