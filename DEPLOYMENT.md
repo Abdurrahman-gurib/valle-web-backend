@@ -121,7 +121,8 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `TRUST_PROXY`       | `true`                                   | One hop: the nginx container                                           |
 | `SITE_URL`          | public origin                            | Named in the sitemap and robots.txt (see Search engines below)         |
 | `SMTP_URL`          | `smtps://resend:<api key>@smtp.resend.com:465` | Set 2026-09-29 (Resend, domain vallepark.com verified). Guest tickets, reminders and the desk alert. Unset = no e-mail; `json` = test transport |
-| `BOOKING_NOTIFY_TO` | `sales@vallepark.com`                    | Optional, default shown. Comma-separated recipients of the new-booking e-mail |
+| `BOOKING_NOTIFY_TO` | `sales@vallepark.com`                    | Optional, default shown. Comma-separated recipients of the new-booking and new-quote-request e-mails |
+| `HR_NOTIFY_TO`      | defaults to `BOOKING_NOTIFY_TO`          | Optional. Recipients of the new-job-application e-mail (set it to the HR mailbox once there is one) |
 | `MAIL_FROM`         | `VALLÉ Advenature Park <bookings@vallepark.com>` | Set. Must be on a domain verified in Resend                      |
 | `D360_API_KEY`      | the channel's key from the 360dialog Hub | WhatsApp tickets and reminders from the park's WABA (+230 5292 8841, "Vallé Advenature Park", COEX) as approved UTILITY templates. Register the templates once with `railway ssh --service api -- node scripts/whatsapp-templates.js`; Meta approves them, usually within hours |
 | `WA_TICKET_TEMPLATE` / `WA_REMINDER_TEMPLATE` / `WA_TEMPLATE_LANG` | `valle_booking_ticket` / `valle_visit_reminder` / `en` | Optional, defaults shown |

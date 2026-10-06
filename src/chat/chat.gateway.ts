@@ -278,6 +278,12 @@ export class ChatGateway {
     await this.emitToStaff('booking:new', { booking });
   }
 
+  /** A group asked for a quote on the website: the dashboard shows a toast and refreshes. */
+  async announceQuote(quote: unknown): Promise<void> {
+    if (!this.server) return;
+    await this.emitToStaff('quote:new', { quote });
+  }
+
   /** Fan-out for a status change (e.g. a conversation closed over REST). */
   async announceConversation(conversation: ChatConversation): Promise<void> {
     if (!this.server) return;

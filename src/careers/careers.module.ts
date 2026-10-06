@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JobApplication, JobVacancy } from '../entities';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { CareersController } from './careers.controller';
 import { CareersService } from './careers.service';
 
@@ -10,7 +11,7 @@ import { CareersService } from './careers.service';
  * share a code path that could return an internal column.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([JobVacancy, JobApplication])],
+  imports: [TypeOrmModule.forFeature([JobVacancy, JobApplication]), NotificationsModule],
   controllers: [CareersController],
   providers: [CareersService],
 })

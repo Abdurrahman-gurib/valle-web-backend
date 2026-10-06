@@ -4,6 +4,7 @@ import { Booking, BookingLine } from '../entities';
 import { TicketsModule } from '../tickets/tickets.module';
 import { BookingNotifierService } from './booking-notifier.service';
 import { GuestMessagingService } from './guest-messaging.service';
+import { InboxNotifierService } from './inbox-notifier.service';
 import { MailService } from './mail.service';
 import { WhatsAppService } from './whatsapp.service';
 
@@ -13,7 +14,7 @@ import { WhatsAppService } from './whatsapp.service';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([Booking, BookingLine]), TicketsModule],
-  providers: [MailService, WhatsAppService, BookingNotifierService, GuestMessagingService],
-  exports: [MailService, WhatsAppService, BookingNotifierService, GuestMessagingService],
+  providers: [MailService, WhatsAppService, BookingNotifierService, GuestMessagingService, InboxNotifierService],
+  exports: [MailService, WhatsAppService, BookingNotifierService, GuestMessagingService, InboxNotifierService],
 })
 export class NotificationsModule {}

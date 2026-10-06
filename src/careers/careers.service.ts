@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InboxNotifierService } from '../notifications/inbox-notifier.service';
 import { JobApplication, JobVacancy } from '../entities';
 import { ApplyToVacancyDto, SLUG_PATTERN } from './dto/careers.dto';
 
@@ -53,7 +54,10 @@ export class CareersService {
     private readonly vacancyRepo: Repository<JobVacancy>,
     @InjectRepository(JobApplication)
     private readonly applicationRepo: Repository<JobApplication>,
+    @Optional() private readonly notifier?: InboxNotifierService,
   ) {}
+
+  private readonly logger = new Logger(CareersService.name);
 
   /** Open roles, newest first. */
   async listPublished(): Promise<VacancyCard[]> {
@@ -97,6 +101,10 @@ export class CareersService {
         reviewedBy: null,
       }),
     );
+
+    // HR hears about it by e-mail; a mail problem never fails the application.
+    void this.notifier?.notifyNewApplication(saved, vacancy)
+      .catch((e: unknown) => this.logger.error(`Application ${saved.id}: could not notify HR: ${(e as Error).message}`));
 
     return { id: saved.id };
   }
