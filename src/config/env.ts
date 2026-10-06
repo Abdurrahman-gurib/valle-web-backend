@@ -48,6 +48,12 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
           'would be signed with a key published in this repository.',
       );
     }
+    if (!env.TICKET_SECRET || env.TICKET_SECRET.length < 32) {
+      problems.push(
+        'TICKET_SECRET must be set to at least 32 characters: it signs every ticket, waiver and ' +
+          'QR link. Set it to the current JWT_SECRET value if links have already been sent.',
+      );
+    }
     if (origins.length === 0) {
       problems.push('CORS_ORIGIN must list the exact public origins, e.g. https://vallepark.com');
     }

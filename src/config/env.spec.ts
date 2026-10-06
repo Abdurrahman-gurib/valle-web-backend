@@ -4,6 +4,7 @@ const PRODUCTION: NodeJS.ProcessEnv = {
   NODE_ENV: 'production',
   PORT: '3001',
   JWT_SECRET: 'x'.repeat(48),
+  TICKET_SECRET: 'y'.repeat(48),
   CORS_ORIGIN: 'https://vallepark.com',
   DB_HOST: 'postgres.railway.internal',
   DB_PASSWORD: 'secret',
@@ -34,6 +35,7 @@ describe('loadEnv', () => {
     expect(() => loadEnv({ ...PRODUCTION, CORS_ORIGIN: 'http://vallepark.com' })).toThrow(/https/);
     expect(() => loadEnv({ ...PRODUCTION, CORS_ORIGIN: '*' })).toThrow(/CORS_ORIGIN/);
     expect(() => loadEnv({ ...PRODUCTION, JWT_SECRET: 'short' })).toThrow(/JWT_SECRET/);
+    expect(() => loadEnv({ ...PRODUCTION, TICKET_SECRET: undefined })).toThrow(/TICKET_SECRET/);
   });
 
   it('lists every problem at once', () => {

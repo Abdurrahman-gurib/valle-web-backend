@@ -21,6 +21,9 @@ export interface CouponRow extends CouponOffer {
   createdAt: string;
 }
 
+/** 409 when the last use of a limited code went to a booking committed a moment earlier. */
+export const COUPON_USED_MESSAGE = 'This code has just been fully used. Remove it or try another.';
+
 const parkToday = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Indian/Mauritius' });
 const d = (v: string | Date | null): string | null => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 
@@ -46,9 +49,17 @@ export class CouponsService {
     return { code: c.code, kind: c.kind, value: c.value, note: c.note };
   }
 
-  /** Count one use; called inside the booking transaction. */
+  /**
+   * Count one use, inside the booking transaction. The row is locked first and
+   * the limit re-checked under the lock, so two bookings racing for the last
+   * use of a code cannot both get it: the second one waits, sees uses = max
+   * and is refused, and its booking rolls back with it.
+   */
   async consume(code: string, manager: EntityManager): Promise<void> {
-    await manager.increment(Coupon, { code: CouponsService.normalise(code) }, 'uses', 1);
+    const c = await manager.findOne(Coupon, { where: { code: CouponsService.normalise(code) }, lock: { mode: 'pessimistic_write' } });
+    if (!c || !c.active) throw new NotFoundException('This code is not valid');
+    if (c.maxUses !== null && c.uses >= c.maxUses) throw new ConflictException(COUPON_USED_MESSAGE);
+    await manager.increment(Coupon, { code: c.code }, 'uses', 1);
   }
 
   // ---------------------------------------------------------------- staff

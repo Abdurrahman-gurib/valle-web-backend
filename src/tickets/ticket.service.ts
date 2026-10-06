@@ -48,6 +48,8 @@ const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString
 @Injectable()
 export class TicketService {
   private readonly secret: string;
+  /** The secret before the last rotation: links signed with it still verify. */
+  private readonly previousSecret: string | null;
   readonly siteUrl: string;
   private readonly apiUrl: string;
 
@@ -58,20 +60,28 @@ export class TicketService {
     @InjectRepository(Waiver) private readonly waiverRepo: Repository<Waiver>,
     @InjectRepository(Setting) private readonly settingRepo: Repository<Setting>,
   ) {
-    this.secret = resolveJwtSecret(config);
+    // Tickets, waivers and QR links are signed with their own secret, so the staff
+    // session key (JWT_SECRET) can be rotated without killing every link ever sent.
+    // The fall-back to JWT_SECRET keeps links from before TICKET_SECRET existed valid.
+    this.secret = config.get<string>('TICKET_SECRET')?.trim() || resolveJwtSecret(config);
+    this.previousSecret = config.get<string>('TICKET_SECRET_PREVIOUS')?.trim() || null;
     this.siteUrl = (config.get<string>('SITE_URL') ?? 'https://vallepark.com').trim().replace(/\/+$/, '');
     this.apiUrl = this.siteUrl + '/api';
   }
 
-  token(refCode: string): string {
-    return createHmac('sha256', this.secret).update('ticket:' + refCode).digest('base64url').slice(0, 24);
+  token(refCode: string, secret: string = this.secret): string {
+    return createHmac('sha256', secret).update('ticket:' + refCode).digest('base64url').slice(0, 24);
   }
 
   verify(refCode: string, token: string | undefined): boolean {
     if (!token) return false;
-    const expected = Buffer.from(this.token(refCode));
     const given = Buffer.from(token);
-    return expected.length === given.length && timingSafeEqual(expected, given);
+    const matches = (secret: string) => {
+      const expected = Buffer.from(this.token(refCode, secret));
+      return expected.length === given.length && timingSafeEqual(expected, given);
+    };
+    // The previous secret only verifies, never signs: new links always carry the current one.
+    return matches(this.secret) || (this.previousSecret !== null && matches(this.previousSecret));
   }
 
   ticketUrl(refCode: string): string {

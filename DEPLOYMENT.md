@@ -115,7 +115,8 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `DB_PASSWORD`       | `${{Postgres.PGPASSWORD}}`               | Keep the reference, never paste the value                              |
 | `DB_NAME`           | `${{Postgres.PGDATABASE}}`               |                                                                       |
 | `DB_SSL`            | `no-verify`                              | TLS on; Railway's Postgres certificate is self-signed                  |
-| `JWT_SECRET`        | 64 random characters                     | Set once; rotating it signs every operator out                         |
+| `JWT_SECRET`        | 64 random characters                     | Signs operator sessions only; rotating it signs every operator out     |
+| `TICKET_SECRET`     | 64 random characters                     | Signs guest ticket, waiver and QR links. Set 2026-10-06 to the then-current `JWT_SECRET` so links already sent keep working. To rotate: copy the old value to `TICKET_SECRET_PREVIOUS` (verifies old links, signs nothing), set a new `TICKET_SECRET`, drop the previous one once old links are no longer needed |
 | `STAFF_COOKIE_NAME` | `valle_staff`                            |                                                                       |
 | `CORS_ORIGIN`       | `https://${{web.RAILWAY_PUBLIC_DOMAIN}}` | Exact https origin(s), comma separated; add a custom domain here too   |
 | `TRUST_PROXY`       | `true`                                   | One hop: the nginx container                                           |
@@ -140,7 +141,7 @@ allows 10 MB bodies on `/api/`.
 
 Guests receive a ticket the moment they book: an e-mail with the QR code
 inline and attached, a link to `/ticket/<ref>?t=<token>` (the token is an HMAC
-of the reference with `JWT_SECRET`, so tickets cannot be browsed by guessing
+of the reference with `TICKET_SECRET`, so tickets cannot be browsed by guessing
 codes), and the same by WhatsApp when Twilio is configured. The evening
 before the visit (from 17:00 park time) a reminder goes out once; migration
 005 adds `ticket_sent_at` / `reminder_sent_at`. The desk can re-send a ticket

@@ -76,6 +76,8 @@ export default defineRailway(() => {
       DB_NAME: Postgres.env.PGDATABASE,
       DB_SSL: "no-verify",
       JWT_SECRET: preserve(),
+      // Signs ticket / waiver / QR links; rotate it with TICKET_SECRET_PREVIOUS set to the old value.
+      TICKET_SECRET: preserve(),
       // Secrets and deploy-time values set on Railway, never written here. They must stay
       // listed: a variable missing from this file is DELETED by `railway config apply`.
       SMTP_URL: preserve(),          // Resend (guest tickets, reminders, backup alerts)

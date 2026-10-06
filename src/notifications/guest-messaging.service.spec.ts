@@ -142,6 +142,20 @@ describe('TicketService', () => {
     expect(tickets.verify('VAL-1234-26', t.slice(0, 23) + 'x')).toBe(false);
     expect(tickets.verify('VAL-1234-26', undefined)).toBe(false);
   });
+  it('signs with TICKET_SECRET, not the session key, and still verifies links from the previous secret', () => {
+    const mk = (vars: Record<string, string>) => new TicketService(config({ SITE_URL: 'https://example.test', ...vars }), {} as Repository<Booking>, {} as Repository<BookingLine>, {} as never, {} as never);
+    const legacy = mk({ JWT_SECRET: 'j'.repeat(40) });
+    const own = mk({ JWT_SECRET: 'j'.repeat(40), TICKET_SECRET: 't'.repeat(40) });
+    // a dedicated ticket secret changes the token; the session key no longer matters
+    expect(own.token('VAL-1-26')).not.toBe(legacy.token('VAL-1-26'));
+    expect(mk({ JWT_SECRET: 'other'.repeat(8), TICKET_SECRET: 't'.repeat(40) }).token('VAL-1-26')).toBe(own.token('VAL-1-26'));
+    // rotation: the old value moves to TICKET_SECRET_PREVIOUS, old links keep opening, new links use the new secret
+    const rotated = mk({ TICKET_SECRET: 'n'.repeat(40), TICKET_SECRET_PREVIOUS: 't'.repeat(40) });
+    expect(rotated.verify('VAL-1-26', own.token('VAL-1-26'))).toBe(true);
+    expect(rotated.token('VAL-1-26')).not.toBe(own.token('VAL-1-26'));
+    expect(rotated.verify('VAL-1-26', legacy.token('VAL-1-26'))).toBe(false);
+  });
+
   it('builds the ticket and QR links on the public origin', async () => {
     expect(tickets.ticketUrl('VAL-1-26')).toMatch(/^https:\/\/example\.test\/ticket\/VAL-1-26\?t=[A-Za-z0-9_-]{24}$/);
     expect(tickets.qrUrl('VAL-1-26')).toMatch(/^https:\/\/example\.test\/api\/tickets\/VAL-1-26\/qr\.png\?t=/);
