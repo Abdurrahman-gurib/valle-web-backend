@@ -79,8 +79,15 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     return `${longDate(dateStr(b.visitDate))}, ${slotLabel(b.slot).replace('Morning arrival', 'morning arrival').replace('Afternoon arrival', 'afternoon arrival')}`;
   }
 
+  /**
+   * What the guest still owes, from the payment actually recorded on the booking
+   * (never from payMode: choosing "pay online" takes no money until a gateway exists).
+   */
   private payLine(b: Booking): string {
-    return b.payMode === 'online' ? `${rs(b.total)} paid online` : `${rs(b.total)} to pay on arrival`;
+    const paid = b.paidAmount ?? 0;
+    if (paid >= b.total) return `${rs(b.total)} paid`;
+    if (paid > 0) return `${rs(paid)} paid, ${rs(b.total - paid)} to pay on arrival`;
+    return `${rs(b.total)} to pay on arrival`;
   }
 
   /** Template parameters (360dialog) plus the full text (Twilio fallback) for the ticket. */
@@ -105,7 +112,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       `Hi ${b.guestName.split(' ')[0]}, your VALLÉ Advenature™ Park booking is confirmed! 🎟️`,
       `Reference: ${b.refCode}`,
       `${longDate(dateStr(b.visitDate))} · ${slotLabel(b.slot)}`,
-      `${party(b)} · ${b.payMode === 'online' ? 'paid online' : 'to pay on arrival: ' + rs(b.total)}`,
+      `${party(b)} · ${this.payLine(b)}`,
       ``,
       `Your ticket with QR code: ${this.tickets.ticketUrl(b.refCode)}`,
       `Skip the paper at the gate: sign the safety waiver for everyone in your party now: ${this.tickets.waiverUrl(b.refCode)}`,
@@ -119,7 +126,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     const visit = longDate(dateStr(b.visitDate));
     const url = this.tickets.ticketUrl(b.refCode);
     const waiver = this.tickets.waiverUrl(b.refCode);
-    const pay = b.payMode === 'online' ? 'Paid online' : `To pay on arrival: ${rs(b.total)} (cash or card at the gate)`;
+    const paidInFull = (b.paidAmount ?? 0) >= b.total;
+    const pay = paidInFull ? `Paid: ${rs(b.total)}` : `${this.payLine(b).replace(/^Rs/, 'To pay on arrival: Rs').replace(' to pay on arrival', '')} (cash or card at the gate)`;
     const subject = `Your VALLÉ ticket ${b.refCode} · ${visit}`;
     const lineText = lines.map((l) => `  • ${l.label}: ${rs(l.amount)}`).join('\n');
     const text = [
@@ -243,7 +251,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     return [
       `See you tomorrow at VALLÉ Advenature™ Park, ${b.guestName.split(' ')[0]}! 🌴`,
       `${longDate(dateStr(b.visitDate))} · ${slotLabel(b.slot)} · ${party(b)}`,
-      b.payMode === 'online' ? 'Already paid online.' : `To pay on arrival: ${rs(b.total)} (cash or card).`,
+      (b.paidAmount ?? 0) >= b.total ? 'Already paid.' : `${this.payLine(b)} (cash or card).`,
       ``,
       `Your ticket: ${this.tickets.ticketUrl(b.refCode)}`,
       `Waivers: sign them tonight and skip the queue at the gate: ${this.tickets.waiverUrl(b.refCode)}`,

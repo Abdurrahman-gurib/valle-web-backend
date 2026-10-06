@@ -41,7 +41,7 @@ export class BookingNotifierService {
       `Guest:       ${booking.guestName}${booking.nationality ? ' (' + booking.nationality + ')' : ''}`,
       `Contact:     ${[booking.email, booking.phone].filter(Boolean).join(' · ') || '-'}`,
       `Party:       ${party} · ${booking.rate === 'nr' ? 'visitor' : 'resident'} rate`,
-      `Payment:     ${booking.payMode === 'online' ? 'paid online' : 'pays on arrival'}`,
+      `Payment:     ${(booking.paidAmount ?? 0) >= booking.total ? 'paid' : booking.payMode === 'online' ? 'chose to pay online, nothing taken yet: collect at the gate' : 'pays on arrival'}`,
       ``,
       `Park entry:  ${rs(booking.entryAmount)}`,
       items ? `Experiences:\n${items}` : `Experiences: none (entry only)`,

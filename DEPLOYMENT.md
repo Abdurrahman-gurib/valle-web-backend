@@ -412,8 +412,12 @@ failover.
 1. **Staff passwords rotated** (done after the first deploy; rotate again after
    any `--reseed`).
 2. `CORS_ORIGIN` points at the real domain(s) and nothing else.
-3. Wire a real payment provider if you intend to take money online: the current
-   "pay online" path records the intent and does not charge a card.
+3. Wire a real payment provider if you intend to take money online. Until then
+   the website offers "pay on arrival" only (the "pay online" step is hidden
+   unless the web service is built with `VITE_ONLINE_PAYMENT=1`), and every
+   message to the guest derives "paid" from the payment recorded on the booking,
+   never from the chosen pay mode. A booking taken at the desk as "Paid online /
+   by transfer" is recorded as paid in full.
 4. Watch the Railway metrics and HTTP logs for 5xx rates and login 429s; add an
    uptime monitor on `https://web-production-ff60b.up.railway.app/api/health`.
 

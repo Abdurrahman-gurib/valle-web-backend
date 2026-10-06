@@ -30,6 +30,10 @@ describe('BookingNotifierService', () => {
     expect(text).toContain('Zipline Adventures · Signature: Rs 4,700');
     expect(text).toContain('Total:       Rs 6,200');
     expect(text).toContain('pays on arrival');
+    // choosing "pay online" takes no money until a gateway exists: the desk must still collect
+    const online = svc.render({ ...booking, payMode: 'online', paidAmount: 0 } as unknown as Booking, lines).text;
+    expect(online).toContain('nothing taken yet: collect at the gate');
+    expect(svc.render({ ...booking, paidAmount: 6200 } as unknown as Booking, lines).text).toContain('Payment:     paid');
   });
 
   it('sends through the configured transport to BOOKING_NOTIFY_TO', async () => {

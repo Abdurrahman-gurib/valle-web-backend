@@ -223,6 +223,13 @@ export class StaffBookingsService {
     if (!booking) throw new NotFoundException(`No booking ${created.refCode}`);
     const stamp = `Taken by ${staff.name} (${channel})`;
     booking.staffNote = [stamp, (note ?? '').trim()].filter(Boolean).join('\n');
+    // "Paid online / by transfer" in the drawer means the money has arrived: record it,
+    // otherwise the guest's ticket would still ask them to pay at the gate.
+    if (bookingDto.payMode === 'online') {
+      booking.paidAmount = booking.total;
+      booking.paidAt = new Date();
+      booking.paymentMethod = 'online';
+    }
     booking.updatedAt = new Date();
     booking.updatedBy = staff.id;
     await this.bookingRepo.save(booking);

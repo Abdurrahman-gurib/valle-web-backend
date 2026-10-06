@@ -45,6 +45,23 @@ describe('GuestMessagingService', () => {
     expect(h2).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
+  it('says "paid" only for money actually recorded, never because the guest chose pay online', () => {
+    const { svc } = build();
+    // "pay online" with nothing taken: the guest still owes the total at the gate
+    const chose = { ...booking, payMode: 'online', paidAmount: 0 } as unknown as Booking;
+    expect(svc.renderTicketEmail(chose, lines).text).toContain('To pay on arrival: Rs 6,200');
+    expect(svc.ticketWhatsAppText(chose)).toContain('Rs 6,200 to pay on arrival');
+    expect(svc.reminderText(chose)).toContain('Rs 6,200 to pay on arrival');
+    expect(svc.ticketWhatsAppText(chose)).not.toMatch(/paid online/);
+    // a payment recorded by the desk (transfer, card) reads as paid
+    const paid = { ...booking, payMode: 'online', paidAmount: 6200 } as unknown as Booking;
+    expect(svc.renderTicketEmail(paid, lines).text).toContain('Paid: Rs 6,200');
+    expect(svc.ticketWhatsApp(paid).params[4]).toBe('Rs 6,200 paid');
+    expect(svc.reminderText(paid)).toContain('Already paid.');
+    const part = { ...booking, paidAmount: 2000 } as unknown as Booking;
+    expect(svc.ticketWhatsApp(part).params[4]).toBe('Rs 2,000 paid, Rs 4,200 to pay on arrival');
+  });
+
   it('sends the ticket by e-mail (QR attached) and WhatsApp, then stamps ticket_sent_at', async () => {
     const { svc, sendMail, posted, bookingRepo } = build({ SMTP_URL: 'json', TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 'tok', TWILIO_WHATSAPP_FROM: 'whatsapp:+14155238886' });
     const r = await svc.sendTicket(booking, lines);
