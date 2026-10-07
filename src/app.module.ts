@@ -22,6 +22,7 @@ import { WaiversModule } from './waivers/waivers.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { WeatherModule } from './weather/weather.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
@@ -53,6 +54,7 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     CatalogModule,
     PaymentsModule,
     ReservationsModule,
+    WeatherModule,
     BookingsModule,
     QuotesModule,
     HealthModule,

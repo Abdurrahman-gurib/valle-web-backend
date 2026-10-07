@@ -45,6 +45,14 @@ describe('GuestMessagingService', () => {
     expect(h2).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 
+  it('puts the desk’s park notice into the reminder, and nothing on an ordinary open day', () => {
+    const { svc } = build();
+    expect(svc.reminderText(booking as Booking)).not.toContain('⚠️');
+    const text = svc.reminderText(booking as Booking, 'Park partly open today. Paused right now: Zipline Adventures.');
+    expect(text).toContain('⚠️ Park partly open today. Paused right now: Zipline Adventures.');
+    expect(text.indexOf('⚠️')).toBeLessThan(text.indexOf('pay on arrival'));
+  });
+
   it('says "paid" only for money actually recorded, never because the guest chose pay online', () => {
     const { svc } = build();
     // "pay online" with nothing taken: the guest still owes the total at the gate

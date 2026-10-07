@@ -1,9 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Optional, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Booking, BookingLine } from '../entities';
 import { TicketService } from '../tickets/ticket.service';
+import { ParkStatusService } from '../weather/park-status.service';
 import { MailService } from './mail.service';
 import { WhatsAppService, type BookingMessage } from './whatsapp.service';
 
@@ -44,6 +45,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     @InjectRepository(BookingLine) private readonly lineRepo: Repository<BookingLine>,
     config: ConfigService,
+    @Optional() private readonly parkStatus?: ParkStatusService,
   ) {
     this.remindersOn = (config.get<string>('GUEST_REMINDERS') ?? '1') !== '0';
   }
@@ -248,10 +250,12 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
 
   // ---------------------------------------------------------------- reminder
 
-  reminderText(b: Booking): string {
+  /** `statusLine` is the desk's park notice of the moment (open / partly open / closed), when there is one. */
+  reminderText(b: Booking, statusLine = ''): string {
     return [
       `See you tomorrow at VALLÉ Advenature™ Park, ${b.guestName.split(' ')[0]}! 🌴`,
       `${longDate(dateStr(b.visitDate))} · ${slotLabel(b.slot)} · ${party(b)}`,
+      ...(statusLine ? [`⚠️ ${statusLine}`] : []),
       (b.paidAmount ?? 0) >= b.total ? 'Already paid.' : `${this.payLine(b)} (cash or card).`,
       ``,
       `Your ticket: ${this.tickets.ticketUrl(b.refCode)}`,
@@ -262,7 +266,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   }
 
   async sendReminder(b: Booking): Promise<boolean> {
-    const text = this.reminderText(b);
+    const statusLine = await this.parkStatus?.line().catch(() => '') ?? '';
+    const text = this.reminderText(b, statusLine);
     const [email, wa] = await Promise.all([
       b.email ? this.mail.send({ to: b.email, subject: `Tomorrow at VALLÉ · ${b.refCode}`, text }) : Promise.resolve(false),
       b.phone ? this.whatsapp.sendBooking('reminder', b.phone, this.reminderWhatsApp(b)) : Promise.resolve(false),
