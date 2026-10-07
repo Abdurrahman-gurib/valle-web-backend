@@ -64,6 +64,27 @@ export class InboxNotifierService {
     return { subject, text };
   }
 
+  /** A table asked for at one of the restaurants. Never throws. */
+  async notifyReservation(r: { restaurantName: string; guestName: string; email: string; phone: string; visitDate: string; visitTime: string; party: number; preorder: { item: string; qty: number }[]; notes: string; bookingRef: string }): Promise<boolean> {
+    if (!this.mail.enabled) return false;
+    const subject = `Table request · ${r.restaurantName} · ${r.visitDate} ${r.visitTime} · ${r.party} people`;
+    const text = [
+      `A guest asked for a table on the website.`,
+      ``,
+      `Restaurant:  ${r.restaurantName}`,
+      `When:        ${r.visitDate} at ${r.visitTime}`,
+      `Party:       ${r.party}`,
+      `Guest:       ${r.guestName}`,
+      `Contact:     ${[r.email, r.phone].filter(Boolean).join(' · ') || '-'}`,
+      r.bookingRef ? `Park booking: ${r.bookingRef}` : '',
+      r.preorder.length ? `Pre-order:\n${r.preorder.map((l) => `  - ${l.qty} × ${l.item}`).join('\n')}` : '',
+      r.notes ? `Notes:       ${r.notes}` : '',
+      ``,
+      `Confirm or decline it in the back office: /staff (Quotes & tables).`,
+    ].filter((l) => l !== '').join('\n');
+    return this.mail.send({ to: this.sales, subject, text });
+  }
+
   /** A guest changed or cancelled their own booking from the ticket page. Never throws. */
   async notifyGuestChange(b: Booking, what: string): Promise<boolean> {
     if (!this.mail.enabled) return false;

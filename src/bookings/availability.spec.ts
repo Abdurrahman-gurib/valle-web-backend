@@ -1,7 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, Repository } from 'typeorm';
-import { Booking, BookingLine, Experience, PriceListEntry, Product, Setting, SlotHold } from '../entities';
+import { Booking, BookingDraft, BookingLine, Experience, PriceListEntry, Product, Setting, SlotHold } from '../entities';
 import { BookingsService, busyLevel } from './bookings.service';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 
@@ -29,7 +29,7 @@ function service(rows: unknown[], capacity?: string, settings: [string, string][
   const config = { get: (k: string) => (k === 'BOOKING_SLOT_CAPACITY' ? capacity : undefined) } as unknown as ConfigService;
   const svc = new BookingsService(
     {} as DataSource, bookingRepo, none as Repository<BookingLine>, experienceRepo,
-    none as Repository<PriceListEntry>, settingRepo, holdRepo, { find: () => Promise.resolve([]) } as unknown as Repository<Product>, undefined, undefined, undefined, undefined, config,
+    none as Repository<PriceListEntry>, settingRepo, holdRepo, { find: () => Promise.resolve([]) } as unknown as Repository<Product>, {} as Repository<BookingDraft>, undefined, undefined, undefined, undefined, config,
   );
   return { svc, qb };
 }

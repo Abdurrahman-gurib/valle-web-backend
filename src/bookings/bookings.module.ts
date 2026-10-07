@@ -5,13 +5,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { TicketsModule } from '../tickets/tickets.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { PaymentsModule } from '../payments/payments.module';
-import { Booking, BookingLine, Experience, Setting, PriceListEntry, SlotHold, Product } from '../entities';
+import { Booking, BookingLine, Experience, Setting, PriceListEntry, SlotHold, Product, BookingDraft } from '../entities';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Booking, BookingLine, Experience, PriceListEntry, Setting, SlotHold, Product]),
+    TypeOrmModule.forFeature([Booking, BookingLine, Experience, PriceListEntry, Setting, SlotHold, Product, BookingDraft]),
     // Live "booking:new" to the staff room and the e-mail to the desk.
     ChatModule,
     NotificationsModule,

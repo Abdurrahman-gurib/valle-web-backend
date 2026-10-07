@@ -21,6 +21,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { WaiversModule } from './waivers/waivers.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { PaymentsModule } from './payments/payments.module';
+import { ReservationsModule } from './reservations/reservations.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
@@ -51,6 +52,7 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
     CatalogModule,
     PaymentsModule,
+    ReservationsModule,
     BookingsModule,
     QuotesModule,
     HealthModule,

@@ -19,7 +19,7 @@ import { MailService } from './mail.service';
 export class BookingNotifierService {
   private readonly to: string;
 
-  constructor(private readonly mail: MailService, config: ConfigService) {
+  constructor(readonly mail: MailService, config: ConfigService) {
     this.to = (config.get<string>('BOOKING_NOTIFY_TO') ?? 'sales@vallepark.com').trim();
   }
 

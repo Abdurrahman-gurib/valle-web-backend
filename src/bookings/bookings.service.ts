@@ -4,12 +4,13 @@ import {
   Injectable,
   Logger,
   Optional,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { ChatGateway } from '../chat/chat.gateway';
-import { Booking, BookingLine, Experience, PriceListEntry, Product, Setting, SlotHold } from '../entities';
+import { Booking, BookingDraft, BookingLine, Experience, PriceListEntry, Product, Setting, SlotHold } from '../entities';
 import { activityLevel, closureFor, HOLD_MINUTES, parseCalendar, reservePlaces, type Calendar, type ClosureKind, type ExperienceInfo, type SlotKey } from './capacity';
 import { BookingNotifierService } from '../notifications/booking-notifier.service';
 import { GuestMessagingService } from '../notifications/guest-messaging.service';
@@ -91,6 +92,8 @@ export class BookingsService {
     private readonly holdRepo: Repository<SlotHold>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    @InjectRepository(BookingDraft)
+    private readonly draftRepo: Repository<BookingDraft>,
     @Optional() private readonly notifier?: BookingNotifierService,
     @Optional() private readonly gateway?: ChatGateway,
     @Optional() private readonly guest?: GuestMessagingService,
@@ -277,6 +280,32 @@ export class BookingsService {
       }));
       return { holdId: saved.id, expiresAt: saved.expiresAt.toISOString() };
     });
+  }
+
+  // ------------------------------------------------------------------ drafts
+
+  /**
+   * Keeps what the guest had on the booking page for 14 days and e-mails them
+   * a link that brings it all back (cart, party, date, slot, details).
+   */
+  async saveDraft(email: string, payload: Record<string, unknown>): Promise<{ id: string; sent: boolean }> {
+    if (JSON.stringify(payload).length > 16_384) throw new BadRequestException('The saved booking is too large');
+    const d = await this.draftRepo.save(this.draftRepo.create({ email, payload, expiresAt: new Date(Date.now() + 14 * 86_400_000) }));
+    const link = `${this.tickets?.siteUrl ?? ''}/booking?draft=${d.id}`;
+    const sent = this.notifier?.enabled
+      ? await this.notifier.mail.send({
+          to: email,
+          subject: 'Your VALLÉ day, saved',
+          text: `Hi,\n\nYour booking at VALLÉ Advenature Park is saved, not booked yet. Pick it up where you left off, any time in the next 14 days:\n\n${link}\n\nNothing is reserved until you confirm on that page. Questions? Call +230 660 44 77.\n\nVALLÉ Advenature Park`,
+        })
+      : false;
+    return { id: d.id, sent };
+  }
+
+  async readDraft(id: string): Promise<Record<string, unknown>> {
+    const d = await this.draftRepo.findOne({ where: { id } });
+    if (!d || d.expiresAt.getTime() < Date.now()) throw new NotFoundException('This saved booking has expired');
+    return d.payload;
   }
 
   async releaseHold(holdId: string): Promise<void> {

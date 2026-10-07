@@ -5,6 +5,7 @@ import { AvailabilityDay, BookingsService, BookingResponse } from './bookings.se
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { HoldDto } from './dto/hold.dto';
+import { SaveDraftDto } from './dto/draft.dto';
 
 /**
  * Bookings: 10 per 10 minutes per IP, deliberately looser than the quote and
@@ -42,6 +43,21 @@ export class BookingsController {
   @Throttle({ default: { limit: 60, ttl: BOOKING_TTL_MS } })
   hold(@Body() dto: HoldDto): Promise<{ holdId: string; expiresAt: string }> {
     return this.bookingsService.hold(dto);
+  }
+
+  @Post('draft')
+  @ApiOperation({ summary: 'Save what the guest filled in and e-mail them a link to come back to it' })
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: BOOKING_TTL_MS } })
+  saveDraft(@Body() dto: SaveDraftDto): Promise<{ id: string; sent: boolean }> {
+    return this.bookingsService.saveDraft(dto.email.trim(), dto.payload);
+  }
+
+  @Get('draft/:id')
+  @ApiOperation({ summary: 'A saved booking draft (404 once expired)' })
+  @Header('Cache-Control', 'private, no-store')
+  readDraft(@Param('id', new ParseUUIDPipe()) id: string): Promise<Record<string, unknown>> {
+    return this.bookingsService.readDraft(id);
   }
 
   @Delete('hold/:id')
