@@ -165,6 +165,11 @@ export class CreateBookingDto {
   @IsUUID()
   holdId?: string;
 
+  @ApiPropertyOptional({ description: 'A UUID the page made once for this attempt; a retry with the same key returns the booking already written' })
+  @IsOptional()
+  @IsUUID()
+  idempotencyKey?: string;
+
   @ApiPropertyOptional({ type: GroupDto, description: 'Present for a school / company / club booking' })
   @IsOptional() @ValidateNested() @Type(() => GroupDto)
   group?: GroupDto;

@@ -140,6 +140,10 @@ export class Booking {
   @Column({ name: 'participants', type: 'jsonb', default: () => "'[]'" })
   participants: { name: string; age?: number | null }[];
 
+  /** The booking page's key for this attempt: the same key never makes a second booking. */
+  @Column({ name: 'idempotency_key', type: 'text', nullable: true })
+  idempotencyKey: string | null;
+
   /** Rupees asked up front for a group (group_deposit_percent of the total). */
   @Column({ name: 'deposit_amount', type: 'int', default: 0 })
   depositAmount: number;

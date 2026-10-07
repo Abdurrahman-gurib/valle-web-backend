@@ -324,6 +324,12 @@ export class BookingsService {
   }
 
   async create(dto: CreateBookingDto): Promise<BookingResponse> {
+    // A retry (double tap, lost response) carries the key of the attempt that already succeeded.
+    if (dto.idempotencyKey) {
+      const done = await this.bookingRepo.findOne({ where: { idempotencyKey: dto.idempotencyKey } });
+      if (done) return this.responseFor(done);
+    }
+
     const email = (dto.email ?? '').trim();
     const phone = (dto.phone ?? '').trim();
     if (!email && !phone) {
@@ -384,6 +390,11 @@ export class BookingsService {
       try {
         return await this.persist(dto, priced, refCode, email, phone, visitDate, adjustment, cal, experienceInfo, settingsMap);
       } catch (err) {
+        if (this.isUniqueViolation(err, 'idempotency')) {
+          // the twin request got there first: hand back what it wrote
+          const done = dto.idempotencyKey ? await this.bookingRepo.findOne({ where: { idempotencyKey: dto.idempotencyKey } }) : null;
+          if (done) return this.responseFor(done);
+        }
         if (this.isUniqueViolation(err)) continue; // ref collision, retry
         throw err;
       }
@@ -439,6 +450,7 @@ export class BookingsService {
         adjustmentAmount: adjustment?.amount ?? 0,
         adjustmentNote: adjustment?.note ?? '',
         couponCode: adjustment?.code ?? '',
+        idempotencyKey: dto.idempotencyKey ?? null,
         groupKind: dto.group?.kind ?? null,
         organisation: dto.group?.organisation?.trim() ?? '',
         leaderName: (dto.group?.leaderName ?? (dto.group ? dto.name : '')).trim(),
@@ -513,11 +525,28 @@ export class BookingsService {
     return `VAL-${digits}-26`;
   }
 
-  private isUniqueViolation(err: unknown): boolean {
-    return (
-      err instanceof QueryFailedError &&
-      (err as QueryFailedError & { driverError?: { code?: string } })
-        .driverError?.code === PG_UNIQUE_VIOLATION
-    );
+  private isUniqueViolation(err: unknown, constraintContains?: string): boolean {
+    if (!(err instanceof QueryFailedError)) return false;
+    const drv = (err as QueryFailedError & { driverError?: { code?: string; constraint?: string } }).driverError;
+    if (drv?.code !== PG_UNIQUE_VIOLATION) return false;
+    return constraintContains ? (drv.constraint ?? '').includes(constraintContains) : true;
+  }
+
+  /** The create() response for a booking already written (a retried attempt). */
+  private async responseFor(b: Booking): Promise<BookingResponse> {
+    const lines = await this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } });
+    return {
+      refCode: b.refCode,
+      total: b.total,
+      discount: b.discount,
+      adjustment: b.adjustmentAmount,
+      adjustmentNote: b.adjustmentNote,
+      couponCode: b.couponCode,
+      lines: lines.map((l) => ({ label: l.label, amount: l.amount })),
+      status: b.status,
+      ticketUrl: this.tickets?.ticketUrl(b.refCode),
+      qrUrl: this.tickets?.qrUrl(b.refCode),
+      ...(b.depositAmount ? { depositAmount: b.depositAmount } : {}),
+    };
   }
 }
