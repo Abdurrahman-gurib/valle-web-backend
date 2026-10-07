@@ -136,12 +136,14 @@ export function computeBooking(
   const entryAdult = adultRow ? (input.rate === 'nr' ? adultRow.nr : adultRow.rr) : settings.entryAdult;
   const entryChild = childRow ? (input.rate === 'nr' ? childRow.nr : childRow.rr) : settings.entryChild;
 
-  const entry = entryAdult * input.adults + entryChild * input.kids;
+  // The student price list (school groups) already includes the entrance fee.
+  const studentRate = input.items.some((i) => isProductId(i.id) && products.find((p) => p.key === productKeyOf(i.id))?.family === 'student');
+  const entry = studentRate ? 0 : entryAdult * input.adults + entryChild * input.kids;
   const lines: PricedLine[] = [
     {
       experienceId: null,
       variant: '',
-      label: 'Park entry · ' + partyLabel(input.adults, input.kids),
+      label: 'Park entry · ' + (studentRate ? 'included with the student rate' : partyLabel(input.adults, input.kids)),
       productKey: null,
       time: null,
       adults: input.adults,

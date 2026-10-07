@@ -90,8 +90,11 @@ export function parseWaiverActivities(value: string | undefined): string[] {
 export function waiverRequiredCount(
   lines: { experienceId: string | null; adults: number; kids: number; units: number }[],
   waiverActivities: string[],
-  party: { adults: number; kids: number },
+  party: { adults: number; kids: number; groupKind?: string | null },
 ): number {
+  // A group: the teacher / leader always signs one waiver pack naming the participants
+  // (the park's disclaimer covers the visit itself, not only the listed activities).
+  if (party.groupKind) return 1;
   let n = 0;
   for (const l of lines) {
     if (!l.experienceId || !waiverActivities.includes(l.experienceId)) continue;

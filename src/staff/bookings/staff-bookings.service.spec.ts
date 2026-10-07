@@ -424,6 +424,11 @@ describe('StaffBookingsService.list', () => {
       adjustmentNote: '',
       couponCode: '',
       postponedFrom: null,
+      groupKind: null,
+      organisation: '',
+      leaderName: '',
+      participants: [],
+      depositAmount: 0,
       createdAt: '2026-08-06T09:30:00.000Z',
     });
   });

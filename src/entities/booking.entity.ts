@@ -125,6 +125,25 @@ export class Booking {
   @Column({ name: 'postponed_from', type: 'date', nullable: true })
   postponedFrom: string | null;
 
+  // ---- groups and schools ----
+  /** school | company | club | other; null for an ordinary booking */
+  @Column({ name: 'group_kind', type: 'text', nullable: true })
+  groupKind: 'school' | 'company' | 'club' | 'other' | null;
+
+  @Column({ name: 'organisation', type: 'text', default: '' })
+  organisation: string;
+
+  /** The teacher / leader who signs the waiver pack for the party. */
+  @Column({ name: 'leader_name', type: 'text', default: '' })
+  leaderName: string;
+
+  @Column({ name: 'participants', type: 'jsonb', default: () => "'[]'" })
+  participants: { name: string; age?: number | null }[];
+
+  /** Rupees asked up front for a group (group_deposit_percent of the total). */
+  @Column({ name: 'deposit_amount', type: 'int', default: 0 })
+  depositAmount: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

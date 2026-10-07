@@ -86,6 +86,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   private payLine(b: Booking): string {
     const paid = b.paidAmount ?? 0;
     if (paid >= b.total) return `${rs(b.total)} paid`;
+    if ((b.depositAmount ?? 0) > paid) return `${rs(b.depositAmount - paid)} deposit due now, ${rs(b.total - paid)} in all`;
     if (paid > 0) return `${rs(paid)} paid, ${rs(b.total - paid)} to pay on arrival`;
     return `${rs(b.total)} to pay on arrival`;
   }

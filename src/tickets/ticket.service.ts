@@ -36,6 +36,8 @@ export interface TicketView {
   couponCode: string;
   receiptUrl: string;
   postponedFrom: string | null;
+  /** School / company / club booking. */
+  group?: { kind: string; organisation: string; leaderName: string; participants: { name: string; age?: number | null }[]; depositAmount: number };
 }
 
 const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
@@ -155,6 +157,7 @@ export class TicketService {
       couponCode: b.couponCode ?? '',
       receiptUrl: this.receiptUrl(b.refCode),
       postponedFrom: b.postponedFrom ? String(b.postponedFrom).slice(0, 10) : null,
+      ...(b.groupKind ? { group: { kind: b.groupKind, organisation: b.organisation ?? '', leaderName: b.leaderName ?? '', participants: b.participants ?? [], depositAmount: b.depositAmount ?? 0 } } : {}),
     };
   }
 }

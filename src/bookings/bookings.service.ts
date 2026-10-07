@@ -36,6 +36,8 @@ export interface BookingResponse {
   /** "Pay online now" with a provider configured: send the guest here; the ticket follows the payment. */
   checkoutUrl?: string;
   paymentId?: string;
+  /** Groups: rupees asked up front. */
+  depositAmount?: number;
 }
 
 const REF_MAX_TRIES = 20;
@@ -301,6 +303,15 @@ export class BookingsService {
       );
     }
 
+    // Ordinary bookings keep the 12-person cap; a group says who it is and gets a bigger party.
+    const party = dto.adults + dto.kids;
+    if (!dto.group && (dto.adults > 12 || dto.kids > 12)) throw new BadRequestException('Parties over 12 book as a group (school, company or club)');
+    if (dto.group && party < 10) throw new BadRequestException('A group booking is for 10 people or more');
+    if (dto.group && (dto.group.participants?.length ?? 0) > party) throw new BadRequestException('More participants listed than people in the party');
+    for (const item of dto.items) {
+      if ((item.adults ?? 0) > dto.adults || (item.kids ?? 0) > dto.kids) throw new BadRequestException('An experience cannot count more people than the party');
+    }
+
     const visitDate = dto.visitDate.slice(0, 10);
     // "Today" is whatever day it is at the park, not on the server.
     const today = new Date().toLocaleDateString('en-CA', {
@@ -342,7 +353,7 @@ export class BookingsService {
     for (let attempt = 0; attempt < REF_MAX_TRIES; attempt++) {
       const refCode = this.generateRefCode();
       try {
-        return await this.persist(dto, priced, refCode, email, phone, visitDate, adjustment, cal, experienceInfo);
+        return await this.persist(dto, priced, refCode, email, phone, visitDate, adjustment, cal, experienceInfo, settingsMap);
       } catch (err) {
         if (this.isUniqueViolation(err)) continue; // ref collision, retry
         throw err;
@@ -365,6 +376,7 @@ export class BookingsService {
     adjustment: { kind: string; value: number; amount: number; note: string; code: string } | null = null,
     cal?: Calendar,
     experienceInfo?: Map<string, ExperienceInfo>,
+    settingsForDeposit: Map<string, string> = new Map(),
   ): Promise<BookingResponse> {
     const { saved, lines } = await this.dataSource.transaction(async (manager) => {
       // The slot, the day and every capped activity must really have room: the picker is only advisory.
@@ -398,7 +410,16 @@ export class BookingsService {
         adjustmentAmount: adjustment?.amount ?? 0,
         adjustmentNote: adjustment?.note ?? '',
         couponCode: adjustment?.code ?? '',
+        groupKind: dto.group?.kind ?? null,
+        organisation: dto.group?.organisation?.trim() ?? '',
+        leaderName: (dto.group?.leaderName ?? (dto.group ? dto.name : '')).trim(),
+        participants: (dto.group?.participants ?? []).map((x) => ({ name: x.name.trim(), age: x.age ?? null })),
+        depositAmount: 0,
       });
+      if (dto.group) {
+        const pct = Number(settingsForDeposit.get('group_deposit_percent') ?? '30');
+        booking.depositAmount = Math.round(booking.total * (Number.isFinite(pct) && pct >= 0 ? Math.min(100, pct) : 30) / 100);
+      }
       const saved = await manager.save(booking);
       if (adjustment && this.coupons) await this.coupons.consume(adjustment.code, manager);
 
@@ -453,6 +474,7 @@ export class BookingsService {
       ticketUrl: this.tickets?.ticketUrl(saved.refCode),
       qrUrl: this.tickets?.qrUrl(saved.refCode),
       ...(checkout ? { checkoutUrl: checkout.checkoutUrl, paymentId: checkout.paymentId } : {}),
+      ...(saved.depositAmount ? { depositAmount: saved.depositAmount } : {}),
     };
   }
 

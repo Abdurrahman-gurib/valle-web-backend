@@ -128,6 +128,7 @@ export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }
     row(L.emName, w.emergencyName);
     row(L.emPhone, w.emergencyPhone);
     row(L.medical, w.medicalNotes);
+    if (w.groupParticipants && w.groupParticipants.length) row(`Signed as leader for ${w.groupParticipants.length}`, w.groupParticipants.join(', '));
     row(VISIT[lang], `${visit} · ${b.slot}`);
     doc.y += 6;
 

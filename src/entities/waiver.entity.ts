@@ -73,6 +73,10 @@ export class Waiver {
   @Column({ name: 'declarations', type: 'jsonb' })
   declarations: WaiverDeclarations;
 
+  /** A group leader's pack: the participants signed for. */
+  @Column({ name: 'group_participants', type: 'jsonb', nullable: true })
+  groupParticipants: string[] | null;
+
   @Column({ name: 'photo_consent', type: 'boolean', default: false })
   photoConsent: boolean;
 

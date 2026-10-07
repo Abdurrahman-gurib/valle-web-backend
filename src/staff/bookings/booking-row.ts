@@ -38,6 +38,11 @@ export interface BookingRow {
   adjustmentNote: string;
   couponCode: string;
   postponedFrom: string | null;
+  groupKind: string | null;
+  organisation: string;
+  leaderName: string;
+  participants: { name: string; age?: number | null }[];
+  depositAmount: number;
   createdAt: string;
 }
 
@@ -79,6 +84,11 @@ export function toBookingRow(b: Booking): BookingRow {
     adjustmentNote: b.adjustmentNote ?? '',
     couponCode: b.couponCode ?? '',
     postponedFrom: b.postponedFrom ? toDateString(b.postponedFrom) : null,
+    groupKind: b.groupKind ?? null,
+    organisation: b.organisation ?? '',
+    leaderName: b.leaderName ?? '',
+    participants: b.participants ?? [],
+    depositAmount: b.depositAmount ?? 0,
     currency: b.currency,
     createdAt: toIso(b.createdAt),
   };

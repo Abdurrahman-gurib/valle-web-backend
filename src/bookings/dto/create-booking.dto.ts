@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEmail,
   IsIn,
@@ -21,6 +22,35 @@ import {
   IsSafeText,
   isSuppliedValue,
 } from '../../common/validation';
+
+export class GroupParticipantDto {
+  @ApiProperty({ example: 'Ariane Léger' })
+  @IsString() @IsSafeText() @IsNotEmpty() @MaxLength(120)
+  name: string;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 110 })
+  @IsOptional() @IsInt() @Min(0) @Max(110)
+  age?: number;
+}
+
+/** A school, company or club booking: larger party, deposit, leader waiver pack. */
+export class GroupDto {
+  @ApiProperty({ enum: ['school', 'company', 'club', 'other'] })
+  @IsIn(['school', 'company', 'club', 'other'])
+  kind: 'school' | 'company' | 'club' | 'other';
+
+  @ApiProperty({ example: 'Loreto College Curepipe' })
+  @IsString() @IsSafeText() @IsNotEmpty() @MaxLength(160)
+  organisation: string;
+
+  @ApiPropertyOptional({ description: 'The teacher / leader signing the waiver pack; defaults to the booking name' })
+  @IsOptional() @IsString() @IsSafeText() @MaxLength(120)
+  leaderName?: string;
+
+  @ApiPropertyOptional({ type: [GroupParticipantDto], description: 'The participant list (names, ages), up to 400' })
+  @IsOptional() @IsArray() @ArrayMaxSize(400) @ValidateNested({ each: true }) @Type(() => GroupParticipantDto)
+  participants?: GroupParticipantDto[];
+}
 
 export class BookingItemDto {
   @ApiProperty({ example: 'zipline' })
@@ -43,18 +73,18 @@ export class BookingItemDto {
   @MaxLength(120)
   variant?: string;
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 12, example: 2 })
+  @ApiPropertyOptional({ minimum: 0, maximum: 400, example: 2 })
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(12)
+  @Max(400)
   adults?: number;
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 12, example: 1 })
+  @ApiPropertyOptional({ minimum: 0, maximum: 400, example: 1 })
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(12)
+  @Max(400)
   kids?: number;
 
   @ApiPropertyOptional({ minimum: 0, maximum: 12, example: 1 })
@@ -80,13 +110,13 @@ export class CreateBookingDto {
   @ApiProperty({ minimum: 1, maximum: 12, example: 2 })
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(400)
   adults: number;
 
   @ApiProperty({ minimum: 0, maximum: 12, example: 1 })
   @IsInt()
   @Min(0)
-  @Max(12)
+  @Max(400)
   kids: number;
 
   @ApiProperty({ enum: ['rr', 'nr'], description: 'rr = resident, nr = non-resident' })
@@ -134,6 +164,10 @@ export class CreateBookingDto {
   @IsOptional()
   @IsUUID()
   holdId?: string;
+
+  @ApiPropertyOptional({ type: GroupDto, description: 'Present for a school / company / club booking' })
+  @IsOptional() @ValidateNested() @Type(() => GroupDto)
+  group?: GroupDto;
 
   @ApiProperty({ enum: ['gate', 'online'] })
   @IsIn(['gate', 'online'])

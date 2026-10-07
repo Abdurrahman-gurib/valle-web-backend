@@ -29,6 +29,8 @@ export interface WaiverPublicView {
   slot: 'morning' | 'afternoon';
   required: number;
   signed: { id: string; participantName: string; isMinor: boolean; signedAt: string }[];
+  /** A group booking: the leader signs one pack for these participants. */
+  group?: { leaderName: string; participants: string[] } | null;
   /** false once the visit date has passed or the booking is cancelled */
   open: boolean;
   termsVersion: string;
@@ -153,6 +155,7 @@ export class WaiversService {
       slot: b.slot,
       required: await this.required(b),
       signed: waivers.map((w) => ({ id: w.id, participantName: w.participantName, isMinor: w.isMinor, signedAt: w.signedAt.toISOString() })),
+      group: b.groupKind ? { leaderName: b.leaderName || b.guestName, participants: (b.participants ?? []).map((x) => x.name) } : null,
       open: this.isOpen(b),
       termsVersion: WAIVER_TERMS_VERSION,
       activities: activities.map((a) => ({ name: a.name, ...a.limits })),
@@ -186,6 +189,7 @@ export class WaiversService {
       ...(existing ? { id: existing.id } : {}),
       bookingId: b.id,
       participantName: name,
+      groupParticipants: b.groupKind ? (dto.groupParticipants ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 400) : null,
       birthDate: dto.birthDate,
       heightCm: dto.heightCm,
       weightKg: dto.weightKg,

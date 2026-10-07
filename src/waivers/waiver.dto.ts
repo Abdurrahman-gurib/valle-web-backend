@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   Equals,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -76,6 +78,11 @@ export class SignWaiverDto {
   @ApiProperty({ type: WaiverDeclarationsDto })
   @ValidateNested() @Type(() => WaiverDeclarationsDto)
   declarations: WaiverDeclarationsDto;
+
+  /** Group leader's pack: the participants (names) this signature covers. */
+  @ApiPropertyOptional({ type: [String], maxItems: 400 })
+  @IsOptional() @IsArray() @ArrayMaxSize(400) @IsString({ each: true }) @MaxLength(120, { each: true })
+  groupParticipants?: string[];
 
   @ApiPropertyOptional() @IsOptional() @IsBoolean()
   photoConsent?: boolean;

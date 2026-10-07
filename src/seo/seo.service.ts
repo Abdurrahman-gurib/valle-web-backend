@@ -68,6 +68,7 @@ export class SeoService {
       { path: '/story', lastmod: new Date('2026-10-01'), changefreq: 'yearly', priority: 0.7 },
       { path: '/privacy', lastmod: new Date('2026-10-06'), changefreq: 'yearly', priority: 0.3 },
       { path: '/terms', lastmod: new Date('2026-10-06'), changefreq: 'yearly', priority: 0.3 },
+      { path: '/groups', lastmod: new Date('2026-10-07'), changefreq: 'monthly', priority: 0.6 },
       { path: '/vacancies', lastmod: vacMod.getTime() ? vacMod : new Date(), changefreq: 'weekly', priority: 0.5 },
       ...vacancies.map((v) => ({ path: `/vacancies/${v.slug}`, lastmod: v.updatedAt, changefreq: 'weekly' as const, priority: 0.5 })),
     ];
