@@ -73,6 +73,8 @@ export interface PackItemDto {
 }
 
 export interface PackTierDto {
+  /** Bookable product key (products table); absent when the tier is not sold online. */
+  key?: string;
   name: string;
   badge?: string;
   color: string;
@@ -113,6 +115,7 @@ export interface GalleryDto {
 }
 
 export interface ComboDto {
+  key?: string;
   name: string;
   color: string;
   items: PackItemDto[];
@@ -121,6 +124,7 @@ export interface ComboDto {
 }
 
 export interface CineItemDto {
+  key?: string;
   n: string;
   p: number;
 }
@@ -132,6 +136,7 @@ export interface PriceRowDto {
 }
 
 export interface PhotoTierDto {
+  key?: string;
   name: string;
   color: string;
   act: string;
@@ -149,7 +154,23 @@ export interface TeamPackDto {
   items: PackItemDto[];
 }
 
+/** A product the booking engine can charge (packages, combos, VIP, photo tiers, cinematic). */
+export interface ProductDto {
+  key: string;
+  family: string;
+  name: string;
+  mode: 'pp' | 'pair' | 'flat';
+  rr: number;
+  nr: number;
+  dblRr: number | null;
+  dblNr: number | null;
+  rateOnly: 'rr' | 'nr' | null;
+  image: string;
+  note: string;
+}
+
 export interface CatalogDto {
+  PRODUCTS: ProductDto[];
   CAT: Record<string, CategoryDto>;
   ACTS: ActivityDto[];
   PINS: PinDto[];

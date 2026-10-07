@@ -1,3 +1,4 @@
+import { type Product, isProductId, productAmount, productKeyOf } from '../entities';
 import { BadRequestException } from '@nestjs/common';
 
 /**
@@ -51,6 +52,8 @@ export interface PricingInput {
 
 export interface PricedLine {
   experienceId: string | null;
+  /** Set instead of experienceId for a package / combo / VIP / photo / cinematic line. */
+  productKey: string | null;
   variant: string;
   label: string;
   time: string | null;
@@ -119,6 +122,7 @@ export function computeBooking(
   settings: PricingSettings,
   input: PricingInput,
   priceRows: PricingPriceRow[] = [],
+  products: Product[] = [],
 ): PricedBooking {
   const byId = new Map(experiences.map((e) => [e.id, e]));
   const lineKey = (item: PricingItem) => item.id + '::' + (item.variant || '');
@@ -138,6 +142,7 @@ export function computeBooking(
       experienceId: null,
       variant: '',
       label: 'Park entry · ' + partyLabel(input.adults, input.kids),
+      productKey: null,
       time: null,
       adults: input.adults,
       kids: input.kids,
@@ -154,6 +159,16 @@ export function computeBooking(
   // never be legitimate. (The Explorer Pass counts DISTINCT experiences, so two
   // options of the same experience are fine but never inflate the discount.)
   const seen = new Set<string>();
+  const productById = new Map(products.map((p) => [p.key, p]));
+  const productItems = input.items.filter((i) => isProductId(i.id));
+  const expItems = input.items.filter((i) => !isProductId(i.id));
+  for (const item of productItems) {
+    const p = productById.get(productKeyOf(item.id));
+    if (!p || !p.active) throw new BadRequestException(`Unknown product "${item.id}"`);
+    if (p.rateOnly && p.rateOnly !== input.rate) throw new BadRequestException(`"${p.name}" is for ${p.rateOnly === 'rr' ? 'residents' : 'visitors'} only`);
+  }
+  input = { ...input, items: expItems };
+
   for (const item of input.items) {
     const key = lineKey(item);
     if (seen.has(key)) {
@@ -220,6 +235,7 @@ export function computeBooking(
     }
     lines.push({
       experienceId: exp.id,
+      productKey: null,
       variant: item.variant || '',
       label: exp.name + (item.variant ? ' · ' + item.variant : '') + ' · ' + q + (item.time ? ' · ' + item.time : ''),
       time: item.time || null,
@@ -228,6 +244,17 @@ export function computeBooking(
       units: u,
       amount,
     });
+  }
+
+  for (const item of productItems) {
+    const p = productById.get(productKeyOf(item.id))!;
+    const a = item.adults || 0;
+    const k = item.kids || 0;
+    const u = p.mode === 'flat' ? Math.max(1, item.units || 0) : 0;
+    const amount = productAmount(p, input.rate, a, k, u);
+    const q = p.mode === 'flat' ? `${u} × ${p.family === 'cine' ? 'film' : 'unit'}` : partyLabel(a, k);
+    subtotal += amount;
+    lines.push({ experienceId: null, productKey: p.key, variant: '', label: p.name + ' · ' + q, time: null, adults: a, kids: k, units: u, amount });
   }
 
   const advCount = advIds.size;

@@ -7,7 +7,9 @@ import {
   ChatConversation,
   Experience,
   Quote,
-  Setting, PriceListEntry } from '../../entities';
+  Setting, PriceListEntry,
+  Product,
+} from '../../entities';
 import { StaffAuthModule } from '../auth/staff-auth.module';
 import { BookingsModule } from '../../bookings/bookings.module';
 import { TicketsModule } from '../../tickets/tickets.module';
@@ -35,6 +37,7 @@ import { StaffBookingsService } from './staff-bookings.service';
       Experience,
       PriceListEntry,
       Setting,
+      Product,
     ]),
     StaffAuthModule,
     // createForGuest prices and validates through the very same public service.

@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { ChatGateway } from '../chat/chat.gateway';
-import { Booking, BookingLine, Experience, PriceListEntry, Setting, SlotHold } from '../entities';
+import { Booking, BookingLine, Experience, PriceListEntry, Product, Setting, SlotHold } from '../entities';
 import { activityLevel, closureFor, HOLD_MINUTES, parseCalendar, reservePlaces, type Calendar, type ClosureKind, type ExperienceInfo, type SlotKey } from './capacity';
 import { BookingNotifierService } from '../notifications/booking-notifier.service';
 import { GuestMessagingService } from '../notifications/guest-messaging.service';
@@ -87,6 +87,8 @@ export class BookingsService {
     private readonly settingRepo: Repository<Setting>,
     @InjectRepository(SlotHold)
     private readonly holdRepo: Repository<SlotHold>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
     @Optional() private readonly notifier?: BookingNotifierService,
     @Optional() private readonly gateway?: ChatGateway,
     @Optional() private readonly guest?: GuestMessagingService,
@@ -308,10 +310,11 @@ export class BookingsService {
       throw new BadRequestException('visitDate cannot be in the past');
     }
 
-    const [experiences, settings, priceRows] = await Promise.all([
+    const [experiences, settings, priceRows, products] = await Promise.all([
       this.experienceRepo.find(),
       this.settingRepo.find(),
       this.priceRepo.find(),
+      this.productRepo.find(),
     ]);
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
     const priced = computeBooking(
@@ -327,6 +330,7 @@ export class BookingsService {
         items: dto.items,
       },
       priceRows,
+      products,
     );
 
     // A promo / partner code: validated now, counted inside the booking transaction.
@@ -404,6 +408,7 @@ export class BookingsService {
           experienceId: l.experienceId,
           variant: l.variant,
           label: l.label,
+          productKey: l.productKey,
           sessionTime: l.time,
           adults: l.adults,
           kids: l.kids,

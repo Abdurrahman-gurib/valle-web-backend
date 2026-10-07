@@ -16,6 +16,7 @@ import {
   Experience,
   Quote,
   Setting,
+  Product,
 } from '../../entities';
 import type { StaffPrincipal } from '../auth/staff-auth.types';
 import { MAX_PAGE_SIZE } from './dto/list-bookings.dto';
@@ -221,17 +222,18 @@ class FakeManager {
 
   find<T extends object>(
     ctor: EntityCtor<T>,
-    options?: { where?: Record<string, unknown>; take?: number },
+    options?: { where?: Record<string, unknown> | Record<string, unknown>[]; take?: number },
   ): Promise<T[]> {
     if (ctor === (BookingLine as unknown as EntityCtor<T>)) {
       const where = options?.where ?? {};
-      // The re-pricing read filters on experienceId (Not(IsNull())).
-      const rows =
-        'experienceId' in where
-          ? this.state.lines.filter((l) => l.experienceId !== null)
-          : this.state.lines;
+      // The re-pricing read asks for the paid lines: experiences (Not(IsNull())) or products, as an OR array.
+      const paidOnly = Array.isArray(where) || 'experienceId' in where;
+      const rows = paidOnly
+        ? this.state.lines.filter((l) => l.experienceId !== null || (l as { productKey?: string | null }).productKey)
+        : this.state.lines;
       return Promise.resolve([...rows] as unknown as T[]);
     }
+    if ((ctor as unknown) === Product) return Promise.resolve([] as unknown as T[]);
     if (ctor === (BookingAudit as unknown as EntityCtor<T>)) {
       const rows = this.state.audit.slice(0, options?.take ?? 20);
       return Promise.resolve(rows as unknown as T[]);
@@ -493,7 +495,7 @@ describe('StaffBookingsService.detail', () => {
     expect(detail.rate).toBe('rr');
     expect(detail.staffNote).toBe('Wheelchair access');
     expect(detail.lines).toEqual([
-      { experienceId: null, variant: '', label: 'Park entry', adults: 2, kids: 1, units: 0, amount: 1250 },
+      { experienceId: null, productKey: null, variant: '', label: 'Park entry', adults: 2, kids: 1, units: 0, amount: 1250 },
     ]);
     expect(detail.audit).toEqual([
       {
@@ -592,6 +594,7 @@ describe('StaffBookingsService.update: re-pricing', () => {
     expect(detail.lines).toEqual(
       fresh.lines.map((l) => ({
         experienceId: l.experienceId,
+        productKey: l.productKey,
         variant: l.variant,
         label: l.label,
         adults: l.adults,

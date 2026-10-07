@@ -26,7 +26,9 @@ import {
   ChatConversation,
   Experience,
   Quote,
-  Setting, PriceListEntry } from '../../entities';
+  Setting, PriceListEntry,
+  Product,
+} from '../../entities';
 import type { StaffPrincipal } from '../auth/staff-auth.types';
 import {
   BookingStatus,
@@ -531,7 +533,8 @@ export class StaffBookingsService {
     const rate = patch.rate ?? booking.rate;
 
     const existing = await manager.find(BookingLine, {
-      where: { bookingId: booking.id, experienceId: Not(IsNull()) },
+      // every paid line: experiences and products (the park-entry row has neither)
+      where: [{ bookingId: booking.id, experienceId: Not(IsNull()) }, { bookingId: booking.id, productKey: Not(IsNull()) }],
       order: { sortOrder: 'ASC' },
     });
     // An item sent without a time keeps the time its line already had (desk and guest editors do not pick times).
@@ -539,10 +542,11 @@ export class StaffBookingsService {
       ? (JSON.parse(patch.items) as { id: string; variant?: string; adults?: number; kids?: number; units?: number; time?: string }[])
           .map((i) => ({ ...i, time: i.time ?? existing.find((l) => l.experienceId === i.id && (l.variant || '') === (i.variant || ''))?.sessionTime ?? undefined }))
       : null;
-    const [experiences, settings, priceRows] = await Promise.all([
+    const [experiences, settings, priceRows, products] = await Promise.all([
       manager.find(Experience),
       manager.find(Setting),
       manager.find(PriceListEntry),
+      manager.find(Product),
     ]);
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
@@ -558,7 +562,7 @@ export class StaffBookingsService {
         rate,
         items: requestedItems ?? existing.map((line) => ({
           // The where clause already excluded the null (park entry) rows.
-          id: line.experienceId ?? '',
+          id: line.experienceId ?? ('product:' + (line.productKey ?? '')),
           variant: line.variant || undefined,
           adults: line.adults,
           kids: line.kids,
@@ -567,6 +571,7 @@ export class StaffBookingsService {
         })),
       },
       priceRows,
+      products,
     );
 
     booking.entryAmount = priced.entry;
@@ -604,6 +609,7 @@ export class StaffBookingsService {
           experienceId: line.experienceId,
           variant: line.variant,
           label: line.label,
+          productKey: line.productKey,
           sessionTime: line.time,
           adults: line.adults,
           kids: line.kids,
@@ -874,6 +880,7 @@ function toBookingDetail(
     reminderSentAt: booking.reminderSentAt ? toIso(booking.reminderSentAt) : null,
     lines: lines.map((l) => ({
       experienceId: l.experienceId,
+      productKey: l.productKey ?? null,
       variant: l.variant || '',
       label: l.label,
       adults: l.adults,

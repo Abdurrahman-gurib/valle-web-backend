@@ -34,6 +34,7 @@ export {
 export { Quote } from './quote.entity';
 export { Payment } from './payment.entity';
 export { SlotHold } from './slot-hold.entity';
+export { Product, PRODUCT_PREFIX, isProductId, productKeyOf, productAmount } from './product.entity';
 export { StaffUser } from './staff-user.entity';
 export { ChatConversation } from './chat-conversation.entity';
 export { ChatMessage } from './chat-message.entity';

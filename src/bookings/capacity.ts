@@ -187,6 +187,7 @@ export async function reservePlaces(manager: EntityManager, req: PlacesRequest, 
   if (taken + req.adults + req.kids > cal.slotCapacity) throw new ConflictException(SLOT_FULL_MESSAGE);
 
   for (const item of req.items) {
+    if (item.id.startsWith('product:')) continue; // packages, combos, VIP, photo, cinematic: no per-activity limit
     const info = experiences.get(item.id);
     const name = info?.name ?? item.id;
     const perPerson = info?.priceMode !== 'flat';

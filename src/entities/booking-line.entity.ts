@@ -31,6 +31,10 @@ export class BookingLine {
   @Column({ name: 'amount', type: 'int' })
   amount: number;
 
+  /** A bookable product (package, combo, VIP, photo, cinematic) instead of an experience; see products table. */
+  @Column({ name: 'product_key', type: 'text', nullable: true })
+  productKey: string | null;
+
   /** Start time ("10:30") of the session booked, for experiences that run in sessions. */
   @Column({ name: 'session_time', type: 'text', nullable: true })
   sessionTime: string | null;

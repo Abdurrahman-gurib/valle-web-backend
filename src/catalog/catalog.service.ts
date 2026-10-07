@@ -26,6 +26,7 @@ import {
   TeamPack,
   TeamPackItem,
   VipItem,
+  Product,
 } from '../entities';
 import {
   ActivityDto,
@@ -35,6 +36,7 @@ import {
   PackTierDto,
   PinDto,
   RestaurantDto,
+  ProductDto,
 } from './catalog.types';
 
 /** Seed order of the categories record. */
@@ -232,9 +234,16 @@ export class CatalogService {
       };
     }
 
+    // ---- PRODUCTS (what the booking engine can charge besides experiences)
+    const products = await ds.getRepository(Product).find({ where: { active: true }, order: { sortOrder: 'ASC' } });
+    const PRODUCTS: ProductDto[] = products.map((p) => ({
+      key: p.key, family: p.family, name: p.name, mode: p.mode, rr: p.priceRr, nr: p.priceNr, dblRr: p.dblRr, dblNr: p.dblNr, rateOnly: p.rateOnly, image: p.image, note: p.note,
+    }));
+
     // ---- PACKS
     const tierItemsByTier = this.groupBy(packageTierItems, (i) => i.tierId);
     const mapTier = (t: PackageTier): PackTierDto => ({
+      key: 'pkg:' + t.family + ':' + t.sortOrder,
       name: t.name,
       ...(t.badge != null ? { badge: t.badge } : {}),
       color: t.color,
@@ -293,6 +302,7 @@ export class CatalogService {
     // ---- COMBO
     const comboItemsByCombo = this.groupBy(comboItems, (i) => i.comboId);
     const COMBO: CatalogDto['COMBO'] = combos.map((c) => ({
+      key: 'combo:' + c.sortOrder,
       name: c.name,
       color: c.color,
       items: (comboItemsByCombo.get(c.id) ?? []).map((i) => ({ t: i.text })),
@@ -302,6 +312,7 @@ export class CatalogService {
 
     // ---- CINE
     const CINE: CatalogDto['CINE'] = cinematicItems.map((c) => ({
+      key: 'cine:' + c.sortOrder,
       n: c.name,
       p: c.price,
     }));
@@ -323,6 +334,7 @@ export class CatalogService {
 
     // ---- PHOTO
     const mapPhotoTier = (t: PhotoTier) => ({
+      key: 'photo:' + t.rate + ':' + t.sortOrder,
       name: t.name,
       color: t.color,
       act: t.activitiesLabel,
@@ -359,6 +371,7 @@ export class CatalogService {
       ACTS,
       PINS,
       RESTOS,
+      PRODUCTS,
       PACKS,
       GAL,
       COMBO,

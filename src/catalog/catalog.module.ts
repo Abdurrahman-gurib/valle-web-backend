@@ -25,6 +25,7 @@ import {
   TeamPack,
   TeamPackItem,
   VipItem,
+  Product,
 } from '../entities';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
@@ -56,6 +57,7 @@ import { CatalogService } from './catalog.service';
       TeamPackItem,
       HeroSlide,
       Setting,
+      Product,
     ]),
   ],
   controllers: [CatalogController],
