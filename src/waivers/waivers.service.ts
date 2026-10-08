@@ -1,6 +1,6 @@
 import { ConflictException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { Booking, BookingAudit, BookingLine, Experience, Setting, Waiver } from '../entities';
 import type { StaffPrincipal } from '../staff/auth/staff-auth.types';
 import { TicketService } from '../tickets/ticket.service';
@@ -63,6 +63,8 @@ export interface GateWaiver {
   lang: string;
   signedAt: string;
   flags: WaiverFlag[];
+  /** How many times this participant signed; earlier versions are in `history`. */
+  version: number;
 }
 
 export interface GateView {
@@ -88,6 +90,8 @@ export interface GateView {
   missing: number;
   stops: number;
   waivers: GateWaiver[];
+  /** Superseded signatures, newest first: a participant signed again. */
+  history: { id: string; participantName: string; version: number; signedAt: string; supersededAt: string }[];
   waiverUrl: string;
 }
 
@@ -145,7 +149,7 @@ export class WaiversService {
   async publicView(refCode: string, token: string | undefined): Promise<WaiverPublicView> {
     const b = await this.tickets.requireBooking(refCode, token);
     const [waivers, activities] = await Promise.all([
-      this.waiverRepo.find({ where: { bookingId: b.id }, order: { signedAt: 'ASC' } }),
+      this.waiverRepo.find({ where: { bookingId: b.id, supersededAt: IsNull() }, order: { signedAt: 'ASC' } }),
       this.activitiesFor(b.id),
     ]);
     return {
@@ -178,15 +182,18 @@ export class WaiversService {
       .createQueryBuilder('w')
       .where('w.booking_id = :id', { id: b.id })
       .andWhere('lower(w.participant_name) = lower(:name)', { name })
+      .andWhere('w.superseded_at IS NULL')
       .getOne();
     if (!existing) {
-      const count = await this.waiverRepo.count({ where: { bookingId: b.id } });
+      const count = await this.waiverRepo.count({ where: { bookingId: b.id, supersededAt: IsNull() } });
       if (count >= (await this.required(b))) {
         throw new ConflictException('Everyone in this booking has already signed. To correct a waiver, sign again under the same name.');
       }
     }
+    // Signing again keeps the old version: it is superseded, never overwritten.
+    if (existing) await this.waiverRepo.update({ id: existing.id }, { supersededAt: new Date() });
     const row = this.waiverRepo.create({
-      ...(existing ? { id: existing.id } : {}),
+      version: existing ? existing.version + 1 : 1,
       bookingId: b.id,
       participantName: name,
       groupParticipants: b.groupKind ? (dto.groupParticipants ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 400) : null,
@@ -221,7 +228,7 @@ export class WaiversService {
 
   /** Signed / required for a booking (ticket page, back office list). */
   async counts(b: Booking): Promise<{ signed: number; required: number }> {
-    return { signed: await this.waiverRepo.count({ where: { bookingId: b.id } }), required: await this.required(b) };
+    return { signed: await this.waiverRepo.count({ where: { bookingId: b.id, supersededAt: IsNull() } }), required: await this.required(b) };
   }
 
   /** A signed waiver of this booking, for the PDF copy (guest with token, or staff). */
@@ -259,7 +266,7 @@ export class WaiversService {
     const visit = dateStr(b.visitDate);
     const [lines, waivers, activities] = await Promise.all([
       this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } }),
-      this.waiverRepo.find({ where: { bookingId: b.id }, order: { signedAt: 'ASC' } }),
+      this.waiverRepo.find({ where: { bookingId: b.id, supersededAt: IsNull() }, order: { signedAt: 'ASC' } }),
       this.activitiesFor(b.id),
     ]);
     const rows: GateWaiver[] = waivers.map((w) => ({
@@ -286,7 +293,10 @@ export class WaiversService {
       lang: w.lang,
       signedAt: w.signedAt.toISOString(),
       flags: flagsFor({ birthDate: dateStr(w.birthDate), heightCm: w.heightCm, weightKg: w.weightKg }, visit, activities),
+      version: w.version ?? 1,
     }));
+    const old = await this.waiverRepo.find({ where: { bookingId: b.id, supersededAt: Not(IsNull()) }, order: { supersededAt: 'DESC' } });
+    const history = old.map((w) => ({ id: w.id, participantName: w.participantName, version: w.version ?? 1, signedAt: w.signedAt.toISOString(), supersededAt: w.supersededAt!.toISOString() }));
     const required = await this.required(b);
     return {
       refCode: b.refCode,
@@ -311,6 +321,7 @@ export class WaiversService {
       missing: Math.max(0, required - rows.length),
       stops: rows.reduce((n, w) => n + w.flags.filter((f) => f.level === 'stop').length, 0),
       waivers: rows,
+      history,
       waiverUrl: this.tickets.waiverUrl(b.refCode),
     };
   }
@@ -319,7 +330,7 @@ export class WaiversService {
   async gateDay(date: string): Promise<GateDayRow[]> {
     const rows = await this.bookingRepo
       .createQueryBuilder('b')
-      .leftJoin(Waiver, 'w', 'w.booking_id = b.id')
+      .leftJoin(Waiver, 'w', 'w.booking_id = b.id AND w.superseded_at IS NULL')
       .select(['b.ref_code AS "refCode"', 'b.guest_name AS "guestName"', 'b.slot AS slot', 'b.adults + b.kids AS party', 'b.status AS status', 'b.total - b.paid_amount AS balance', 'COUNT(w.id)::int AS signed'])
       .where('b.visit_date = :date', { date })
       .andWhere('b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] })

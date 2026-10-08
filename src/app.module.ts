@@ -23,6 +23,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { WeatherModule } from './weather/weather.module';
+import { PhotosModule } from './photos/photos.module';
 import { StaffAuthModule } from './staff/auth/staff-auth.module';
 import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
 
@@ -55,6 +56,7 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     PaymentsModule,
     ReservationsModule,
     WeatherModule,
+    PhotosModule,
     BookingsModule,
     QuotesModule,
     HealthModule,

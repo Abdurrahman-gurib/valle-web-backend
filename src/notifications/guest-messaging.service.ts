@@ -5,6 +5,9 @@ import { IsNull, Repository } from 'typeorm';
 import { Booking, BookingLine } from '../entities';
 import { TicketService } from '../tickets/ticket.service';
 import { ParkStatusService } from '../weather/park-status.service';
+import { Waiver } from '../entities/waiver.entity';
+import { Setting } from '../entities/setting.entity';
+import { parseWaiverActivities, waiverRequiredCount } from '../waivers/waiver-rules';
 import { MailService } from './mail.service';
 import { WhatsAppService, type BookingMessage } from './whatsapp.service';
 
@@ -46,6 +49,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(BookingLine) private readonly lineRepo: Repository<BookingLine>,
     config: ConfigService,
     @Optional() private readonly parkStatus?: ParkStatusService,
+    @Optional() @InjectRepository(Waiver) private readonly waiverRepo?: Repository<Waiver>,
+    @Optional() @InjectRepository(Setting) private readonly settingRepo?: Repository<Setting>,
   ) {
     this.remindersOn = (config.get<string>('GUEST_REMINDERS') ?? '1') !== '0';
   }
@@ -118,7 +123,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       `${party(b)} · ${this.payLine(b)}`,
       ``,
       `Your ticket with QR code: ${this.tickets.ticketUrl(b.refCode)}`,
-      `Skip the paper at the gate: sign the safety waiver for everyone in your party now: ${this.tickets.waiverUrl(b.refCode)}`,
+      `Sign the safety waiver for everyone in your party ${this.waiverDeadline(b)} and skip the paperwork at the gate: ${this.tickets.waiverUrl(b.refCode)}`,
       `Show it at the gate. Directions: ${MAPS}`,
       `Questions? Reply here or call ${PARK_PHONE}.`,
     ].join('\n');
@@ -147,7 +152,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       ``,
       `Your ticket: ${url}`,
       ``,
-      `Sign the safety waiver before you arrive (one per person, 2 minutes on your phone, it saves queuing at the gate): ${waiver}`,
+      `Sign the safety waiver ${this.waiverDeadline(b)} (one per person, 2 minutes on your phone, it saves queuing at the gate): ${waiver}`,
       ``,
       `Getting here: ${PARK_ADDRESS}. ${MAPS}`,
       `Bring closed shoes, sunscreen, water and a change of clothes for the waterfalls. Zipline, quad and buggy have age, height and weight limits.`,
@@ -181,8 +186,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     <p style="text-align:center;margin:22px 0 6px"><a href="${url}" style="background:#FF3358;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:999px;display:inline-block">Open my ticket</a></p>
     <p style="text-align:center;margin:0;font-size:12px;color:#7A6A93">Save it to your phone, or add it to WhatsApp from the ticket page.</p>
     <div style="margin:20px 0 0;background:#FFFDE0;border:1.5px solid #FFE94D;border-radius:14px;padding:16px 18px">
-      <p style="margin:0 0 6px;font-size:14px;font-weight:800">Skip the queue: sign your waivers now</p>
-      <p style="margin:0 0 12px;font-size:13px;line-height:1.5">Ziplines, quads and buggies need a signed safety waiver for every participant. Fill it in on your phone before you arrive, one per person, and walk straight past the paperwork at the gate.</p>
+      <p style="margin:0 0 6px;font-size:14px;font-weight:800">Sign your waivers ${esc(this.waiverDeadline(b))}</p>
+      <p style="margin:0 0 12px;font-size:13px;line-height:1.5">Ziplines, quads and buggies need a signed safety waiver for every participant. Fill it in on your phone, one per person, and walk straight past the paperwork at the gate. Unsigned on the day means filling it in at the desk before the briefing.</p>
       <a href="${waiver}" style="background:#340057;color:#FFFFFF;text-decoration:none;font-weight:700;padding:10px 20px;border-radius:999px;display:inline-block;font-size:14px">Sign the waivers</a>
     </div>
     <hr style="border:0;border-top:1px dashed #D9CCF2;margin:20px 0">
@@ -214,7 +219,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   waiverLinkText(b: Booking): string {
     return [
       `Hi ${b.guestName.split(' ')[0] || b.guestName}, one thing before your visit to VALLÉ Advenature™ Park on ${longDate(dateStr(b.visitDate))}:`,
-      `each participant needs a signed safety waiver (Disclaimer Form). Sign it on your phone now, one per person, and skip the paperwork at the gate:`,
+      `each participant needs a signed safety waiver (Disclaimer Form). Sign it on your phone ${this.waiverDeadline(b)}, one per person, and skip the paperwork at the gate:`,
       this.tickets.waiverUrl(b.refCode),
       ``,
       `Booking ${b.refCode} · questions? Reply here or call ${PARK_PHONE}.`,
@@ -222,8 +227,9 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Staff re-sends the waiver link: e-mail always, WhatsApp when the 24-hour window allows a plain message. */
-  async sendWaiverLink(b: Booking): Promise<{ email: boolean; whatsapp: boolean }> {
+  async sendWaiverLink(b: Booking, waivers?: { signed: number; required: number }): Promise<{ email: boolean; whatsapp: boolean }> {
     const text = this.waiverLinkText(b);
+    const left = waivers && waivers.required > 0 ? `${waivers.required - waivers.signed} of ${waivers.required} still to sign · ` : '';
     const url = this.tickets.waiverUrl(b.refCode);
     const html = `<!doctype html><html><body style="margin:0;background:#F7F3FF;font-family:Arial,Helvetica,sans-serif;color:#340057">
 <div style="max-width:560px;margin:0 auto;padding:24px 16px">
@@ -234,7 +240,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   <div style="height:8px;background:repeating-linear-gradient(-45deg,#33FF74 0 12px,#340057 12px 24px)"></div>
   <div style="background:#FFFFFF;padding:24px;border-radius:0 0 18px 18px;font-size:15px;line-height:1.5">
     <p style="margin:0 0 12px">Hi ${esc(b.guestName)}, one thing before your visit on <strong>${esc(longDate(dateStr(b.visitDate)))}</strong>:</p>
-    <p style="margin:0 0 18px">Each participant needs a signed safety waiver (Disclaimer Form). Fill it in on your phone now, one per person, and walk straight past the paperwork at the gate.</p>
+    <p style="margin:0 0 18px">${esc(left)}Each participant needs a signed safety waiver (Disclaimer Form). Fill it in on your phone ${esc(this.waiverDeadline(b))}, one per person, and walk straight past the paperwork at the gate.</p>
     <p style="text-align:center;margin:0 0 18px"><a href="${url}" style="background:#FF3358;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:999px;display:inline-block">Sign the waivers</a></p>
     <p style="margin:0;font-size:12px;color:#7A6A93;word-break:break-all">${esc(url)}</p>
   </div>
@@ -250,8 +256,37 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
 
   // ---------------------------------------------------------------- reminder
 
-  /** `statusLine` is the desk's park notice of the moment (open / partly open / closed), when there is one. */
-  reminderText(b: Booking, statusLine = ''): string {
+  /**
+   * The waiver deadline as guests read it: the evening before the visit, or
+   * "before you arrive" when the visit is tomorrow or today.
+   */
+  waiverDeadline(b: Booking): string {
+    const visit = dateStr(b.visitDate);
+    const eve = addDays(visit, -1);
+    return eve > parkToday() ? `by ${longDate(eve)} evening` : 'before you arrive';
+  }
+
+  /** Signed / required waivers of a booking, 0/0 when the booking needs none. */
+  async waiverStatus(b: Booking): Promise<{ signed: number; required: number }> {
+    if (!this.waiverRepo || !this.settingRepo) return { signed: 0, required: 0 };
+    const [signed, lines, setting] = await Promise.all([
+      this.waiverRepo.count({ where: { bookingId: b.id, supersededAt: IsNull() } }),
+      this.lineRepo.find({ where: { bookingId: b.id } }),
+      this.settingRepo.findOne({ where: { key: 'waiver_activities' } }),
+    ]);
+    return { signed, required: waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b) };
+  }
+
+  /**
+   * `statusLine` is the desk's park notice of the moment (open / partly open / closed), when there is one;
+   * `waivers` what is signed so far (the line changes from a nudge to a tick).
+   */
+  reminderText(b: Booking, statusLine = '', waivers?: { signed: number; required: number }): string {
+    const waiverLine = !waivers || waivers.required === 0
+      ? `Waivers: sign them tonight and skip the queue at the gate: ${this.tickets.waiverUrl(b.refCode)}`
+      : waivers.signed >= waivers.required
+        ? `Waivers: all ${waivers.required} signed, thank you. Straight to the briefing tomorrow.`
+        : `⚠️ Waivers: ${waivers.required - waivers.signed} of ${waivers.required} still unsigned. Sign tonight (2 minutes each) or fill them in at the desk before the briefing: ${this.tickets.waiverUrl(b.refCode)}`;
     return [
       `See you tomorrow at VALLÉ Advenature™ Park, ${b.guestName.split(' ')[0]}! 🌴`,
       `${longDate(dateStr(b.visitDate))} · ${slotLabel(b.slot)} · ${party(b)}`,
@@ -259,21 +294,61 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       (b.paidAmount ?? 0) >= b.total ? 'Already paid.' : `${this.payLine(b)} (cash or card).`,
       ``,
       `Your ticket: ${this.tickets.ticketUrl(b.refCode)}`,
-      `Waivers: sign them tonight and skip the queue at the gate: ${this.tickets.waiverUrl(b.refCode)}`,
+      waiverLine,
       `Directions: ${MAPS}`,
       `Bring closed shoes, sunscreen and water. Reply here or call ${PARK_PHONE} if anything changes.`,
     ].join('\n');
   }
 
   async sendReminder(b: Booking): Promise<boolean> {
-    const statusLine = await this.parkStatus?.line().catch(() => '') ?? '';
-    const text = this.reminderText(b, statusLine);
+    const [statusLine, waivers] = await Promise.all([
+      this.parkStatus?.line().catch(() => '') ?? Promise.resolve(''),
+      this.waiverStatus(b).catch(() => ({ signed: 0, required: 0 })),
+    ]);
+    const text = this.reminderText(b, statusLine, waivers);
     const [email, wa] = await Promise.all([
       b.email ? this.mail.send({ to: b.email, subject: `Tomorrow at VALLÉ · ${b.refCode}`, text }) : Promise.resolve(false),
       b.phone ? this.whatsapp.sendBooking('reminder', b.phone, this.reminderWhatsApp(b)) : Promise.resolve(false),
     ]);
     if (email || wa) await this.bookingRepo.update({ id: b.id }, { reminderSentAt: new Date() });
+    // Unsigned the evening before: the waiver mail with its button goes too, once.
+    if (waivers.required > waivers.signed && !b.waiverReminderSentAt) {
+      const nudged = await this.sendWaiverLink(b, waivers).catch(() => ({ email: false, whatsapp: false }));
+      if (nudged.email || nudged.whatsapp) await this.bookingRepo.update({ id: b.id }, { waiverReminderSentAt: new Date() });
+    }
     return email || wa;
+  }
+
+  /** "Your photos are ready": the ticket page now carries the visit photos. */
+  async sendPhotosReady(b: Booking, count: number): Promise<{ email: boolean; whatsapp: boolean }> {
+    const url = this.tickets.ticketUrl(b.refCode) + '#photos';
+    const first = b.guestName.split(' ')[0] || b.guestName;
+    const text = [
+      `Hi ${first}, your photos from VALLÉ Advenature™ Park are ready! 📸`,
+      `${count} photo${count === 1 ? '' : 's'} from ${longDate(dateStr(b.visitDate))} are waiting on your ticket page, yours to download and keep:`,
+      url,
+      ``,
+      `Booking ${b.refCode} · questions? Reply here or call ${PARK_PHONE}.`,
+    ].join('\n');
+    const html = `<!doctype html><html><body style="margin:0;background:#F7F3FF;font-family:Arial,Helvetica,sans-serif;color:#340057">
+<div style="max-width:560px;margin:0 auto;padding:24px 16px">
+  <div style="background:#340057;color:#FFFFFF;border-radius:18px 18px 0 0;padding:22px 24px">
+    <div style="font-size:11px;letter-spacing:.16em;opacity:.7">VALLÉ ADVENATURE™ PARK</div>
+    <div style="font-size:24px;font-weight:900;font-style:italic;margin-top:6px">Your photos are ready</div>
+  </div>
+  <div style="height:8px;background:repeating-linear-gradient(-45deg,#33FF74 0 12px,#340057 12px 24px)"></div>
+  <div style="background:#FFFFFF;padding:24px;border-radius:0 0 18px 18px;font-size:15px;line-height:1.5">
+    <p style="margin:0 0 12px">Hi ${esc(first)}, ${count} photo${count === 1 ? '' : 's'} from your visit on <strong>${esc(longDate(dateStr(b.visitDate)))}</strong> are on your ticket page, yours to download and keep.</p>
+    <p style="text-align:center;margin:0 0 18px"><a href="${url}" style="background:#FF3358;color:#FFFFFF;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:999px;display:inline-block">See my photos</a></p>
+    <p style="margin:0;font-size:12px;color:#7A6A93;word-break:break-all">${esc(url)}</p>
+  </div>
+  <p style="text-align:center;font-size:11px;color:#7A6A93;margin:16px 0 0">Booking ${esc(b.refCode)} · ${esc(PARK_PHONE)} · sales@vallepark.com</p>
+</div></body></html>`;
+    const [email, whatsapp] = await Promise.all([
+      b.email ? this.mail.send({ to: b.email, subject: `Your VALLÉ photos are ready · ${b.refCode}`, text, html }) : Promise.resolve(false),
+      b.phone ? this.whatsapp.sendText(b.phone, text) : Promise.resolve(false),
+    ]);
+    return { email, whatsapp };
   }
 
   /** Bookings for tomorrow that have not been reminded yet; runs from 17:00 park time. */

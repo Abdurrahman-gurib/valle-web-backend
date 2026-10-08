@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Header, Put, UseGuards } from '@nestjs/common';
+import { LiveOpsService, LiveOpsView } from './live-ops.service';
 import { ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 import { IsSafeText } from '../common/validation';
 import { CurrentStaff } from '../staff/auth/current-staff.decorator';
 import { Roles, RolesGuard } from '../staff/auth/roles.guard';
@@ -23,10 +24,23 @@ export class ParkStatusDto {
   pausedActivities?: string[];
 }
 
+export class LiveOpsDto {
+  @ApiProperty({ description: 'Per experience id: { waitMin: minutes | null, meetingPoint?, note? }', type: Object })
+  @IsObject()
+  activities: Record<string, { waitMin?: number | null; meetingPoint?: string; note?: string }>;
+}
+
 @ApiTags('weather')
 @Controller()
 export class WeatherController {
-  constructor(private readonly weather: WeatherService, private readonly status: ParkStatusService) {}
+  constructor(private readonly weather: WeatherService, private readonly status: ParkStatusService, private readonly live: LiveOpsService) {}
+
+  @Get('park-live')
+  @ApiOperation({ summary: 'Live per-activity info for the visit day: wait, meeting point, note, paused' })
+  @Header('Cache-Control', 'no-store')
+  parkLive(): Promise<LiveOpsView> {
+    return this.live.get();
+  }
 
   @Get('weather')
   @ApiOperation({ summary: 'Live weather at the park (Open-Meteo): now, next 12 hours, 7 days' })
@@ -48,7 +62,19 @@ export class WeatherController {
 @UseGuards(StaffAuthGuard, RolesGuard)
 @Roles('agent', 'manager')
 export class StaffParkStatusController {
-  constructor(private readonly status: ParkStatusService) {}
+  constructor(private readonly status: ParkStatusService, private readonly live: LiveOpsService) {}
+
+  @Get('live')
+  @Header('Cache-Control', 'no-store')
+  getLive(): Promise<LiveOpsView> {
+    return this.live.get();
+  }
+
+  @Put('live')
+  @ApiOperation({ summary: 'Set the wait, meeting point and note per activity (what the ticket shows on the day)' })
+  setLive(@Body() dto: LiveOpsDto, @CurrentStaff() staff: StaffPrincipal): Promise<LiveOpsView> {
+    return this.live.set(dto.activities ?? {}, staff.email);
+  }
 
   @Get()
   @Header('Cache-Control', 'no-store')

@@ -101,4 +101,12 @@ export class Waiver {
 
   @Column({ name: 'signed_at', type: 'timestamptz', default: () => 'now()' })
   signedAt: Date;
+
+  /** 1 for the first signature under this name, +1 each time the participant signs again. */
+  @Column({ name: 'version', type: 'int', default: 1 })
+  version: number;
+
+  /** Set on the old row when the participant signs again; only rows with null count. */
+  @Column({ name: 'superseded_at', type: 'timestamptz', nullable: true })
+  supersededAt: Date | null;
 }

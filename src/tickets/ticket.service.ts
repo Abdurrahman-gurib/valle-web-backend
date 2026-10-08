@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import QRCode from 'qrcode';
 import { Booking, BookingLine, Setting, Waiver } from '../entities';
 import { parseWaiverActivities, waiverRequiredCount } from '../waivers/waiver-rules';
@@ -119,7 +119,7 @@ export class TicketService {
     const b = await this.requireBooking(refCode, token);
     const [lines, signed, setting] = await Promise.all([
       this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } }),
-      this.waiverRepo.count({ where: { bookingId: b.id } }),
+      this.waiverRepo.count({ where: { bookingId: b.id, supersededAt: IsNull() } }),
       this.settingRepo.findOne({ where: { key: 'waiver_activities' } }),
     ]);
     return this.toView(b, lines, signed, waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b));

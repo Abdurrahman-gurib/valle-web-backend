@@ -53,6 +53,40 @@ describe('GuestMessagingService', () => {
     expect(text.indexOf('⚠️')).toBeLessThan(text.indexOf('pay on arrival'));
   });
 
+  it('the reminder nudges only while waivers are unsigned, and the waiver mail carries a deadline', async () => {
+    const { svc, sendMail, bookingRepo } = build();
+    const unsigned = svc.reminderText(booking as Booking, '', { signed: 1, required: 3 });
+    expect(unsigned).toContain('2 of 3 still unsigned');
+    expect(unsigned).toContain('/waiver/');
+    const signed = svc.reminderText(booking as Booking, '', { signed: 3, required: 3 });
+    expect(signed).toContain('all 3 signed');
+    expect(signed).not.toContain('/waiver/');
+    expect(svc.reminderText(booking as Booking, '', { signed: 0, required: 0 })).toContain('Waivers: sign them tonight');
+    // deadline wording: a far visit names the evening before; tomorrow says before you arrive
+    expect(svc.waiverDeadline({ ...booking, visitDate: '2099-03-10' } as Booking)).toBe('by Monday, 9 March 2099 evening');
+    expect(svc.waiverDeadline({ ...booking, visitDate: '2020-01-01' } as Booking)).toBe('before you arrive');
+    expect(svc.renderTicketEmail({ ...booking, visitDate: '2099-03-10' } as Booking, lines).text).toContain('by Monday, 9 March 2099 evening');
+    // the evening sweep: unsigned → the waiver mail goes too and is stamped once
+    (svc as unknown as { waiverStatus: () => Promise<{ signed: number; required: number }> }).waiverStatus = async () => ({ signed: 0, required: 2 });
+    await svc.sendReminder(booking as Booking);
+    expect(sendMail).toHaveBeenCalledTimes(2);
+    expect(sendMail.mock.calls[1][0].subject).toContain('Sign your safety waivers');
+    expect(bookingRepo.update).toHaveBeenCalledWith({ id: booking.id }, expect.objectContaining({ waiverReminderSentAt: expect.any(Date) }));
+    sendMail.mockClear();
+    await svc.sendReminder({ ...booking, waiverReminderSentAt: new Date() } as Booking);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+  });
+
+  it('"your photos are ready" points at the ticket page', async () => {
+    const { svc, sendMail } = build();
+    const r = await svc.sendPhotosReady(booking as Booking, 12);
+    expect(r.email).toBe(true);
+    const m = sendMail.mock.calls[0][0];
+    expect(m.subject).toContain('photos are ready');
+    expect(m.text).toContain('12 photos');
+    expect(m.text).toContain('/ticket/VAL-1234-26?t=');
+  });
+
   it('says "paid" only for money actually recorded, never because the guest chose pay online', () => {
     const { svc } = build();
     // "pay online" with nothing taken: the guest still owes the total at the gate

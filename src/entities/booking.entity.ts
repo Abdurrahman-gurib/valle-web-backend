@@ -88,6 +88,14 @@ export class Booking {
   @Column({ name: 'reminder_sent_at', type: 'timestamptz', nullable: true })
   reminderSentAt: Date | null;
 
+  /** When the evening-before "your waivers are still unsigned" nudge went out. */
+  @Column({ name: 'waiver_reminder_sent_at', type: 'timestamptz', nullable: true })
+  waiverReminderSentAt: Date | null;
+
+  /** When the desk told the guest their visit photos are on the ticket page. */
+  @Column({ name: 'photos_ready_at', type: 'timestamptz', nullable: true })
+  photosReadyAt: Date | null;
+
   // ---- cashier ----
   /** Rupees collected so far (gate payments and online). */
   @Column({ name: 'paid_amount', type: 'int', default: 0 })

@@ -119,16 +119,21 @@ function build(booking: Record<string, unknown>, existing: Record<string, unknow
   const saved: unknown[] = [];
   const audits: unknown[] = [];
   const waiverRepo = {
-    find: jest.fn(async () => rows.map((r) => ({ signedAt: new Date(), ...r }))),
-    count: jest.fn(async () => rows.length),
+    find: jest.fn(async (q?: { where?: { supersededAt?: unknown } }) => {
+      const f = q?.where?.supersededAt as { _type?: string } | undefined;
+      const wantOld = f?._type === 'not';
+      return rows.filter((r) => (wantOld ? !!r.supersededAt : !r.supersededAt)).map((r) => ({ signedAt: new Date(), ...r }));
+    }),
+    count: jest.fn(async () => rows.filter((r) => !r.supersededAt).length),
+    update: jest.fn(async (where: { id: string }, patch: Record<string, unknown>) => { const r = rows.find((x) => x.id === where.id); if (r) Object.assign(r, patch); return {}; }),
     create: jest.fn((x: unknown) => x),
     save: jest.fn(async (x: Record<string, unknown>) => { saved.push(x); if (!x.id) rows.push({ ...x, id: 'w' + rows.length }); return x; }),
     createQueryBuilder: jest.fn(() => {
       let name = '';
       const qb = {
         where: () => qb,
-        andWhere: (_: string, p: { name: string }) => { name = p.name; return qb; },
-        getOne: async () => rows.find((r) => String(r.participantName).toLowerCase() === name.toLowerCase()) ?? null,
+        andWhere: (_: string, p?: { name: string }) => { if (p?.name) name = p.name; return qb; },
+        getOne: async () => rows.find((r) => String(r.participantName).toLowerCase() === name.toLowerCase() && !r.supersededAt) ?? null,
       };
       return qb;
     }),
@@ -192,9 +197,13 @@ describe('WaiversService.sign', () => {
     const existing = ['A', 'B', 'C'].map((n, i) => ({ id: 'w' + i, participantName: n, isMinor: false }));
     const { svc } = build({}, existing);
     await expect(svc.sign('VAL-1111-26', 't', dto({ participantName: 'D' }), meta)).rejects.toBeInstanceOf(ConflictException);
-    const { svc: again, saved } = build({}, existing);
+    // signing again keeps the old version: the previous row is superseded, the new one is version 2
+    const { svc: again, saved, rows } = build({}, existing.map((e) => ({ ...e, version: 1 })));
     await again.sign('VAL-1111-26', 't', dto({ participantName: 'b' }), meta);
-    expect(saved[0]).toMatchObject({ id: 'w1' });
+    expect(saved[0]).toMatchObject({ participantName: 'b', version: 2 });
+    expect(saved[0]).not.toHaveProperty('id');
+    expect(rows.find((r) => r.id === 'w1')?.supersededAt).toBeInstanceOf(Date);
+    expect(rows.filter((r) => !r.supersededAt)).toHaveLength(3);
   });
 
   it('refuses a past or cancelled booking', async () => {
