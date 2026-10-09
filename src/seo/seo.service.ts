@@ -63,6 +63,7 @@ export class SeoService {
       ...['adventure', 'nature', 'kids', 'tours'].map((c) => ({ path: `/explore?cat=${c}`, lastmod: expMod, changefreq: 'weekly' as const, priority: 0.7 })),
       ...experiences.map((e) => ({ path: `/activities/${e.id}`, lastmod: latest(e.updatedAt, priceMod), changefreq: 'monthly' as const, priority: 0.8 })),
       { path: '/packages', lastmod: latest(tierMod, priceMod), changefreq: 'monthly', priority: 0.9 },
+      ...['exclusive', 'resident', 'senior', 'student', 'corporate', 'photo-video'].map((g) => ({ path: `/packages/${g}`, lastmod: latest(tierMod, priceMod), changefreq: 'monthly' as const, priority: 0.8 })),
       ...restaurants.map((r) => ({ path: `/dine/${r.id}`, lastmod: r.updatedAt, changefreq: 'monthly' as const, priority: 0.7 })),
       { path: '/booking', lastmod: priceMod, changefreq: 'monthly', priority: 0.6 },
       { path: '/story', lastmod: new Date('2026-10-01'), changefreq: 'yearly', priority: 0.7 },
