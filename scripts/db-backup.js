@@ -12,6 +12,10 @@
  *               next to the dump together with its size and SHA-256.
  *   2. RETAIN   the newest 14 nightly dumps; the first dump of each month is
  *               also copied to $BACKUP_DIR/monthly and kept for 12 months.
+ *   2b. OFFSITE  optional: when OFFSITE_S3_* is set, the dump (AES-256-GCM
+ *               encrypted when OFFSITE_ENCRYPTION_KEY is set) and its manifest
+ *               are uploaded to an S3-compatible bucket and copies older than
+ *               OFFSITE_KEEP_DAYS are removed there (scripts/lib/offsite.js).
  *   3. RESTORE  once a month (the first run of the month that has no passed
  *      TEST     test yet), the newest dump is restored into a throwaway
  *               PostgreSQL started inside this container, never into
@@ -27,6 +31,7 @@
  *   node scripts/db-backup.js --restore-test   back up, then test the restore now
  *   node scripts/db-backup.js --test-only      test the newest existing dump
  *   node scripts/db-backup.js --list           what is stored
+ *   node scripts/db-backup.js --decrypt IN OUT decrypt an off-site .enc copy (needs OFFSITE_ENCRYPTION_KEY)
  *
  * Exits non-zero when the backup or a due restore test fails.
  */
@@ -38,18 +43,20 @@ const path = require('node:path');
 const { Client } = require('pg');
 const { clientConfig, connect, describe } = require('./lib/db');
 const plan = require('./lib/backup-plan');
+const offsite = require('./lib/offsite');
 
 const BACKUP_DIR = process.env.BACKUP_DIR || '/backups';
 const NIGHTLY = path.join(BACKUP_DIR, 'nightly');
 const MONTHLY = path.join(BACKUP_DIR, 'monthly');
-const MIGRATION = path.join(__dirname, '..', 'database', 'migrations', '009-backup-runs.sql');
+const MIGRATIONS = ['009-backup-runs.sql', '023-retention-offsite.sql'].map((f) => path.join(__dirname, '..', 'database', 'migrations', f));
 /** Unprivileged account the scratch server runs as when this script is root (PostgreSQL refuses to run as root). */
 const PG_OS_USER = process.env.BACKUP_PG_OS_USER || 'postgres';
 const IS_ROOT = typeof process.getuid === 'function' && process.getuid() === 0;
 
 const args = process.argv.slice(2);
 const known = ['--restore-test', '--test-only', '--list'];
-if (args.some((a) => !known.includes(a))) {
+const decrypting = args[0] === '--decrypt';
+if (!decrypting && args.some((a) => !known.includes(a))) {
   console.error(`db-backup: unknown option ${args.filter((a) => !known.includes(a)).join(', ')}`);
   console.error('Usage: node scripts/db-backup.js [--restore-test | --test-only | --list]');
   process.exit(2);
@@ -122,11 +129,12 @@ async function record(run) {
   let client;
   try {
     client = await connect();
-    await client.query(fs.readFileSync(MIGRATION, 'utf8')); // idempotent; the API deploy applies it too
+    for (const m of MIGRATIONS) await client.query(fs.readFileSync(m, 'utf8')); // idempotent; the API deploy applies them too
     await client.query(
-      `INSERT INTO backup_runs (kind, ok, started_at, file, bytes, sha256, table_count, row_count, detail)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [run.kind, run.ok, run.startedAt, run.file || '', run.bytes || 0, run.sha256 || '', run.tables || 0, run.rows || 0, (run.detail || '').slice(0, 4000)],
+      `INSERT INTO backup_runs (kind, ok, started_at, file, bytes, sha256, table_count, row_count, detail, offsite_status, offsite_detail)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [run.kind, run.ok, run.startedAt, run.file || '', run.bytes || 0, run.sha256 || '', run.tables || 0, run.rows || 0, (run.detail || '').slice(0, 4000),
+        run.offsiteStatus || '', (run.offsiteDetail || '').slice(0, 1000)],
     );
   } catch (e) {
     log(`could not record the run in backup_runs: ${e.message}`);
@@ -199,7 +207,19 @@ async function backup() {
   const tables = Object.keys(manifest.tables).length;
   const rows = Object.values(manifest.tables).reduce((n, v) => n + v, 0);
   log(`backup ok: ${plan.humanBytes(manifest.bytes)}, ${tables} tables, ${rows} rows, sha256 ${manifest.sha256.slice(0, 12)}…`);
-  return { kind: 'backup', ok: true, startedAt, file: name, bytes: manifest.bytes, sha256: manifest.sha256, tables, rows, detail: `PostgreSQL ${manifest.serverVersion}, ${entries} archive entries` };
+  const result = { kind: 'backup', ok: true, startedAt, file: name, bytes: manifest.bytes, sha256: manifest.sha256, tables, rows, detail: `PostgreSQL ${manifest.serverVersion}, ${entries} archive entries` };
+
+  // Off-site copy: optional, and its failure never fails the local backup.
+  if (offsite.offsiteConfig()) {
+    const copy = await offsite.copyOffsite({ dumpName: name, dumpBytes: fs.readFileSync(file), manifestBytes: fs.readFileSync(`${file}.json`) }, { log });
+    result.offsiteStatus = copy.status;
+    result.offsiteDetail = copy.detail;
+    if (copy.status === 'failed') log(`OFF-SITE COPY FAILED: ${copy.detail}`);
+  } else {
+    result.offsiteStatus = 'not_configured';
+    result.offsiteDetail = `missing ${offsite.missingVars().join(', ')}`;
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------- restore test
@@ -306,6 +326,14 @@ function list() {
 
 async function main() {
   if (args.includes('--list')) { list(); return 0; }
+  if (decrypting) {
+    const [, input, output] = args;
+    const key = (process.env.OFFSITE_ENCRYPTION_KEY || '').trim();
+    if (!input || !output || !key) { console.error('Usage: OFFSITE_ENCRYPTION_KEY=... node scripts/db-backup.js --decrypt IN.enc OUT.dump'); return 2; }
+    fs.writeFileSync(output, offsite.decrypt(fs.readFileSync(input), key));
+    log(`decrypted ${input} to ${output}`);
+    return 0;
+  }
   let failed = false;
   const summary = [];
 
@@ -324,6 +352,10 @@ async function main() {
       await notify('VALLÉ database backup FAILED', ['The nightly database backup did not complete.', '', result.detail, '', 'Until it is fixed there is no fresh backup. See Backend/DEPLOYMENT.md, "Backups".']);
     } else {
       summary.push(`Backup: ${result.file}, ${plan.humanBytes(result.bytes)}, ${result.tables} tables, ${result.rows} rows.`);
+      if (result.offsiteStatus === 'uploaded') summary.push(`Off-site copy: ${result.offsiteDetail}.`);
+      if (result.offsiteStatus === 'failed') {
+        await notify('VALLÉ off-site backup copy FAILED', ['The nightly backup succeeded and is stored on the backup volume, but the off-site copy failed.', '', result.offsiteDetail, '', 'See Backend/DEPLOYMENT.md, "Off-site copy".']);
+      }
     }
   }
 

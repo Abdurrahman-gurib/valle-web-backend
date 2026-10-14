@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import type { CookieOptions } from 'express';
 import { Repository } from 'typeorm';
 import { StaffUser } from '../../entities';
+import { normaliseRecoveryCode, openSecret, sha256Hex, verifyTotp } from './totp';
 import { parseCookieHeader } from './cookies';
 import {
   resolveCookieName,
@@ -30,6 +31,17 @@ export interface LoginResult {
   staff: StaffPrincipal;
 }
 
+/** Password accepted but a second factor is required before a session exists. */
+export interface PendingTwoFactor {
+  twoFactorRequired: true;
+  pendingToken: string;
+}
+
+/** How long the client has to type the 6-digit code after the password. */
+export const TWO_FACTOR_PENDING_SECONDS = 5 * 60;
+
+const GENERIC_CODE_FAILURE = 'Invalid or expired code';
+
 @Injectable()
 export class StaffAuthService {
   /** Name of the httpOnly session cookie (`STAFF_COOKIE_NAME`). */
@@ -51,7 +63,7 @@ export class StaffAuthService {
 
   // ------------------------------------------------------------------- login
 
-  async login(email: string, password: string): Promise<LoginResult> {
+  async login(email: string, password: string): Promise<LoginResult | PendingTwoFactor> {
     const user = await this.staffRepo.findOne({
       where: { email: email.trim().toLowerCase() },
     });
@@ -64,19 +76,79 @@ export class StaffAuthService {
       throw new UnauthorizedException(GENERIC_FAILURE);
     }
 
-    await this.staffRepo.update({ id: user.id }, { lastLoginAt: new Date() });
+    if (user.totpEnabled && user.totpSecretEnc) {
+      const pendingToken = await this.jwt.signAsync(
+        { sub: user.id, email: user.email, role: user.role, tv: user.tokenVersion ?? 0, purpose: '2fa' } satisfies StaffJwtPayload,
+        { secret: this.secret, expiresIn: TWO_FACTOR_PENDING_SECONDS },
+      );
+      return { twoFactorRequired: true, pendingToken };
+    }
 
+    return this.issueSession(user);
+  }
+
+  /** Second half of a two-step login: a TOTP code or one recovery code. */
+  async completeTwoFactor(pendingToken: string, code: string): Promise<LoginResult> {
+    const payload = await this.verifyToken(pendingToken);
+    if (!payload?.sub || payload.purpose !== '2fa') {
+      throw new UnauthorizedException('Sign-in expired, enter your password again');
+    }
+    const user = await this.staffRepo.findOne({ where: { id: payload.sub } });
+    if (!user || !user.active || (payload.tv ?? 0) !== (user.tokenVersion ?? 0) || !user.totpEnabled) {
+      throw new UnauthorizedException('Sign-in expired, enter your password again');
+    }
+    if (!(await this.consumeSecondFactor(user, code))) {
+      throw new UnauthorizedException(GENERIC_CODE_FAILURE);
+    }
+    return this.issueSession(user);
+  }
+
+  /**
+   * Accept a current TOTP code (not replayed) or an unused recovery code,
+   * persisting the consumption. Shared with enrolment/disable.
+   */
+  async consumeSecondFactor(user: StaffUser, code: string): Promise<boolean> {
+    const secret = user.totpSecretEnc ? openSecret(user.totpSecretEnc, this.secret) : null;
+    if (secret) {
+      const step = verifyTotp(secret, code);
+      if (step !== null && (user.totpLastStep == null || step > user.totpLastStep)) {
+        user.totpLastStep = step;
+        await this.staffRepo.update({ id: user.id }, { totpLastStep: step });
+        return true;
+      }
+    }
+    const norm = normaliseRecoveryCode(code);
+    if (norm.length >= 10) {
+      const h = sha256Hex(norm);
+      const list = user.recoveryCodeHashes ?? [];
+      if (list.includes(h)) {
+        user.recoveryCodeHashes = list.filter((x) => x !== h);
+        await this.staffRepo.update({ id: user.id }, { recoveryCodeHashes: user.recoveryCodeHashes });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Key material used to seal TOTP secrets (derived from JWT_SECRET). */
+  get sealingSecret(): string {
+    return this.secret;
+  }
+
+  private async issueSession(user: StaffUser): Promise<LoginResult> {
+    await this.staffRepo.update({ id: user.id }, { lastLoginAt: new Date() });
     const staff = this.toPrincipal(user);
-    return { token: await this.signToken(staff), staff };
+    return { token: await this.signToken(staff, user.tokenVersion ?? 0), staff };
   }
 
   // -------------------------------------------------------------------- jwt
 
-  signToken(staff: StaffPrincipal): Promise<string> {
+  signToken(staff: StaffPrincipal, tokenVersion = 0): Promise<string> {
     const payload: StaffJwtPayload = {
       sub: staff.id,
       email: staff.email,
       role: staff.role,
+      tv: tokenVersion,
     };
     return this.jwt.signAsync(payload, {
       secret: this.secret,
@@ -101,9 +173,11 @@ export class StaffAuthService {
    */
   async staffFromToken(token: string): Promise<StaffPrincipal | null> {
     const payload = await this.verifyToken(token);
-    if (!payload?.sub) return null;
+    if (!payload?.sub || payload.purpose) return null;
     const user = await this.staffRepo.findOne({ where: { id: payload.sub } });
     if (!user || !user.active) return null;
+    // Password reset / deactivation bump token_version: older sessions die.
+    if ((payload.tv ?? 0) !== (user.tokenVersion ?? 0)) return null;
     return this.toPrincipal(user);
   }
 

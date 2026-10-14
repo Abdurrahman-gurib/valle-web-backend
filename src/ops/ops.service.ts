@@ -14,6 +14,9 @@ export interface CalendarView extends Calendar {
 export interface BackupRun {
   id: string; kind: 'backup' | 'restore_test'; ok: boolean; startedAt: string; finishedAt: string;
   file: string; bytes: number; tables: number; rows: number; detail: string;
+  /** Off-site copy of a nightly dump: '' for runs before migration 023 and restore tests. */
+  offsiteStatus?: '' | 'not_configured' | 'uploaded' | 'failed';
+  offsiteDetail?: string;
 }
 
 export interface BackupStatus {
@@ -35,11 +38,13 @@ export const RESTORE_TEST_MAX_AGE_DAYS = 35;
 interface Row {
   id: string; kind: 'backup' | 'restore_test'; ok: boolean; started_at: Date; finished_at: Date;
   file: string; bytes: string; table_count: number; row_count: string; detail: string;
+  offsite_status?: string; offsite_detail?: string;
 }
 
 const toRun = (r: Row): BackupRun => ({
   id: String(r.id), kind: r.kind, ok: r.ok, startedAt: new Date(r.started_at).toISOString(), finishedAt: new Date(r.finished_at).toISOString(),
   file: r.file, bytes: Number(r.bytes), tables: Number(r.table_count), rows: Number(r.row_count), detail: r.detail,
+  offsiteStatus: (r.offsite_status ?? '') as BackupRun['offsiteStatus'], offsiteDetail: r.offsite_detail ?? '',
 });
 
 /** Pure: turns the backup log (newest first) into the verdict the back office shows. */
@@ -114,7 +119,7 @@ export class OpsService {
   /** The backup log, newest first, judged against the nightly and monthly expectations. */
   async backups(now = new Date()): Promise<BackupStatus> {
     const rows: Row[] = await this.db.query(
-      `SELECT id, kind, ok, started_at, finished_at, file, bytes, table_count, row_count, detail
+      `SELECT id, kind, ok, started_at, finished_at, file, bytes, table_count, row_count, detail, offsite_status, offsite_detail
          FROM backup_runs ORDER BY finished_at DESC, id DESC LIMIT 120`,
     );
     return backupStatus(rows.map(toRun), now);

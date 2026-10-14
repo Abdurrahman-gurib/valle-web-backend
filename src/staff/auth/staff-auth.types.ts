@@ -18,6 +18,10 @@ export interface StaffJwtPayload {
   sub: string;
   email: string;
   role: StaffRole;
+  /** staff_users.token_version at signing; absent on pre-022 tokens (= 0). */
+  tv?: number;
+  /** Set only on the short-lived "password ok, code needed" token. */
+  purpose?: '2fa';
 }
 
 /** Express request once StaffAuthGuard has run. */

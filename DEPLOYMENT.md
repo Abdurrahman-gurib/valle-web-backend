@@ -115,12 +115,12 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `DB_PASSWORD`       | `${{Postgres.PGPASSWORD}}`               | Keep the reference, never paste the value                              |
 | `DB_NAME`           | `${{Postgres.PGDATABASE}}`               |                                                                       |
 | `DB_SSL`            | `no-verify`                              | TLS on; Railway's Postgres certificate is self-signed                  |
-| `JWT_SECRET`        | 64 random characters                     | Signs operator sessions only; rotating it signs every operator out     |
+| `JWT_SECRET`        | 64 random characters                     | Signs operator sessions only; rotating it signs every operator out. It also seals staff two-step (TOTP) secrets (migration 022): rotating it turns those unreadable, so affected staff sign in with a recovery code, or run `UPDATE staff_users SET totp_enabled=false, totp_secret_enc=NULL, recovery_code_hashes='[]' WHERE email='…'` and they enrol again |
 | `TICKET_SECRET`     | 64 random characters                     | Signs guest ticket, waiver and QR links. Set 2026-10-06 to the then-current `JWT_SECRET` so links already sent keep working. To rotate: copy the old value to `TICKET_SECRET_PREVIOUS` (verifies old links, signs nothing), set a new `TICKET_SECRET`, drop the previous one once old links are no longer needed |
 | `STAFF_COOKIE_NAME` | `valle_staff`                            |                                                                       |
 | `CORS_ORIGIN`       | `https://${{web.RAILWAY_PUBLIC_DOMAIN}}` | Exact https origin(s), comma separated; add a custom domain here too   |
 | `TRUST_PROXY`       | `true`                                   | One hop: the nginx container                                           |
-| `SITE_URL`          | public origin                            | Named in the sitemap and robots.txt (see Search engines below)         |
+| `SITE_URL`          | public origin                            | Named in the sitemap and robots.txt (see Search engines below); also the origin of staff password-reset links (`/staff/reset?token=`) |
 | `SMTP_URL`          | `smtps://resend:<api key>@smtp.resend.com:465` | Set 2026-09-29 (Resend, domain vallepark.com verified). Guest tickets, reminders and the desk alert. Unset = no e-mail; `json` = test transport |
 | (idempotent submit)  | `bookings.idempotency_key` (migration 016) | The booking and group pages send a UUID made once per attempt; a double tap or a retry with the same key gets the booking already written (same reference, same ticket link) instead of a second one. A concurrent twin is caught by the unique index and answered the same way |
 | (restaurant tables)  | `table_reservations` (migration 015)   | Guests ask for a table from a restaurant page (`POST /api/restaurants/:id/reservations`: date, time, party, pre-order from the menu, notes); the desk gets an e-mail and confirms or declines under Quotes & tables in the back office (`/staff/reservations`); the guest is e-mailed at each step |
@@ -138,6 +138,7 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `WA_TICKET_TEMPLATE` / `WA_REMINDER_TEMPLATE` / `WA_TEMPLATE_LANG` | `valle_booking_ticket` / `valle_visit_reminder` / `en` | Optional, defaults shown |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | see notes | Optional fallback when 360dialog is not set: plain-text WhatsApp through Twilio. Neither set = e-mail only, guests can add the ticket to WhatsApp from the ticket page |
 | `GUEST_REMINDERS`   | `1`                                      | Optional. `0` switches off the evening-before reminder sweep          |
+| `RETENTION_JOB`     | `1`                                      | Optional. `0` switches off the daily data-retention job (see "Data retention") |
 | `BOOKING_RATE_LIMIT` | `10`                                     | Optional, default shown. Bookings per IP per 10 minutes; the compose stack raises it for the e2e suite. Leave unset in production |
 | `BOOKING_SLOT_CAPACITY` | `150`                                | Optional, default shown. Guests per arrival slot behind the quiet / busy / very busy / full dots on the booking date picker (35 %, 70 %, 100 %) |
 
@@ -316,14 +317,81 @@ seconds a night. Outside that window start a run from the Railway dashboard
 5. Lift maintenance. Bookings made after the dump was taken are not in it: check
    the confirmation e-mails sent since (Resend dashboard) and re-enter them.
 
-What these backups do not cover: the dumps live in the same Railway project as
-the database. They protect against bad deploys, mistaken deletes and data
-corruption, not against losing the Railway account. For that, copy
-`/backups/monthly` to storage outside Railway from time to time, or add an
-off-site bucket to the script.
+What the volume alone does not cover: those dumps live in the same Railway
+project as the database. They protect against bad deploys, mistaken deletes
+and data corruption, not against losing the Railway account. That is what the
+off-site copy is for.
+
+#### Off-site copy
+
+When the four `OFFSITE_S3_*` variables below are set on `db-backup`, every
+successful nightly dump (and its manifest) is also uploaded to an
+S3-compatible bucket outside Railway (Cloudflare R2, Backblaze B2, AWS S3),
+and copies older than `OFFSITE_KEEP_DAYS` are deleted there. The upload is a
+plain signed HTTPS PUT (AWS Signature V4, `scripts/lib/offsite.js`, no AWS SDK
+in the image). A failed upload never fails the local backup: it is recorded on
+the run (`backup_runs.offsite_status`), shown in the back office as
+"Off-site copy: failed: reason" and e-mailed to `BACKUP_NOTIFY_TO`. With the
+variables unset the job does exactly what it did before and the panel says
+"Off-site copy: not configured".
+
+| Variable (service `db-backup`) | Example | Notes |
+| --- | --- | --- |
+| `OFFSITE_S3_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` | Required to switch on. B2: `https://s3.<region>.backblazeb2.com`; AWS: `https://s3.<region>.amazonaws.com`. Path-style requests |
+| `OFFSITE_S3_BUCKET` | `valle-db-backups` | Required. A private bucket used only for this |
+| `OFFSITE_S3_ACCESS_KEY_ID` | from the provider | Required. A key limited to that bucket (object read and write) |
+| `OFFSITE_S3_SECRET_ACCESS_KEY` | from the provider | Required. Secret: only in Railway variables, never in Git or logs |
+| `OFFSITE_S3_REGION` | `auto` | Optional, default `auto` (R2). B2 / AWS: the bucket's region, e.g. `eu-central-003`, `eu-west-1` |
+| `OFFSITE_KEEP_DAYS` | `30` | Optional, default `30`. Copies older than this (by the time in their name) are deleted from the bucket after each upload |
+| `OFFSITE_PREFIX` | `valle-db/` | Optional, default shown. Folder inside the bucket; only `valle-YYYYMMDD-HHMMSS.dump*` names there are ever pruned |
+| `OFFSITE_ENCRYPTION_KEY` | a long random passphrase (`openssl rand -base64 32`) | Optional but recommended. The dump is encrypted with AES-256-GCM before upload (`.dump.enc`). Keep a copy of this key OUTSIDE Railway (password manager): without it the off-site copies cannot be read |
+
+Free Cloudflare R2 bucket (10 GB free, no egress fees):
+
+1. Cloudflare dashboard → *R2 Object Storage* → enable R2 (a card is asked for
+   but the free tier is not charged) → *Create bucket*, e.g. `valle-db-backups`,
+   location automatic. Leave public access off.
+2. *R2* → *Manage API tokens* → *Create API token*: permission *Object Read &
+   Write*, applied to that bucket only. Copy the *Access Key ID*, the *Secret
+   Access Key* and the S3 endpoint `https://<account-id>.r2.cloudflarestorage.com`
+   (shown once).
+3. On Railway service `db-backup` set `OFFSITE_S3_ENDPOINT`, `OFFSITE_S3_BUCKET`,
+   `OFFSITE_S3_ACCESS_KEY_ID`, `OFFSITE_S3_SECRET_ACCESS_KEY`,
+   `OFFSITE_ENCRYPTION_KEY` (region stays `auto`). If you manage variables with
+   `railway config apply`, declare them in `.railway/railway.ts` too or the apply
+   deletes them.
+4. *Run now* on `db-backup`; the log says `off-site copy uploaded: ...` and the
+   back office shows "Off-site copy: uploaded".
+
+Restoring from an off-site copy: download the `.dump.enc` from the bucket, then
+`OFFSITE_ENCRYPTION_KEY=... node scripts/db-backup.js --decrypt valle-....dump.enc valle-....dump`
+and continue with `pg_restore` as above.
 
 The major version in `Dockerfile.backup` (`postgres:18-alpine`) must stay at or
 above the production server's: `pg_dump` refuses to dump a newer server.
+
+### Data retention
+
+The API runs a daily retention job (`src/ops/retention.service.ts`, checked
+hourly, runs when no run finished in the last 20 hours) that keeps the promise
+in the privacy policy. Periods live in the `retention` settings row and are
+edited by managers through `PUT /api/staff/ops/retention` within safe bounds.
+
+| Data | Default | What happens |
+| --- | --- | --- |
+| Chat conversations, messages, attachments | 12 months after the last message | deleted (messages and attachments cascade) |
+| Quote requests | 24 months after they came in | deleted |
+| Table reservations | 24 months after the reserved date | deleted |
+| Job applications (CV links) | 12 months after the decision (rejected / hired) or the vacancy closing | deleted |
+| Booking visit photos | 12 months after the visit | deleted |
+| Booking drafts, slot holds | once expired | deleted |
+| Bookings and waivers | 7 years after the visit (minimum 7) | ANONYMISED, never deleted: guest name `Removed`, e-mail, phone, address, ID number, medical notes, signature, emergency contact, participants, IP cleared; birth date reduced to the year; audit diffs and payment payloads cleared. Amounts, dates, lines and receipt numbers stay for the books |
+
+Each run deletes in batches of 500, one transaction per batch, and writes a
+`retention_runs` row with the counts (also logged). `GET /api/staff/ops/retention`
+shows the policy and the last runs; `POST /api/staff/ops/retention/preview` counts
+what the next run would touch without changing anything. `RETENTION_JOB=0` on
+`api` switches the job off.
 
 ## Day-two operations
 

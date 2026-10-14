@@ -38,6 +38,7 @@ export { Product, PRODUCT_PREFIX, isProductId, productKeyOf, productAmount } fro
 export { TableReservation } from './table-reservation.entity';
 export { BookingDraft } from './booking-draft.entity';
 export { StaffUser } from './staff-user.entity';
+export { StaffPasswordReset } from './staff-password-reset.entity';
 export { ChatConversation } from './chat-conversation.entity';
 export { ChatMessage } from './chat-message.entity';
 export { ChatAttachment } from './chat-attachment.entity';
