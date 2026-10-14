@@ -42,21 +42,10 @@ interface Rule {
  * them, and the books need them): their personal fields are cleared instead.
  * There is no password-reset token table yet; add a rule here when there is.
  */
+// Business decision (2026-10-14): chats, quote requests, table requests, job
+// applications and visit photos are KEPT, never deleted. Only expired technical
+// records (unfinished booking drafts, temporary slot holds) are cleared.
 export const RULES: Rule[] = [
-  { key: 'chatConversations', table: 'chat_conversations', where: 't.last_message_at < $1', param: (c) => c.chatBefore },
-  { key: 'quotes', table: 'quotes', where: 't.created_at < $1', param: (c) => c.quoteBefore },
-  { key: 'tableReservations', table: 'table_reservations', where: 't.visit_date < $1::date', param: (c) => c.tableReservationBefore },
-  {
-    key: 'jobApplications', table: 'job_applications',
-    where: `t.updated_at < $1 AND (t.status IN ('rejected','hired')
-             OR EXISTS (SELECT 1 FROM job_vacancies v WHERE v.id = t.vacancy_id AND v.status = 'closed'))`,
-    param: (c) => c.applicationBefore,
-  },
-  {
-    key: 'bookingPhotos', table: 'booking_photos',
-    where: 'EXISTS (SELECT 1 FROM bookings b WHERE b.id = t.booking_id AND b.visit_date < $1::date)',
-    param: (c) => c.photoVisitBefore,
-  },
   { key: 'bookingDrafts', table: 'booking_drafts', where: 't.expires_at < $1', param: (c) => c.expiredBefore },
   { key: 'slotHolds', table: 'slot_holds', where: 't.expires_at < $1', param: (c) => c.expiredBefore },
 ];
@@ -239,7 +228,6 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     );
     await m.query("UPDATE booking_audit SET changes = '{}'::jsonb WHERE booking_id = ANY($1::uuid[])", [ids]);
     await m.query('UPDATE payments SET raw = NULL WHERE booking_id = ANY($1::uuid[])', [ids]);
-    await m.query('DELETE FROM booking_photos WHERE booking_id = ANY($1::uuid[])', [ids]);
     return ids.length;
   }
 }

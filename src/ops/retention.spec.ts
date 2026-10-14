@@ -73,22 +73,24 @@ describe('RetentionService dry run', () => {
     });
     const r = await svc.preview(at('2026-10-14T08:00:00Z'));
     expect(r.counts).toEqual({
-      chatConversations: 4, quotes: 2, tableReservations: 1, jobApplications: 3,
-      bookingPhotos: 9, bookingDrafts: 5, slotHolds: 7, bookingsAnonymised: 11,
+      // chats, quotes, table requests, applications and photos are kept: never counted for deletion
+      chatConversations: 0, quotes: 0, tableReservations: 0, jobApplications: 0,
+      bookingPhotos: 0, bookingDrafts: 5, slotHolds: 7, bookingsAnonymised: 11,
     });
     expect(queries.every((q) => /^SELECT count/.test(q.sql))).toBe(true);
     expect(db.transaction).not.toHaveBeenCalled();
     // the cut-offs are passed as parameters, never interpolated
-    const chat = queries.find((q) => q.sql.includes('chat_conversations'))!;
-    expect((chat.params![0] as Date).toISOString()).toBe('2025-10-14T08:00:00.000Z');
+    const drafts = queries.find((q) => q.sql.includes('booking_drafts'))!;
+    expect(drafts.params![0]).toBeInstanceOf(Date);
     expect(queries.find((q) => q.sql.includes('FROM bookings t'))!.params).toEqual(['2019-10-14']);
   });
 
-  it('uses the stored periods', async () => {
+  it('never touches chats, quotes, table requests, applications or photos', async () => {
     const { svc, queries } = makeService({ setting: JSON.stringify({ chatMonths: 3 }) });
     await svc.preview(at('2026-10-14T08:00:00Z'));
-    const chat = queries.find((q) => q.sql.includes('chat_conversations'))!;
-    expect((chat.params![0] as Date).toISOString()).toBe('2026-07-14T08:00:00.000Z');
+    for (const table of ['chat_conversations', 'quotes', 'table_reservations', 'job_applications', 'booking_photos']) {
+      expect(queries.some((q) => q.sql.includes(table))).toBe(false);
+    }
   });
 
   it('refuses to save a period below its floor', async () => {
@@ -99,21 +101,21 @@ describe('RetentionService dry run', () => {
 });
 
 describe('RetentionService run', () => {
-  it('deletes in batched transactions until a short batch, then logs a summary row', async () => {
+  it('deletes expired drafts in batched transactions until a short batch, then logs a summary row', async () => {
     const { svc, db } = makeService();
-    let chatCalls = 0;
+    let calls = 0;
     db.transaction.mockImplementation(async (fn: (m: unknown) => unknown) => fn({
       query: async (sql: string) => {
-        if (sql.includes('DELETE FROM chat_conversations')) { chatCalls++; return [{ n: chatCalls === 1 ? RETENTION_BATCH : 3 }]; }
+        if (sql.includes('DELETE FROM booking_drafts')) { calls++; return [{ n: calls === 1 ? RETENTION_BATCH : 3 }]; }
+        if (sql.includes('DELETE FROM chat_conversations')) throw new Error('chats must never be deleted');
         return sql.includes('DELETE') ? [{ n: 0 }] : [];
       },
     }));
     const counts = await svc.run('manual', at('2026-10-14T08:00:00Z'));
-    expect(counts.chatConversations).toBe(RETENTION_BATCH + 3);
-    expect(chatCalls).toBe(2);
-    expect(db.transaction).toHaveBeenCalledTimes(RULES.length + 1 + 1);
+    expect(counts.bookingDrafts).toBe(RETENTION_BATCH + 3);
+    expect(counts.chatConversations).toBe(0);
+    expect(calls).toBe(2);
     const insert = db.query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO retention_runs'))!;
     expect(insert[1]![1]).toBe(true);
-    expect(JSON.parse(String(insert[1]![3])).chatConversations).toBe(RETENTION_BATCH + 3);
   });
 });

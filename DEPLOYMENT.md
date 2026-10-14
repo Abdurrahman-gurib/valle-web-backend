@@ -379,11 +379,11 @@ edited by managers through `PUT /api/staff/ops/retention` within safe bounds.
 
 | Data | Default | What happens |
 | --- | --- | --- |
-| Chat conversations, messages, attachments | 12 months after the last message | deleted (messages and attachments cascade) |
-| Quote requests | 24 months after they came in | deleted |
-| Table reservations | 24 months after the reserved date | deleted |
-| Job applications (CV links) | 12 months after the decision (rejected / hired) or the vacancy closing | deleted |
-| Booking visit photos | 12 months after the visit | deleted |
+| Chat conversations, messages, attachments | never | kept (owner's decision, 2026-10-14) |
+| Quote requests | never | kept |
+| Table reservations | never | kept |
+| Job applications (CV links) | never | kept |
+| Booking visit photos | never | kept (also kept when a booking is anonymised) |
 | Booking drafts, slot holds | once expired | deleted |
 | Bookings and waivers | 7 years after the visit (minimum 7) | ANONYMISED, never deleted: guest name `Removed`, e-mail, phone, address, ID number, medical notes, signature, emergency contact, participants, IP cleared; birth date reduced to the year; audit diffs and payment payloads cleared. Amounts, dates, lines and receipt numbers stay for the books |
 
