@@ -15,10 +15,6 @@ export class BookingDraft {
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt: Date;
 
-  /** When the one abandoned-booking reminder was claimed (migration 025). */
-  @Column({ name: 'reminded_at', type: 'timestamptz', nullable: true })
-  remindedAt: Date | null;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

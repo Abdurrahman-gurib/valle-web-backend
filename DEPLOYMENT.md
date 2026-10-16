@@ -138,7 +138,6 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `WA_TICKET_TEMPLATE` / `WA_REMINDER_TEMPLATE` / `WA_TEMPLATE_LANG` | `valle_booking_ticket` / `valle_visit_reminder` / `en` | Optional, defaults shown |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | see notes | Optional fallback when 360dialog is not set: plain-text WhatsApp through Twilio. Neither set = e-mail only, guests can add the ticket to WhatsApp from the ticket page |
 | `GUEST_REMINDERS`   | `1`                                      | Optional. `0` switches off the evening-before reminder sweep          |
-| `ABANDONED_REMINDERS` | `1`                                    | Optional. `0` switches off the one-off "Your day at VALLÉ is waiting" e-mail for saved drafts not booked within 60 minutes |
 | `RETENTION_JOB`     | `1`                                      | Optional. `0` switches off the daily data-retention job (see "Data retention") |
 | `BOOKING_RATE_LIMIT` | `10`                                     | Optional, default shown. Bookings per IP per 10 minutes; the compose stack raises it for the e2e suite. Leave unset in production |
 | `BOOKING_SLOT_CAPACITY` | `150`                                | Optional, default shown. Guests per arrival slot behind the quiet / busy / very busy / full dots on the booking date picker (35 %, 70 %, 100 %) |
@@ -393,25 +392,6 @@ Each run deletes in batches of 500, one transaction per batch, and writes a
 shows the policy and the last runs; `POST /api/staff/ops/retention/preview` counts
 what the next run would touch without changing anything. `RETENTION_JOB=0` on
 `api` switches the job off.
-
-## Booking funnel and abandoned-booking reminder
-
-Migration `025-funnel-abandoned.sql` adds `funnel_events` and `booking_drafts.reminded_at`.
-
-- `POST /api/funnel` (public, 120 requests per minute per IP, returns 204): body
-  `{step, label, sid, path}`; `step` is one of the `FunnelStep` values in
-  `Frontend/src/lib/funnel.ts`, `label` up to 60 characters, `sid` 1-20 letters
-  or digits, `path` up to 80. One row per event; no IP or user agent is stored.
-- `GET /api/staff/ops/funnel?from=YYYY-MM-DD&to=YYYY-MM-DD` (managers; default the
-  last 30 park days, at most 92): per-day counts per step, the conversion chain
-  view_booking > pick_items > pick_date > details > submit > booked by distinct
-  session, and package_click / addon_add / suggestion_taken counts by label.
-- Abandoned-booking reminder: every 10 minutes (off under `NODE_ENV=test` or with
-  `ABANDONED_REMINDERS=0`, and while `SMTP_URL` is unset) drafts saved more than
-  60 minutes ago, unexpired and never reminded get one e-mail with the
-  `/booking?draft=<id>` link. `reminded_at` is claimed before sending, so a draft
-  is never reminded twice; a draft whose e-mail has a booking created after the
-  draft is marked and skipped. E-mail only (no WhatsApp template).
 
 ## Day-two operations
 

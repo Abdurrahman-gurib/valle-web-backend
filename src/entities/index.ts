@@ -47,4 +47,3 @@ export { JobApplication } from './job-application.entity';
 export { Waiver } from './waiver.entity';
 export type { WaiverDeclarations } from './waiver.entity';
 export { Coupon } from './coupon.entity';
-export { FunnelEvent } from './funnel-event.entity';

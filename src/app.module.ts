@@ -16,7 +16,6 @@ import { SeoModule } from './seo/seo.module';
 import { FxModule } from './fx/fx.module';
 import { ReportsModule } from './staff/reports/reports.module';
 import { OpsModule } from './ops/ops.module';
-import { FunnelModule } from './funnel/funnel.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { WaiversModule } from './waivers/waivers.module';
@@ -74,7 +73,6 @@ import { StaffBookingsModule } from './staff/bookings/staff-bookings.module';
     FxModule,
     ReportsModule,
     OpsModule,
-    FunnelModule,
     NotificationsModule,
     TicketsModule,
     WaiversModule,
