@@ -6,6 +6,8 @@ import { IsOptional, IsString, Length, Matches } from 'class-validator';
 import { TicketQueryDto } from '../tickets/ticket.dto';
 import { PaymentsService, PaymentStatusView } from './payments.service';
 import { SandboxProvider } from './sandbox.provider';
+import { MpgsProvider } from './mpgs.provider';
+import { randomBytes } from 'node:crypto';
 
 class CheckoutDto {
   @IsString() @Matches(/^[A-Za-z]{3}-\d{3,6}-\d{2}$/) refCode: string;
@@ -94,6 +96,44 @@ export class PaymentsController {
     if (!p) throw new NotFoundException();
     const body = { paymentId: id, providerRef: p.providerRef, status: dto.outcome, amount: dto.outcome === 'paid' ? p.amount : 0, reason: dto.outcome === 'failed' ? 'Card declined (sandbox)' : undefined, sig: sbx.sign(id, dto.outcome, dto.outcome === 'paid' ? p.amount : 0) };
     await this.payments.handleWebhook({}, body);
+    const booking = await this.payments.bookingOf(p);
+    if (!booking) throw new NotFoundException();
+    res.redirect(303, this.payments.returnUrl(booking, id));
+  }
+
+  // ------------------------------------------------ MCB Gateway (MPGS)
+
+  private mpgs(): MpgsProvider {
+    const p = this.payments.provider;
+    if (!(p instanceof MpgsProvider)) throw new NotFoundException();
+    return p;
+  }
+
+  @Get('mpgs/pay')
+  @ApiOperation({ summary: "MCB Gateway: hands the guest over to Mastercard's hosted payment page" })
+  mpgsPay(@Query('session') session: string | undefined, @Res() res: Response): void {
+    const gw = this.mpgs();
+    if (!session || !/^SESSION[0-9A-Za-z]{10,60}$/.test(session)) throw new NotFoundException();
+    const nonce = randomBytes(16).toString('base64');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}' ${gw.host}; connect-src ${gw.host}; frame-src ${gw.host}; img-src ${gw.host} data:; style-src 'unsafe-inline'; form-action ${gw.host}; base-uri 'none'; frame-ancestors 'none'`);
+    res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Secure payment · VALLÉ</title>
+<style>body{font-family:system-ui,sans-serif;background:#F7F3FF;color:#340057;margin:0;display:grid;place-items:center;min-height:100vh;text-align:center}p{max-width:340px;padding:0 16px}</style></head>
+<body><p>Opening the secure MCB payment page…</p><noscript><p>Please turn on JavaScript to pay by card, or go back and choose pay at the gate.</p></noscript>
+<script nonce="${nonce}" src="${esc(gw.host)}/static/checkout/checkout.min.js" data-error="mpgsError"></script>
+<script nonce="${nonce}">function mpgsError(){document.body.innerHTML='<p>The payment page could not open. Please go back and try again, or pay at the gate.</p>';}
+try{Checkout.configure({session:{id:${JSON.stringify(session)}}});Checkout.showPaymentPage();}catch(e){mpgsError();}</script></body></html>`);
+  }
+
+  @Get('mpgs/return/:id')
+  @ApiOperation({ summary: 'MCB Gateway: the guest comes back; the outcome is read from the gateway, never from the browser' })
+  async mpgsReturn(@Param('id') id: string, @Res() res: Response): Promise<void> {
+    const gw = this.mpgs();
+    const p = await this.payments.find(id);
+    if (!p) throw new NotFoundException();
+    const event = await gw.verifyOrder(id);
+    if (event) await this.payments.settle(event);
     const booking = await this.payments.bookingOf(p);
     if (!booking) throw new NotFoundException();
     res.redirect(303, this.payments.returnUrl(booking, id));

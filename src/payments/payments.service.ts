@@ -7,6 +7,7 @@ import { GuestMessagingService } from '../notifications/guest-messaging.service'
 import { TicketService } from '../tickets/ticket.service';
 import type { PaymentProvider, WebhookEvent } from './payment-provider';
 import { SandboxProvider } from './sandbox.provider';
+import { MpgsProvider } from './mpgs.provider';
 
 export interface PaymentStatusView {
   id: string;
@@ -53,11 +54,29 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         throw new Error('PAYMENT_PROVIDER=sandbox takes no money and must not run in production');
       }
       this.provider = new SandboxProvider(apiUrl, secret);
+    } else if (name === 'mpgs') {
+      // MCB Gateway (Mastercard Payment Gateway Services). Missing credentials
+      // switch online payment off rather than stopping the API.
+      const merchantId = config.get<string>('MPGS_MERCHANT_ID')?.trim();
+      const apiPassword = config.get<string>('MPGS_API_PASSWORD')?.trim();
+      if (!merchantId || !apiPassword) {
+        this.logger.error('PAYMENT_PROVIDER=mpgs but MPGS_MERCHANT_ID / MPGS_API_PASSWORD are missing: online payment stays off');
+        this.provider = null;
+      } else {
+        this.provider = new MpgsProvider({
+          host: (config.get<string>('MPGS_HOST')?.trim() || 'https://mcb.gateway.mastercard.com').replace(/\/+$/, ''),
+          merchantId,
+          apiPassword,
+          webhookSecret: config.get<string>('MPGS_WEBHOOK_SECRET')?.trim() || undefined,
+          merchantName: config.get<string>('MPGS_MERCHANT_NAME')?.trim() || 'VALLÉ Advenature Park',
+          apiUrl,
+          siteUrl: tickets.siteUrl,
+        });
+      }
     } else if (name === 'none' || name === '') {
       this.provider = null;
     } else {
-      // A real adapter (peach, mips) is wired here once the merchant account exists.
-      throw new Error(`PAYMENT_PROVIDER=${name} is not implemented; use none or sandbox`);
+      throw new Error(`PAYMENT_PROVIDER=${name} is not implemented; use none, sandbox or mpgs`);
     }
     const grace = Number(config.get<string>('PAYMENT_TICKET_GRACE_MIN') ?? '');
     this.graceMs = (Number.isFinite(grace) && grace > 0 ? grace : DEFAULT_GRACE_MIN) * 60_000;
