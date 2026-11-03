@@ -374,6 +374,7 @@ export class BookingsService {
         kids: dto.kids,
         rate: dto.rate,
         items: dto.items,
+        visitDate,
       },
       priceRows,
       products,

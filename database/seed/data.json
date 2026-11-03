@@ -363,14 +363,14 @@
       "cat": "kids",
       "thrill": 1,
       "dur": "15 MIN",
-      "age": "3–12",
+      "age": "12+",
       "price": 200,
       "mode": "pp",
       "img": "/images/pirateship.avif",
       "blurb": "Set sail on gentle thrills: pirate adventures for the smallest buccaneers.",
       "gtk": [
         {
-          "t": "Gentle swings suited to young kids"
+          "t": "Minimum height 1.2 m"
         },
         {
           "t": "Adult supervision required"
@@ -400,6 +400,9 @@
         },
         {
           "t": "In the Kids Park zone"
+        },
+        {
+          "t": "Weight limit: chair under 50 kg, bicycle under 80 kg"
         }
       ]
     },
@@ -419,7 +422,7 @@
           "t": "The Kids Park favourite"
         },
         {
-          "t": "Height requirements apply"
+          "t": "Minimum height 1.2 m"
         },
         {
           "t": "Adult supervision required"
@@ -432,7 +435,7 @@
       "cat": "kids",
       "thrill": 1,
       "dur": "OPEN PLAY",
-      "age": "3–12",
+      "age": "3–14",
       "price": 0,
       "mode": "entry",
       "img": "/images/outdoorplayground.avif",
@@ -455,7 +458,7 @@
       "cat": "kids",
       "thrill": 2,
       "dur": "15 MIN",
-      "age": "6–12",
+      "age": "7–16",
       "price": 200,
       "mode": "pp",
       "img": "/images/miniquad.avif",
@@ -478,7 +481,7 @@
       "cat": "kids",
       "thrill": 1,
       "dur": "15 MIN",
-      "age": "4–12",
+      "age": "5+",
       "price": 200,
       "mode": "pp",
       "img": "/images/miniexcavator.avif",
@@ -749,11 +752,6 @@
               "n": "Mussels Pot",
               "note": "A couple’s break, with bread & gravy",
               "p": "Rs 2,500"
-            },
-            {
-              "n": "Kids Menu",
-              "note": "Chicken burger, penne or fish beignet",
-              "p": "Rs 600"
             }
           ]
         },
@@ -800,6 +798,40 @@
               "note": "Yellowfin tuna or dorado",
               "p": "Rs 1,010"
             }
+          ]
+        },
+        {
+          "title": "KIDS MENU",
+          "items": [
+            {
+              "n": "Chicken burger",
+              "note": "Chicken patty, soft bun, fries",
+              "p": "Rs 600",
+              "allergens": [
+                "GL"
+              ]
+            },
+            {
+              "n": "Chicken farfalle pasta",
+              "note": "Creamy chicken or tomato sauce",
+              "p": "Rs 600",
+              "allergens": [
+                "GL",
+                "LACT"
+              ]
+            },
+            {
+              "n": "Chicken skewers",
+              "note": "Chicken sticks, fries, salad",
+              "p": "Rs 600",
+              "allergens": [
+                "GL"
+              ]
+            }
+          ],
+          "note": "Desserts included: 2 scoops of ice cream",
+          "noteAllergens": [
+            "LACT"
           ]
         }
       ]

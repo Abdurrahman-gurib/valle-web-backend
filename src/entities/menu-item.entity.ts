@@ -19,4 +19,8 @@ export class MenuItem {
 
   @Column({ name: 'sort_order', type: 'int' })
   sortOrder: number;
+
+  /** Allergen codes, comma separated (GL = gluten, LACT = lactose); '' = none listed. */
+  @Column({ name: 'allergens', type: 'text', default: '' })
+  allergens: string;
 }

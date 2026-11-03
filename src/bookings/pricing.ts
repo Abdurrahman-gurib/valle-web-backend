@@ -1,4 +1,4 @@
-import { type Product, isProductId, productAmount, productKeyOf } from '../entities';
+import { type Product, ENTRY_INCLUDED_FAMILIES, isProductId, productAmount, productKeyOf, productValidOn } from '../entities';
 import { BadRequestException } from '@nestjs/common';
 
 /**
@@ -48,6 +48,8 @@ export interface PricingInput {
   kids: number;
   rate: 'rr' | 'nr';
   items: PricingItem[];
+  /** Visit date (YYYY-MM-DD): products with a validity window are refused outside it. Omitted = not checked. */
+  visitDate?: string;
 }
 
 export interface PricedLine {
@@ -136,14 +138,16 @@ export function computeBooking(
   const entryAdult = adultRow ? (input.rate === 'nr' ? adultRow.nr : adultRow.rr) : settings.entryAdult;
   const entryChild = childRow ? (input.rate === 'nr' ? childRow.nr : childRow.rr) : settings.entryChild;
 
-  // The student price list (school groups) already includes the entrance fee.
-  const studentRate = input.items.some((i) => isProductId(i.id) && products.find((p) => p.key === productKeyOf(i.id))?.family === 'student');
-  const entry = studentRate ? 0 : entryAdult * input.adults + entryChild * input.kids;
+  // The student price list (school groups) and the expo deals already include the entrance fee.
+  const familyOf = (id: string) => (isProductId(id) ? products.find((p) => p.key === productKeyOf(id))?.family : undefined);
+  const included = input.items.map((i) => familyOf(i.id)).find((f) => f && ENTRY_INCLUDED_FAMILIES.has(f));
+  const studentRate = included === 'student';
+  const entry = included ? 0 : entryAdult * input.adults + entryChild * input.kids;
   const lines: PricedLine[] = [
     {
       experienceId: null,
       variant: '',
-      label: 'Park entry · ' + (studentRate ? 'included with the student rate' : partyLabel(input.adults, input.kids)),
+      label: 'Park entry · ' + (studentRate ? 'included with the student rate' : included ? 'included with the expo deal' : partyLabel(input.adults, input.kids)),
       productKey: null,
       time: null,
       adults: input.adults,
@@ -168,6 +172,9 @@ export function computeBooking(
     const p = productById.get(productKeyOf(item.id));
     if (!p || !p.active) throw new BadRequestException(`Unknown product "${item.id}"`);
     if (p.rateOnly && p.rateOnly !== input.rate) throw new BadRequestException(`"${p.name}" is for ${p.rateOnly === 'rr' ? 'residents' : 'visitors'} only`);
+    if (input.visitDate && !productValidOn(p, input.visitDate)) {
+      throw new BadRequestException(`"${p.name}" is valid for visits from ${String(p.validFrom ?? '').slice(0, 10) || 'now'} to ${String(p.validTo ?? '').slice(0, 10) || 'further notice'} only`);
+    }
   }
   input = { ...input, items: expItems };
 

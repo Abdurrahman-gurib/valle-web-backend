@@ -209,6 +209,7 @@ export class CatalogService {
     const groupsByResto = this.groupBy(menuGroups, (g) => g.restaurantId);
     const itemsByGroup = this.groupBy(menuItems, (i) => i.groupId);
     const RESTOS: CatalogDto['RESTOS'] = {};
+    const codes = (s: string | null | undefined) => (s ?? '').split(',').map((c) => c.trim()).filter(Boolean);
     for (const r of restaurants) {
       RESTOS[r.id] = {
         name: r.name,
@@ -229,7 +230,10 @@ export class CatalogService {
             n: i.name,
             note: i.note,
             p: i.priceLabel,
+            ...(codes(i.allergens).length ? { allergens: codes(i.allergens) } : {}),
           })),
+          ...(g.note ? { note: g.note } : {}),
+          ...(codes(g.noteAllergens).length ? { noteAllergens: codes(g.noteAllergens) } : {}),
         })),
       };
     }
@@ -238,6 +242,10 @@ export class CatalogService {
     const products = await ds.getRepository(Product).find({ where: { active: true }, order: { sortOrder: 'ASC' } });
     const PRODUCTS: ProductDto[] = products.map((p) => ({
       key: p.key, family: p.family, name: p.name, mode: p.mode, rr: p.priceRr, nr: p.priceNr, dblRr: p.dblRr, dblNr: p.dblNr, rateOnly: p.rateOnly, image: p.image, note: p.note,
+      ...(p.wasPrice != null ? { was: p.wasPrice } : {}),
+      ...(p.contents?.length ? { contents: p.contents } : {}),
+      ...(p.validFrom ? { validFrom: String(p.validFrom).slice(0, 10) } : {}),
+      ...(p.validTo ? { validTo: String(p.validTo).slice(0, 10) } : {}),
     }));
 
     // ---- PACKS

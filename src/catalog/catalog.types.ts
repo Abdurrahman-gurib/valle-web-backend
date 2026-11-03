@@ -45,11 +45,17 @@ export interface MenuItemDto {
   n: string;
   note: string;
   p: string;
+  /** Allergen codes (GL = gluten, LACT = lactose); absent when none are listed. */
+  allergens?: string[];
 }
 
 export interface MenuGroupDto {
   title: string;
   items: MenuItemDto[];
+  /** A line under the group (e.g. "Desserts included: ..."); absent when empty. */
+  note?: string;
+  /** Allergen codes of what the note describes. */
+  noteAllergens?: string[];
 }
 
 export interface RestaurantDto {
@@ -167,6 +173,13 @@ export interface ProductDto {
   rateOnly: 'rr' | 'nr' | null;
   image: string;
   note: string;
+  /** Deals only: struck-through "was" price per person. */
+  was?: number;
+  /** Deals only: what the product includes, in order. */
+  contents?: string[];
+  /** Bookable for visits from / to these dates (YYYY-MM-DD, inclusive); absent = open. */
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface CatalogDto {

@@ -6,6 +6,7 @@ import {
   PricingExperience,
   PricingSettings,
 } from './pricing';
+import type { Product } from '../entities';
 
 const SETTINGS: PricingSettings = { entryAdult: 500, entryChild: 250 };
 
@@ -388,5 +389,48 @@ describe('adjustmentAmount', () => {
     expect(adjustmentAmount('amount', 99999, priced)).toBe(8500);
     expect(adjustmentAmount('foc', 0, priced)).toBe(8500);
     expect(adjustmentAmount('entry_free', 0, priced)).toBe(1100);
+  });
+});
+
+describe('expo deals (resident-only, entry included, dated)', () => {
+  const ADMISSION = [
+    { groupKey: 'admission', label: '12 years old & above', rr: 400, nr: 550 },
+    { groupKey: 'admission', label: '6 to 11 years old', rr: 275, nr: 325 },
+  ];
+  const GO = {
+    key: 'expo:go', family: 'expo', name: 'GO-PACKAGE', mode: 'pp', priceRr: 1975, priceNr: 1975, dblRr: null, dblNr: null,
+    rateOnly: 'rr', image: '', note: '', sortOrder: 600, active: true, wasPrice: 3225,
+    contents: ['Giant Swing (1 ride)', 'Free entrance'], validFrom: '2026-10-23', validTo: '2027-01-15',
+  } as Product;
+  const book = (over: Partial<{ rate: 'rr' | 'nr'; visitDate: string; adults: number; kids: number; extra: { id: string; adults?: number }[] }> = {}) =>
+    computeBooking(EXPS, SETTINGS, {
+      adults: over.adults ?? 2, kids: over.kids ?? 1, rate: over.rate ?? 'rr', visitDate: over.visitDate ?? '2026-11-20',
+      items: [{ id: 'product:expo:go', adults: over.adults ?? 2, kids: over.kids ?? 1 }, ...(over.extra ?? [])],
+    }, ADMISSION, [GO]);
+
+  it('charges the deal price for every person and no park entry', () => {
+    const r = book();
+    expect(r.entry).toBe(0);
+    expect(r.lines[0].amount).toBe(0);
+    expect(r.lines[0].label).toBe('Park entry · included with the expo deal');
+    expect(r.lines[1]).toMatchObject({ productKey: 'expo:go', amount: 1975 * 3, label: 'GO-PACKAGE · 2 adults · 1 child' });
+    expect(r.total).toBe(1975 * 3);
+  });
+
+  it('keeps entry free when an experience is added next to the deal', () => {
+    const r = book({ extra: [{ id: 'luge', adults: 2 }] });
+    expect(r.entry).toBe(0);
+    expect(r.total).toBe(1975 * 3 + 500 * 2);
+  });
+
+  it('is refused at the visitor rate', () => {
+    expect(() => book({ rate: 'nr' })).toThrow('"GO-PACKAGE" is for residents only');
+  });
+
+  it('is bookable from 23 Oct 2026 to 15 Jan 2027 only', () => {
+    expect(book({ visitDate: '2026-10-23' }).total).toBe(1975 * 3);
+    expect(book({ visitDate: '2027-01-15' }).total).toBe(1975 * 3);
+    expect(() => book({ visitDate: '2026-10-22' })).toThrow(BadRequestException);
+    expect(() => book({ visitDate: '2027-01-16' })).toThrow('valid for visits from 2026-10-23 to 2027-01-15 only');
   });
 });

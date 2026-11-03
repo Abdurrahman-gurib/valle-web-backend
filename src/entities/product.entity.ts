@@ -48,7 +48,29 @@ export class Product {
 
   @Column({ name: 'active', type: 'boolean', default: true })
   active: boolean;
+
+  /** Struck-through "was" price per person (deals); null when the product is not a deal. */
+  @Column({ name: 'was_price', type: 'int', nullable: true })
+  wasPrice: number | null;
+
+  /** What the product includes, in display order (deals); null = not listed. */
+  @Column({ name: 'contents', type: 'text', array: true, nullable: true })
+  contents: string[] | null;
+
+  /** First / last visit date (YYYY-MM-DD, inclusive) the product can be booked for; null = open. */
+  @Column({ name: 'valid_from', type: 'date', nullable: true })
+  validFrom: string | null;
+
+  @Column({ name: 'valid_to', type: 'date', nullable: true })
+  validTo: string | null;
 }
+
+/** Families whose price already includes park entry: the booking charges no entry line. */
+export const ENTRY_INCLUDED_FAMILIES = new Set(['student', 'expo']);
+
+/** Whether a product can be booked for a visit date (YYYY-MM-DD); open-ended when the bounds are null. */
+export const productValidOn = (p: Pick<Product, 'validFrom' | 'validTo'>, visitDate: string): boolean =>
+  (!p.validFrom || visitDate >= String(p.validFrom).slice(0, 10)) && (!p.validTo || visitDate <= String(p.validTo).slice(0, 10));
 
 export const PRODUCT_PREFIX = 'product:';
 export const isProductId = (id: string): boolean => id.startsWith(PRODUCT_PREFIX);
