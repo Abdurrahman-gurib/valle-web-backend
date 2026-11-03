@@ -5,9 +5,11 @@ import { DataSource, EntityManager, LessThan, Repository } from 'typeorm';
 import { Booking, BookingAudit, BookingLine, Payment } from '../entities';
 import { GuestMessagingService } from '../notifications/guest-messaging.service';
 import { TicketService } from '../tickets/ticket.service';
+import { auditRecord, type Actor } from '../common/audit';
+import { orNotFound } from '../common/lookup';
+import { rupees } from '../common/money';
 import type { PaymentProvider, WebhookEvent } from './payment-provider';
-import { SandboxProvider } from './sandbox.provider';
-import { MpgsProvider } from './mpgs.provider';
+import { providerFromConfig } from './provider-from-config';
 
 export interface PaymentStatusView {
   id: string;
@@ -46,38 +48,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private readonly tickets: TicketService,
     @Optional() private readonly guest?: GuestMessagingService,
   ) {
-    const name = (config.get<string>('PAYMENT_PROVIDER') ?? 'none').trim().toLowerCase();
-    const apiUrl = tickets.siteUrl + '/api';
-    const secret = config.get<string>('TICKET_SECRET')?.trim() || config.get<string>('JWT_SECRET')?.trim() || 'valle-dev-only-jwt-secret-change-me';
-    if (name === 'sandbox') {
-      if (config.get<string>('NODE_ENV') === 'production' && config.get<string>('PAYMENT_SANDBOX_IN_PRODUCTION') !== '1') {
-        throw new Error('PAYMENT_PROVIDER=sandbox takes no money and must not run in production');
-      }
-      this.provider = new SandboxProvider(apiUrl, secret);
-    } else if (name === 'mpgs') {
-      // MCB Gateway (Mastercard Payment Gateway Services). Missing credentials
-      // switch online payment off rather than stopping the API.
-      const merchantId = config.get<string>('MPGS_MERCHANT_ID')?.trim();
-      const apiPassword = config.get<string>('MPGS_API_PASSWORD')?.trim();
-      if (!merchantId || !apiPassword) {
-        this.logger.error('PAYMENT_PROVIDER=mpgs but MPGS_MERCHANT_ID / MPGS_API_PASSWORD are missing: online payment stays off');
-        this.provider = null;
-      } else {
-        this.provider = new MpgsProvider({
-          host: (config.get<string>('MPGS_HOST')?.trim() || 'https://mcb.gateway.mastercard.com').replace(/\/+$/, ''),
-          merchantId,
-          apiPassword,
-          webhookSecret: config.get<string>('MPGS_WEBHOOK_SECRET')?.trim() || undefined,
-          merchantName: config.get<string>('MPGS_MERCHANT_NAME')?.trim() || 'VALLÉ Advenature Park',
-          apiUrl,
-          siteUrl: tickets.siteUrl,
-        });
-      }
-    } else if (name === 'none' || name === '') {
-      this.provider = null;
-    } else {
-      throw new Error(`PAYMENT_PROVIDER=${name} is not implemented; use none, sandbox or mpgs`);
-    }
+    this.provider = providerFromConfig(config, tickets.siteUrl, this.logger);
     const grace = Number(config.get<string>('PAYMENT_TICKET_GRACE_MIN') ?? '');
     this.graceMs = (Number.isFinite(grace) && grace > 0 ? grace : DEFAULT_GRACE_MIN) * 60_000;
     this.logger.log(`Online payments: ${this.provider ? this.provider.name : 'off (pay on arrival only)'}`);
@@ -135,10 +106,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async status(paymentId: string, token: string | undefined): Promise<PaymentStatusView> {
-    const p = await this.payRepo.findOne({ where: { id: paymentId } });
-    if (!p) throw new NotFoundException('No such payment');
-    const b = await this.bookingRepo.findOne({ where: { id: p.bookingId } });
-    if (!b) throw new NotFoundException('No such payment');
+    const p = orNotFound(await this.payRepo.findOne({ where: { id: paymentId } }), 'No such payment');
+    const b = orNotFound(await this.bookingRepo.findOne({ where: { id: p.bookingId } }), 'No such payment');
     if (!this.tickets.verify(b.refCode, token)) throw new ForbiddenException('Bad or missing token');
     return {
       id: p.id, status: p.status, amount: p.amount, refundedAmount: p.refundedAmount, provider: p.provider,
@@ -163,10 +132,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    */
   async settle(event: WebhookEvent): Promise<{ applied: boolean }> {
     return this.dataSource.transaction(async (manager) => {
-      const payment = event.paymentId
-        ? await manager.findOne(Payment, { where: { id: event.paymentId }, lock: { mode: 'pessimistic_write' } })
-        : await manager.findOne(Payment, { where: { providerRef: event.providerRef, provider: this.provider?.name }, lock: { mode: 'pessimistic_write' } });
-      if (!payment) throw new NotFoundException('No such payment');
+      const payment = orNotFound(await this.lockPayment(manager, event), 'No such payment');
       if (payment.status !== 'pending') {
         this.logger.log(`Payment ${payment.id}: webhook ${event.status} ignored, already ${payment.status}`);
         return { applied: false };
@@ -179,36 +145,54 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       await manager.save(Payment, payment);
 
       if (event.status === 'paid') {
-        const amount = event.amount > 0 ? event.amount : payment.amount;
-        payment.amount = amount;
+        payment.amount = event.amount > 0 ? event.amount : payment.amount;
         await manager.save(Payment, payment);
-        const booking = await manager.findOne(Booking, { where: { id: payment.bookingId }, lock: { mode: 'pessimistic_write' } });
-        if (!booking) throw new NotFoundException('No such booking');
-        const from = booking.paidAmount ?? 0;
-        booking.paidAmount = from + amount;
-        booking.paidAt = new Date();
-        booking.paymentMethod = 'online';
-        booking.receiptNo = payment.providerRef || payment.id;
-        booking.updatedAt = new Date();
-        await manager.save(Booking, booking);
-        await manager.save(manager.create(BookingAudit, {
-          bookingId: booking.id, staffId: null, staffEmail: `payments:${payment.provider}`, action: 'edit',
-          changes: { paidAmount: { from, to: booking.paidAmount }, paymentMethod: { from: null, to: 'online' }, receiptNo: { from: null, to: booking.receiptNo } },
-        }));
+        const bookingId = await this.creditBooking(manager, payment);
         // The ticket was held back until the money arrived: send it now, reading "paid".
-        void this.sendTicketAfterCommit(booking.id);
+        void this.sendTicketAfterCommit(bookingId);
       }
       this.logger.log(`Payment ${payment.id} for booking ${payment.bookingId}: ${event.status}`);
       return { applied: true };
     });
   }
 
+  /** The payment an event is about (by our id, else by the provider's reference), locked. */
+  private lockPayment(manager: EntityManager, event: WebhookEvent): Promise<Payment | null> {
+    return event.paymentId
+      ? manager.findOne(Payment, { where: { id: event.paymentId }, lock: { mode: 'pessimistic_write' } })
+      : manager.findOne(Payment, { where: { providerRef: event.providerRef, provider: this.provider?.name }, lock: { mode: 'pessimistic_write' } });
+  }
+
+  /** Adds a settled payment to its booking's paid amount, receipt and trail. Returns the booking id. */
+  private async creditBooking(manager: EntityManager, payment: Payment): Promise<string> {
+    const booking = orNotFound(
+      await manager.findOne(Booking, { where: { id: payment.bookingId }, lock: { mode: 'pessimistic_write' } }),
+      'No such booking',
+    );
+    const from = booking.paidAmount ?? 0;
+    booking.paidAmount = from + payment.amount;
+    booking.paidAt = new Date();
+    booking.paymentMethod = 'online';
+    booking.receiptNo = payment.providerRef || payment.id;
+    booking.updatedAt = new Date();
+    await manager.save(Booking, booking);
+    await manager.save(manager.create(BookingAudit, auditRecord(booking.id, { id: null, email: `payments:${payment.provider}` }, 'edit', {
+      paidAmount: { from, to: booking.paidAmount }, paymentMethod: { from: null, to: 'online' }, receiptNo: { from: null, to: booking.receiptNo },
+    })));
+    return booking.id;
+  }
+
   private async sendTicketAfterCommit(bookingId: string): Promise<void> {
     await new Promise((r) => setImmediate(r));
     const booking = await this.bookingRepo.findOne({ where: { id: bookingId } });
     if (!booking || !this.guest) return;
-    const lines = await this.lineRepo.find({ where: { bookingId }, order: { sortOrder: 'ASC' } });
-    await this.guest.sendTicket(booking, lines).catch((e: Error) => this.logger.warn(`Ticket for ${booking.refCode} not sent: ${e.message}`));
+    await this.sendTicketQuietly(booking, this.guest);
+  }
+
+  /** The guest's ticket with its lines; a failure is logged, never thrown. */
+  private async sendTicketQuietly(booking: Booking, guest: GuestMessagingService): Promise<void> {
+    const lines = await this.lineRepo.find({ where: { bookingId: booking.id }, order: { sortOrder: 'ASC' } });
+    await guest.sendTicket(booking, lines).catch((e: Error) => this.logger.warn(`Ticket for ${booking.refCode} not sent: ${e.message}`));
   }
 
   /**
@@ -225,8 +209,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       n++;
       const booking = await this.bookingRepo.findOne({ where: { id: p.bookingId } });
       if (booking && booking.status !== 'cancelled' && !booking.ticketSentAt && this.guest) {
-        const lines = await this.lineRepo.find({ where: { bookingId: booking.id }, order: { sortOrder: 'ASC' } });
-        await this.guest.sendTicket(booking, lines).catch((e: Error) => this.logger.warn(`Ticket for ${booking.refCode} not sent: ${e.message}`));
+        await this.sendTicketQuietly(booking, this.guest);
       }
     }
     return n;
@@ -235,13 +218,13 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   // ------------------------------------------------------------ refunds (staff)
 
   /** Money back through the provider, the booking's paid_amount reduced, the trail written. */
-  async refund(manager: EntityManager, booking: Booking, amount: number, reason: string, by: { id: string | null; email: string }): Promise<Payment> {
+  async refund(manager: EntityManager, booking: Booking, amount: number, reason: string, by: Actor): Promise<Payment> {
     if (!this.provider) throw new BadRequestException('Online payment is not available');
     if (!(amount > 0)) throw new BadRequestException('Enter the amount to refund');
     const payment = await manager.findOne(Payment, { where: { bookingId: booking.id, status: 'paid' }, order: { settledAt: 'DESC' }, lock: { mode: 'pessimistic_write' } });
     if (!payment) throw new BadRequestException('No online payment to refund on this booking');
     const refundable = payment.amount - payment.refundedAmount;
-    if (amount > refundable) throw new BadRequestException(`Only Rs ${refundable.toLocaleString('en-US')} can still be refunded on this payment`);
+    if (amount > refundable) throw new BadRequestException(`Only ${rupees(refundable)} can still be refunded on this payment`);
     const result = await this.provider.refund(payment.providerRef, amount, reason);
     payment.refundedAmount += amount;
     if (payment.refundedAmount >= payment.amount) payment.status = 'refunded';
@@ -251,10 +234,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     booking.paidAmount = Math.max(0, from - amount);
     booking.updatedAt = new Date();
     await manager.save(Booking, booking);
-    await manager.save(manager.create(BookingAudit, {
-      bookingId: booking.id, staffId: by.id, staffEmail: by.email, action: 'edit',
-      changes: { paidAmount: { from, to: booking.paidAmount }, refund: { from: null, to: `Rs ${amount.toLocaleString('en-US')} · ${reason || 'refund'} · ${result.providerRef}` } },
-    }));
+    await manager.save(manager.create(BookingAudit, auditRecord(booking.id, by, 'edit', {
+      paidAmount: { from, to: booking.paidAmount },
+      refund: { from: null, to: `${rupees(amount)} · ${reason || 'refund'} · ${result.providerRef}` },
+    })));
     return payment;
   }
 
