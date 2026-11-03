@@ -1,6 +1,6 @@
 /**
  * End-to-end tests run against the dev PostgreSQL database
- * (schema.sql + seed.sql loaded, env from .env / .env.example).
+ * (schema.sql + seed.sql loaded, env from .env, see DEPLOYMENT.md).
  *
  * They are OPT-IN: set TEST_DB=1 to enable them, so the suite never fails
  * on machines without a reachable database.

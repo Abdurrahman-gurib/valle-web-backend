@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { cutoffs, minusMonths, parkDateCutoff, parsePolicy, policyProblems, RETENTION_DEFAULTS } from './retention.policy';
-import { RETENTION_BATCH, RetentionService, RULES } from './retention.service';
+import { RETENTION_BATCH, RetentionService } from './retention.service';
 
 const at = (iso: string) => new Date(iso);
 

@@ -17,9 +17,9 @@ import {
   parseWaiverActivities,
   waiverRequiredCount,
 } from './waiver-rules';
+import { parkToday } from '../common/park-time';
 
 const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
-export const parkToday = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Indian/Mauritius' });
 
 /** What the guest's waiver page needs: who still has to sign, and nothing private. */
 export interface WaiverPublicView {

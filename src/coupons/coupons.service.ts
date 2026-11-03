@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Coupon } from '../entities';
 import type { AdjustmentKind } from '../bookings/pricing';
+import { parkToday } from '../common/park-time';
 
 export interface CouponOffer {
   code: string;
@@ -24,7 +25,6 @@ export interface CouponRow extends CouponOffer {
 /** 409 when the last use of a limited code went to a booking committed a moment earlier. */
 export const COUPON_USED_MESSAGE = 'This code has just been fully used. Remove it or try another.';
 
-const parkToday = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Indian/Mauritius' });
 const d = (v: string | Date | null): string | null => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 
 /** Coupon codes: validated for the guest on the website, applied to bookings, managed by staff. */

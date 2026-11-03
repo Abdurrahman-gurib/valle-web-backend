@@ -47,9 +47,7 @@ import type { TicketView } from '../../tickets/ticket.service';
 import type { GuestChangeDto } from './guest-changes.controller';
 import { TicketService } from '../../tickets/ticket.service';
 import { GuestMessagingService } from '../../notifications/guest-messaging.service';
-
-/** The park's wall clock: "today" is whatever day it is on site, not on the server. */
-const PARK_TZ = 'Indian/Mauritius';
+import { PARK_TZ, parkToday } from '../../common/park-time';
 
 /** Editing any of these re-prices the booking from its own experience lines. */
 const MONEY_FIELDS = ['adults', 'kids', 'rate', 'items', 'adjustmentKind', 'adjustmentValue', 'adjustmentNote', 'couponCode'] as const;
@@ -742,11 +740,6 @@ function resolvePaging(query: PageQueryDto): {
     Math.max(1, Math.trunc(Number(query.pageSize) || DEFAULT_PAGE_SIZE)),
   );
   return { page, pageSize };
-}
-
-/** Today at the park, as YYYY-MM-DD, matching BookingsService.create(). */
-function parkToday(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: PARK_TZ });
 }
 
 function startOfMonth(day: string): string {

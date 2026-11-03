@@ -25,20 +25,6 @@ export class ClosureDto {
   reason?: string;
 }
 
-export class SessionPlanDto {
-  @ApiProperty({ example: ['09:30', '10:30', '14:00'] })
-  @IsArray() @ArrayMaxSize(48) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { each: true })
-  times: string[];
-
-  @ApiPropertyOptional({ description: 'Guests (per-person) or units (vehicles) per session; null = no limit' })
-  @IsOptional() @IsInt() @Min(0) @Max(5000)
-  capacity?: number | null;
-
-  @ApiPropertyOptional({ minimum: 5, maximum: 600, default: 60 })
-  @IsOptional() @IsInt() @Min(5) @Max(600)
-  durationMin?: number;
-}
-
 export class CalendarDto {
   @ApiPropertyOptional({ description: 'Guests one arrival slot takes, park wide', minimum: 1, maximum: 5000 })
   @IsOptional() @IsInt() @Min(1) @Max(5000)

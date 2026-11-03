@@ -10,7 +10,8 @@ import type { StaffPrincipal } from '../staff/auth/staff-auth.types';
 import { TicketQueryDto } from '../tickets/ticket.dto';
 import { IsCalendarDate } from '../common/validation';
 import { CheckInDto, SignWaiverDto } from './waiver.dto';
-import { GateDayRow, GateView, WaiverPublicView, WaiversService, parkToday } from './waivers.service';
+import { GateDayRow, GateView, WaiverPublicView, WaiversService } from './waivers.service';
+import { parkToday } from '../common/park-time';
 
 /** Query classes come before the controllers: decorators read them when the class body is evaluated. */
 class SampleQueryDto {

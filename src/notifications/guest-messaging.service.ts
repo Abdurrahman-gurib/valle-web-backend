@@ -10,8 +10,8 @@ import { Setting } from '../entities/setting.entity';
 import { parseWaiverActivities, waiverRequiredCount } from '../waivers/waiver-rules';
 import { MailService } from './mail.service';
 import { WhatsAppService, type BookingMessage } from './whatsapp.service';
+import { PARK_TZ, parkToday } from '../common/park-time';
 
-const PARK_TZ = 'Indian/Mauritius';
 const REMINDER_HOUR = 17; // sent between 17:00 and midnight, park time, the evening before
 const REMINDER_SWEEP_MS = 15 * 60 * 1000;
 
@@ -24,7 +24,6 @@ const slotLabel = (slot: string) => (slot === 'morning' ? 'Morning arrival, 09:0
 const party = (b: Booking) => `${b.adults} adult${b.adults === 1 ? '' : 's'}` + (b.kids ? ` and ${b.kids} child${b.kids === 1 ? '' : 'ren'}` : '');
 const addDays = (iso: string, n: number): string => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const parkNow = () => new Date(new Date().toLocaleString('en-US', { timeZone: PARK_TZ }));
-const parkToday = () => new Date().toLocaleDateString('en-CA', { timeZone: PARK_TZ });
 
 const PARK_ADDRESS = 'B102, Mare Anguilles, Chamouny, Mauritius';
 const PARK_PHONE = '+230 660 44 77';

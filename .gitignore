@@ -1,6 +1,9 @@
 node_modules/
 dist/
 coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
 .env
 *.log
 # local PostgreSQL dev instance (database/scripts/dev-db.ps1)

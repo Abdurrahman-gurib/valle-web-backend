@@ -5,8 +5,9 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { StaffAuthGuard } from '../auth/staff-auth.guard';
 import { DateQueryDto, ExportQueryDto, ForecastQueryDto, RangeQueryDto } from './reports.dto';
 import {
-  ExperienceRow, ForecastDay, NationalityRow, Reconciliation, ReportsService, SalesSummary, parkToday,
+  ExperienceRow, ForecastDay, NationalityRow, Reconciliation, ReportsService, SalesSummary,
 } from './reports.service';
+import { parkToday } from '../../common/park-time';
 
 const MAX_RANGE_DAYS = 400;
 

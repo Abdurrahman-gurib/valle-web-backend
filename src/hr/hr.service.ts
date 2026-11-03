@@ -24,9 +24,7 @@ import {
   UpdateApplicationDto,
   UpdateVacancyDto,
 } from './dto/hr.dto';
-
-/** The park's wall clock, matching StaffBookingsService. */
-const PARK_TZ = 'Indian/Mauritius';
+import { PARK_TZ, parkToday } from '../common/park-time';
 
 /** "This week" is the last seven park days, today included. */
 const WEEK_DAYS = 7;
@@ -430,11 +428,6 @@ function isUniqueViolation(error: unknown): boolean {
     'code' in error &&
     (error as { code?: unknown }).code === PG_UNIQUE_VIOLATION
   );
-}
-
-/** Today at the park, as YYYY-MM-DD. */
-function parkToday(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: PARK_TZ });
 }
 
 function daysAgo(day: string, days: number): string {

@@ -140,6 +140,8 @@ Railway's cross-service reference syntax and resolves at deploy time.
 | `GUEST_REMINDERS`   | `1`                                      | Optional. `0` switches off the evening-before reminder sweep          |
 | `RETENTION_JOB`     | `1`                                      | Optional. `0` switches off the daily data-retention job (see "Data retention") |
 | `BOOKING_RATE_LIMIT` | `10`                                     | Optional, default shown. Bookings per IP per 10 minutes; the compose stack raises it for the e2e suite. Leave unset in production |
+| `TICKET_SECRET_PREVIOUS` | unset                               | Optional. During a `TICKET_SECRET` rotation, the old value: links already sent keep opening |
+| `PAYMENT_TICKET_GRACE_MIN` | `120`                             | Optional, default shown. Minutes an unpaid online-payment booking keeps its ticket and seats |
 | `BOOKING_SLOT_CAPACITY` | `150`                                | Optional, default shown. Guests per arrival slot behind the quiet / busy / very busy / full dots on the booking date picker (35 %, 70 %, 100 %) |
 
 Back-office reports (`/api/staff/reports/*`: sales summary, nationalities,
@@ -176,6 +178,27 @@ The API refuses to start in production when `JWT_SECRET` is missing or short, wh
 `CORS_ORIGIN` is empty, contains `*` or uses `http://`, when `DB_PASSWORD` or
 `DB_HOST` is unset, or when `DB_SSL` is not `true` / `no-verify`. That is
 deliberate: each of those silently weakens the deployment.
+
+#### Local development (`Backend/.env`)
+
+For `npm run start:dev` and the operator scripts, create `Backend/.env` (gitignored,
+never committed) with the values below; anything left out takes the code default.
+The docker compose stack and CI set their own variables and need no `.env`.
+
+| Variable           | Local value                                   | Purpose |
+| ------------------ | --------------------------------------------- | ------- |
+| `NODE_ENV`         | `development`                                 | Relaxed boot checks, Swagger on `/api/docs` |
+| `PORT`             | `3001`                                        | What the Vite dev proxy targets |
+| `DB_HOST` / `DB_PORT` | `localhost` / `5433`                       | The dev instance from `database/scripts/dev-db.ps1` |
+| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | `postgres` / empty / `valle_park` | |
+| `DB_SSL`           | `false`                                       | Plain TCP; production refuses it (`true` verifies the certificate, `no-verify` accepts a self-signed one) |
+| `JWT_SECRET`       | empty                                         | Empty uses the published development key (warning at boot); 32+ random characters in production: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
+| `TICKET_SECRET` / `TICKET_SECRET_PREVIOUS` | empty                 | Ticket, waiver and QR link signing (32+ characters); see the table above |
+| `STAFF_COOKIE_NAME`| `valle_staff`                                 | Staff session cookie |
+| `CORS_ORIGIN`      | `http://localhost:5173,http://localhost:4173` | Dev server and `vite preview` origins |
+| `TRUST_PROXY`      | `false`                                       | Always on in production |
+| `PAYMENT_PROVIDER` | `none`                                        | `sandbox` serves a stand-in checkout (development and tests only) |
+| `PAYMENT_TICKET_GRACE_MIN` | `120`                                 | See the table above |
 
 ### `web`
 
@@ -438,6 +461,10 @@ railway domain --service web --port 80   # public domain for the site
 The api's first deployment fails its boot checks until `JWT_SECRET` is set;
 setting it triggers the redeploy. Non-secret variables live in the file;
 secrets are `preserve()`d, never written to source.
+`railway config apply` previews the changes and asks before applying; in a
+non-interactive session destructive changes also need `--confirm-destructive`,
+so read `railway config plan` first. `railway config pull` imports changes made
+in the dashboard back into the file.
 
 Windows note: with the CLI installed through npm, `railway config plan` /
 `apply` fail with "requires Railway CLI 5.42.1 or newer" even on a current CLI,

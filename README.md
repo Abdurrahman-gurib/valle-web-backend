@@ -30,10 +30,9 @@ operations, is [DEPLOYMENT.md](DEPLOYMENT.md). The public site is built from
 
 2. Configure the environment:
 
-   ```sh
-   cp .env.example .env
-   # then edit DB_* values as needed
-   ```
+   Create `.env` (gitignored) with the local values listed in
+   [DEPLOYMENT.md](DEPLOYMENT.md#local-development-backendenv); the defaults
+   point at the dev database on port 5433.
 
 3. Install and run:
 

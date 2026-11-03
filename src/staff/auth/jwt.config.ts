@@ -25,7 +25,7 @@ export function resolveJwtSecret(config: ConfigService): string {
   // eslint-disable-next-line no-console
   console.warn(
     '[staff-auth] JWT_SECRET is not set, so using the development-only signing ' +
-      'key. Set JWT_SECRET before deploying (see .env.example).',
+      'key. Set JWT_SECRET before deploying (see DEPLOYMENT.md).',
   );
   return DEV_JWT_SECRET;
 }

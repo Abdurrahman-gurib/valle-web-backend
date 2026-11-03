@@ -111,10 +111,3 @@ export function rtlParagraph(doc: PDFDocument, text: string, o: RtlOptions): voi
   doc.y += o.paragraphGap ?? 0;
   doc.x = o.x;
 }
-
-/** One right-aligned line (labels, short values); wraps like a paragraph when long. */
-export function rtlLine(doc: PDFDocument, text: string, o: RtlOptions): void {
-  rtlParagraph(doc, text, o);
-}
-
-export const hasArabic = (s: string): boolean => ARABIC.test(s);

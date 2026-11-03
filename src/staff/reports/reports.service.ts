@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { toCsv } from './csv';
+import { parkToday } from '../../common/park-time';
 
 /**
  * Sales, reconciliation and forecast figures for the back office.
@@ -11,8 +12,6 @@ import { toCsv } from './csv';
  * "today" is the park's calendar day. Aggregations run in SQL so a season of
  * bookings is one round trip, not a table scan in JavaScript.
  */
-const PARK_TZ = 'Indian/Mauritius';
-export const parkToday = (): string => new Date().toLocaleDateString('en-CA', { timeZone: PARK_TZ });
 
 const addDays = (iso: string, n: number): string => {
   const d = new Date(iso + 'T00:00:00Z');

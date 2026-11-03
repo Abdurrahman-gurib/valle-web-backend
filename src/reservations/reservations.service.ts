@@ -5,14 +5,13 @@ import { Restaurant, TableReservation } from '../entities';
 import { InboxNotifierService } from '../notifications/inbox-notifier.service';
 import { MailService } from '../notifications/mail.service';
 import type { CreateReservationDto } from './reservation.dto';
+import { parkToday } from '../common/park-time';
 
 export interface ReservationRow {
   id: string; restaurantId: string; restaurantName: string; guestName: string; email: string; phone: string;
   visitDate: string; visitTime: string; party: number; preorder: { item: string; qty: number }[]; notes: string;
   status: 'requested' | 'confirmed' | 'cancelled'; bookingRef: string; createdAt: string;
 }
-
-const parkToday = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Indian/Mauritius' });
 
 @Injectable()
 export class ReservationsService {
