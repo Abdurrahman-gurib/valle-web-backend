@@ -1,5 +1,3 @@
-// Sentry first: it must load before Nest, express and pg to instrument them.
-import { sentryEnabled } from './instrument';
 import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -103,7 +101,7 @@ async function bootstrap(): Promise<void> {
   // unreachable from nginx on Railway.
   await app.listen(env.port, '::');
   // eslint-disable-next-line no-console
-  console.log(`VALLE Advenature Park API listening on port ${env.port} (${env.nodeEnv})` + (sentryEnabled ? ', Sentry on' : ', Sentry off'));
+  console.log(`VALLE Advenature Park API listening on port ${env.port} (${env.nodeEnv})`);
   if (docsEnabled) {
     // eslint-disable-next-line no-console
     console.log(`Swagger docs on http://localhost:${env.port}/api/docs`);

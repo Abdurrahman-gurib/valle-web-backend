@@ -45,10 +45,6 @@ export default defineRailway(() => {
       CANONICAL_HOST: "web-production-ff60b.up.railway.app",
       // Set on Railway, kept as they are (browser error monitoring and source maps).
       // Listing them matters: a variable missing from this file is DELETED by `railway config apply`.
-      VITE_SENTRY_DSN: preserve(),
-      VITE_SENTRY_ENVIRONMENT: preserve(),
-      VITE_SENTRY_RELEASE: preserve(),
-      SENTRY_AUTH_TOKEN: preserve(),
     },
   });
 
@@ -82,10 +78,6 @@ export default defineRailway(() => {
       // listed: a variable missing from this file is DELETED by `railway config apply`.
       SMTP_URL: preserve(),          // Resend (guest tickets, reminders, backup alerts)
       D360_API_KEY: preserve(),      // WhatsApp Business (360dialog)
-      SENTRY_DSN: preserve(),
-      SENTRY_ENVIRONMENT: preserve(),
-      SENTRY_RELEASE: preserve(),    // stamped by CI on every deploy
-      SENTRY_AUTH_TOKEN: preserve(),
       STAFF_COOKIE_NAME: "valle_staff",
       CORS_ORIGIN: "https://${{web.RAILWAY_PUBLIC_DOMAIN}}",
       TRUST_PROXY: "true",
@@ -114,7 +106,6 @@ export default defineRailway(() => {
       BACKUP_NOTIFY_TO: "abdurrahman@vallepark.com",
       MAIL_FROM: "VALLÉ Advenature Park <bookings@vallepark.com>",
       SMTP_URL: "${{api.SMTP_URL}}",
-      SENTRY_DSN: "${{api.SENTRY_DSN}}",
       DB_HOST: Postgres.env.RAILWAY_PRIVATE_DOMAIN,
       DB_PORT: "5432",
       DB_USER: Postgres.env.PGUSER,

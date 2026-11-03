@@ -280,8 +280,6 @@ Where to see the result:
   days, amber when something is overdue, red when the latest run failed.
 - **E-mail** to `BACKUP_NOTIFY_TO`: immediately when a backup or a restore test
   fails, and once a month with the restore-test result.
-- **Sentry Crons**: monitors `valle-db-backup` and `valle-db-restore-test`
-  (created by the first check-in) alert on a failed or missed run.
 - **Table** `backup_runs`: one row per backup and per restore test.
 
 Run it by hand (Railway CLI, linked to the project):
@@ -608,21 +606,11 @@ az containerapp update -g valle-rg -n valle-api \
   --probe-type liveness --probe-path /api/health/live --probe-port 3001
 ```
 
-## Error monitoring (Sentry)
+## Error monitoring
 
-Both apps carry the Sentry SDK and stay silent until a DSN is configured.
-Create two projects in the Sentry org (React for the site, Node.js for the API),
-then set on Railway:
-
-- service `web` (build variables, Vite inlines them): `VITE_SENTRY_DSN`,
-  `VITE_SENTRY_ENVIRONMENT=production`
-- service `api`: `SENTRY_DSN`, `SENTRY_ENVIRONMENT=production`
-
-Redeploy after setting them (`railway up` or a push to main). The site
-reports unhandled errors with a session replay of the moments before, and one
-page load or route change in five as a performance trace; the API reports 5xx
-exceptions and one request in five. Request bodies and cookies are stripped
-before sending, so booking and application data never leaves the platform.
+No third-party error monitoring (Sentry was removed on 2026-11-03). Use the
+Railway logs and HTTP metrics of the `api` and `web` services; the backup job
+reports by e-mail (see "Backups").
 
 ## Search engines (technical SEO)
 

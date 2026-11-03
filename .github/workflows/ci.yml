@@ -102,7 +102,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     steps:
       - if: env.RAILWAY_TOKEN == ''
         run: echo "RAILWAY_TOKEN is not set, skipping (Railway's GitHub autodeploy handles deploys)."
@@ -110,23 +109,9 @@ jobs:
         uses: actions/checkout@v4
       - if: env.RAILWAY_TOKEN != ''
         run: npm install -g @railway/cli
-      # Tag the build with the commit so Sentry groups issues by release and can
-      # tell which deploy introduced a regression (crash-free sessions need it too).
-      - if: env.RAILWAY_TOKEN != ''
-        run: railway variables --service api --skip-deploys --set "SENTRY_RELEASE=${{ github.sha }}"
       - if: env.RAILWAY_TOKEN != ''
         run: railway up --service api --ci --message "GitHub Actions ${{ github.sha }}"
       # The backup cron service runs the scripts from this repository: keep its image in
       # step with the API. A cron service does not start on deploy; it waits for 22:00 UTC.
       - if: env.RAILWAY_TOKEN != ''
         run: railway up --service db-backup --ci --message "GitHub Actions ${{ github.sha }}"
-      # Deploy tracking in Sentry (needs the SENTRY_AUTH_TOKEN repository secret):
-      # marks this commit as deployed to production so issues show "first seen in".
-      - if: env.RAILWAY_TOKEN != '' && env.SENTRY_AUTH_TOKEN != ''
-        env:
-          SENTRY_ORG: valle-advenature-park
-          SENTRY_PROJECT: valle-web-api
-        run: |
-          npx --yes @sentry/cli releases new "${{ github.sha }}" --finalize
-          npx --yes @sentry/cli releases set-commits "${{ github.sha }}" --auto --ignore-missing
-          npx --yes @sentry/cli deploys new --release "${{ github.sha }}" --env production

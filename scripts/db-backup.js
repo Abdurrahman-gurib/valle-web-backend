@@ -23,9 +23,8 @@
  *               present, every row count equal, no invalid index, same latest
  *               booking. The scratch server is deleted afterwards.
  *
- * Every run is recorded in backup_runs (the back office shows it), reported to
- * Sentry Crons when SENTRY_DSN is set, and e-mailed to BACKUP_NOTIFY_TO: always
- * on failure, and once a month with the restore-test result.
+ * Every run is recorded in backup_runs (the back office shows it) and e-mailed
+ * to BACKUP_NOTIFY_TO: always on failure, and once a month with the restore-test result.
  *
  *   node scripts/db-backup.js                  the nightly run
  *   node scripts/db-backup.js --restore-test   back up, then test the restore now
@@ -279,27 +278,6 @@ async function restoreTest() {
 
 // ---------------------------------------------------------------- reporting
 
-/** Sentry Crons check-in over plain HTTPS (no SDK in this image). Creates or updates the monitor as it reports. */
-async function sentryCheckIn(slug, ok, schedule) {
-  const dsn = (process.env.SENTRY_DSN || '').trim();
-  if (!dsn) return;
-  try {
-    const u = new URL(dsn);
-    const projectId = u.pathname.replace(/\//g, '');
-    const body = {
-      status: ok ? 'ok' : 'error',
-      environment: process.env.SENTRY_ENVIRONMENT || process.env.RAILWAY_ENVIRONMENT_NAME || 'production',
-      monitor_config: { schedule: { type: 'crontab', value: schedule }, checkin_margin: 120, max_runtime: 30, timezone: 'UTC', failure_issue_threshold: 1, recovery_threshold: 1 },
-    };
-    const res = await fetch(`${u.protocol}//${u.host}/api/${projectId}/cron/${slug}/${u.username}/`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) log(`Sentry check-in for ${slug} answered ${res.status}`);
-  } catch (e) {
-    log(`Sentry check-in for ${slug} failed: ${e.message}`);
-  }
-}
-
 async function notify(subject, lines) {
   const to = (process.env.BACKUP_NOTIFY_TO || '').trim();
   const smtp = (process.env.SMTP_URL || '').trim();
@@ -346,7 +324,6 @@ async function main() {
       console.error(`[db-backup] BACKUP FAILED: ${e.message}`);
     }
     await record(result);
-    await sentryCheckIn('valle-db-backup', result.ok, process.env.BACKUP_CRON || '0 22 * * *');
     if (!result.ok) {
       failed = true;
       await notify('VALLÉ database backup FAILED', ['The nightly database backup did not complete.', '', result.detail, '', 'Until it is fixed there is no fresh backup. See Backend/DEPLOYMENT.md, "Backups".']);
@@ -369,7 +346,6 @@ async function main() {
       console.error(`[db-backup] RESTORE TEST FAILED: ${e.message}`);
     }
     await record(result);
-    await sentryCheckIn('valle-db-restore-test', result.ok, '0 22 1 * *');
     if (result.ok) {
       await notify(`VALLÉ backup check passed (${plan.parkMonth(new Date())})`, ['This month\'s test restore of the nightly database backup passed.', '', ...summary, `Restore test: ${result.detail}`, '', 'Nothing to do. This message is sent once a month.']);
     } else {
