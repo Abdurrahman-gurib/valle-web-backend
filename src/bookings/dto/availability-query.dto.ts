@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
-import { AVAILABILITY_MAX_DAYS } from '../bookings.service';
+import { AVAILABILITY_MAX_DAYS } from '../availability';
 
 export class AvailabilityQueryDto {
   @ApiPropertyOptional({ description: 'First date, YYYY-MM-DD. Default: today at the park.' })

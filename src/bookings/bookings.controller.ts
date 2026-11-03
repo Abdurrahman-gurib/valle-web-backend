@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { parkToday } from '../common/park-time';
 import { AvailabilityDay, BookingsService, BookingResponse } from './bookings.service';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -32,8 +33,7 @@ export class BookingsController {
   @ApiOperation({ summary: 'How busy each arrival slot is (quiet / busy / very-busy / full) for the date picker' })
   @Header('Cache-Control', 'public, max-age=120')
   availability(@Query() q: AvailabilityQueryDto): Promise<AvailabilityDay[]> {
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Indian/Mauritius' });
-    return this.bookingsService.availability(q.from ?? today, q.days ?? 14);
+    return this.bookingsService.availability(q.from ?? parkToday(), q.days ?? 14);
   }
 
   @Post('hold')
