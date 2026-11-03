@@ -1,3 +1,4 @@
+import { isoDay, toIso } from '../../common/park-time';
 import type { Booking } from '../../entities';
 
 /**
@@ -46,19 +47,11 @@ export interface BookingRow {
   createdAt: string;
 }
 
-export function toDateString(value: string | Date): string {
-  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
-}
-
-export function toIso(value: string | Date): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
-
 export function toBookingRow(b: Booking): BookingRow {
   return {
     id: b.id,
     refCode: b.refCode,
-    visitDate: toDateString(b.visitDate),
+    visitDate: isoDay(b.visitDate),
     slot: b.slot,
     adults: b.adults,
     kids: b.kids,
@@ -83,7 +76,7 @@ export function toBookingRow(b: Booking): BookingRow {
     adjustmentAmount: b.adjustmentAmount ?? 0,
     adjustmentNote: b.adjustmentNote ?? '',
     couponCode: b.couponCode ?? '',
-    postponedFrom: b.postponedFrom ? toDateString(b.postponedFrom) : null,
+    postponedFrom: b.postponedFrom ? isoDay(b.postponedFrom) : null,
     groupKind: b.groupKind ?? null,
     organisation: b.organisation ?? '',
     leaderName: b.leaderName ?? '',
