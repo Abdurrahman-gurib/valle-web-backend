@@ -1998,6 +1998,31 @@
         "n": "Lunch menu · 12 yrs and over",
         "rr": 300,
         "nr": 300
+      },
+      {
+        "n": "Kids Park · Mini Quad",
+        "rr": 100,
+        "nr": 100
+      },
+      {
+        "n": "Kids Park · Roller Coaster Express",
+        "rr": 100,
+        "nr": 100
+      },
+      {
+        "n": "Kids Park · Mini Excavator",
+        "rr": 100,
+        "nr": 100
+      },
+      {
+        "n": "Kids Park · Pirate Ship",
+        "rr": 100,
+        "nr": 100
+      },
+      {
+        "n": "Kids Park · top-up card",
+        "rr": 50,
+        "nr": 50
       }
     ],
     "kids": [
