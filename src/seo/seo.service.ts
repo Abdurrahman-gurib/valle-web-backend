@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { escapeHtml as escapeXml } from '../common/html';
+import { isoDay } from '../common/park-time';
 import { Experience, JobVacancy, PackageTier, PriceListEntry, Restaurant } from '../entities';
 
 /** One <url> entry of the sitemap. */
@@ -11,7 +13,6 @@ export interface SitemapUrl {
   priority: number;
 }
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Languages of the public site; English at the root, the others under /fr, /de, /it. */
 export const SITE_LANGS = ['en', 'fr', 'de', 'it', 'ar', 'ru', 'es', 'hi'] as const;
@@ -24,7 +25,6 @@ export function localizePath(path: string, lang: SiteLang): string {
   if (path.startsWith('/?') || path.startsWith('/#')) return '/' + lang + path.slice(1);
   return '/' + lang + path;
 }
-const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const latest = (...dates: (Date | null | undefined)[]) =>
   dates.reduce<Date>((m, d) => (d && d > m ? d : m), new Date(0));
 
@@ -90,7 +90,7 @@ export class SeoService {
           .map((l) => `    <xhtml:link rel="alternate" hreflang="${l}" href="${escapeXml(siteUrl + localizePath(u.path, l === 'x-default' ? 'en' : l))}"/>`)
           .join('\n');
         const priority = lang === 'en' ? u.priority : Math.max(0.1, u.priority - 0.1);
-        return `  <url>\n    <loc>${escapeXml(siteUrl + localizePath(u.path, lang))}</loc>\n    <lastmod>${iso(u.lastmod)}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${priority.toFixed(1)}</priority>\n${alternates}\n  </url>`;
+        return `  <url>\n    <loc>${escapeXml(siteUrl + localizePath(u.path, lang))}</loc>\n    <lastmod>${isoDay(u.lastmod)}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${priority.toFixed(1)}</priority>\n${alternates}\n  </url>`;
       }))
       .join('\n');
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${body}\n</urlset>\n`;

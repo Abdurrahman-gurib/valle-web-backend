@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { toCsv } from './csv';
-import { parkToday } from '../../common/park-time';
+import { addDays, isoDay, parkToday, weekday } from '../../common/park-time';
+import { reconciliationTotals } from './reconciliation';
 
 /**
  * Sales, reconciliation and forecast figures for the back office.
@@ -13,12 +14,6 @@ import { parkToday } from '../../common/park-time';
  * bookings is one round trip, not a table scan in JavaScript.
  */
 
-const addDays = (iso: string, n: number): string => {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-};
-const dateOf = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 const num = (v: unknown): number => Number(v) || 0;
 
 export interface Breakdown { key: string; bookings: number; guests: number; revenue: number }
@@ -89,6 +84,13 @@ export interface ForecastDay {
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+/** A row of the bookings CSV export, as the driver returns it. */
+interface BookingExportRow {
+  ref_code: string; visit_date: string | Date; slot: string; status: string; guest_name: string; nationality: string;
+  email: string; phone: string; adults: number; kids: number; rate: string; pay_mode: string;
+  entry_amount: string; subtotal: string; discount: string; total: string; currency: string; staff_note: string; created_at: string | Date;
+}
+
 @Injectable()
 export class ReportsService {
   constructor(@InjectDataSource() private readonly db: DataSource) {}
@@ -123,13 +125,13 @@ export class ReportsService {
       );
       return rows.map((r) => ({ key: String(r.key ?? ''), bookings: num(r.bookings), guests: num(r.guests), revenue: num(r.revenue) }));
     };
-    const dailyRaw: { date: unknown; bookings: string; guests: string; revenue: string }[] = await this.db.query(
+    const dailyRaw: { date: string | Date; bookings: string; guests: string; revenue: string }[] = await this.db.query(
       `SELECT visit_date AS date, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids), 0)::int AS guests,
               COALESCE(SUM(total), 0)::bigint AS revenue
          FROM bookings WHERE ${live} GROUP BY visit_date ORDER BY visit_date`,
       [from, to],
     );
-    const byDate = new Map(dailyRaw.map((r) => [dateOf(r.date), r]));
+    const byDate = new Map(dailyRaw.map((r) => [isoDay(r.date), r]));
     const daily: DailyPoint[] = [];
     for (let d = from; d <= to; d = addDays(d, 1)) {
       const r = byDate.get(d);
@@ -200,32 +202,14 @@ export class ReportsService {
       refCode: r.ref_code, guestName: r.guest_name, slot: r.slot, payMode: r.pay_mode, status: r.status,
       adults: num(r.adults), kids: num(r.kids), total: num(r.total), nationality: r.nationality ?? '', phone: r.phone ?? '', email: r.email ?? '',
     }));
-    const past = date < parkToday();
-    const t = {
-      bookings: rows.length, guestsExpected: 0, guestsArrived: 0, gateExpected: 0, gateCollected: 0, gateOutstanding: 0,
-      onlinePaid: 0, cancelled: 0, cancelledAmount: 0, noShows: 0, noShowAmount: 0,
-    };
-    for (const r of rows) {
-      const guests = r.adults + r.kids;
-      if (r.status === 'cancelled') { t.cancelled++; t.cancelledAmount += r.total; continue; }
-      t.guestsExpected += guests;
-      if (r.status === 'arrived') t.guestsArrived += guests;
-      if (r.payMode === 'online') t.onlinePaid += r.total;
-      if (r.payMode === 'gate') {
-        t.gateExpected += r.total;
-        if (r.status === 'arrived') t.gateCollected += r.total;
-        else t.gateOutstanding += r.total;
-      }
-      if (past && r.status === 'confirmed') { t.noShows++; t.noShowAmount += r.total; }
-    }
-    return { date, rows, totals: t };
+    return { date, rows, totals: reconciliationTotals(rows, date < parkToday()) };
   }
 
   async forecast(days: number): Promise<ForecastDay[]> {
     const today = parkToday();
     const n = Math.min(Math.max(1, days), 90);
     const to = addDays(today, n - 1);
-    const booked: { date: unknown; slot: string; bookings: string; guests: string; revenue: string }[] = await this.db.query(
+    const booked: { date: string | Date; slot: string; bookings: string; guests: string; revenue: string }[] = await this.db.query(
       `SELECT visit_date AS date, slot, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids), 0)::int AS guests,
               COALESCE(SUM(total), 0)::bigint AS revenue
          FROM bookings WHERE visit_date BETWEEN $1 AND $2 AND status <> 'cancelled' GROUP BY visit_date, slot`,
@@ -243,8 +227,8 @@ export class ReportsService {
     const out: ForecastDay[] = [];
     for (let i = 0; i < n; i++) {
       const date = addDays(today, i);
-      const dow = new Date(date + 'T00:00:00Z').getUTCDay();
-      const rows = booked.filter((b) => dateOf(b.date) === date);
+      const dow = weekday(date);
+      const rows = booked.filter((b) => isoDay(b.date) === date);
       const m = rows.find((r) => r.slot === 'morning');
       const a = rows.find((r) => r.slot === 'afternoon');
       const guests = num(m?.guests) + num(a?.guests);
@@ -264,7 +248,7 @@ export class ReportsService {
   async exportCsv(type: 'bookings' | 'daily' | 'nationalities' | 'experiences', from: string, to: string): Promise<{ filename: string; csv: string }> {
     const stamp = `${from}_${to}`;
     if (type === 'bookings') {
-      const rows: Record<string, unknown>[] = await this.db.query(
+      const rows: BookingExportRow[] = await this.db.query(
         `SELECT ref_code, visit_date, slot, status, guest_name, nationality, email, phone, adults, kids, rate, pay_mode,
                 entry_amount, subtotal, discount, total, currency, staff_note, created_at
            FROM bookings WHERE visit_date BETWEEN $1 AND $2 ORDER BY visit_date, slot, guest_name`,
@@ -275,10 +259,10 @@ export class ReportsService {
         csv: toCsv(
           ['Reference', 'Visit date', 'Slot', 'Status', 'Guest', 'Nationality', 'Email', 'Phone', 'Adults', 'Children', 'Rate', 'Payment', 'Park entry', 'Subtotal', 'Discount', 'Total', 'Currency', 'Internal note', 'Booked at'],
           rows.map((r) => [
-            r.ref_code as string, dateOf(r.visit_date), r.slot as string, r.status as string, r.guest_name as string, r.nationality as string,
-            r.email as string, r.phone as string, num(r.adults), num(r.kids), r.rate === 'nr' ? 'Visitor' : 'Resident',
+            r.ref_code, isoDay(r.visit_date), r.slot, r.status, r.guest_name, r.nationality,
+            r.email, r.phone, num(r.adults), num(r.kids), r.rate === 'nr' ? 'Visitor' : 'Resident',
             r.pay_mode === 'online' ? 'Online' : 'At gate', num(r.entry_amount), num(r.subtotal), num(r.discount), num(r.total),
-            r.currency as string, r.staff_note as string, new Date(r.created_at as string).toISOString(),
+            r.currency, r.staff_note, new Date(r.created_at).toISOString(),
           ]),
         ),
       };

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Coupon } from '../entities';
 import type { AdjustmentKind } from '../bookings/pricing';
-import { parkToday } from '../common/park-time';
+import { isoDay, isoDayOrNull, parkToday } from '../common/park-time';
 
 export interface CouponOffer {
   code: string;
@@ -25,7 +25,6 @@ export interface CouponRow extends CouponOffer {
 /** 409 when the last use of a limited code went to a booking committed a moment earlier. */
 export const COUPON_USED_MESSAGE = 'This code has just been fully used. Remove it or try another.';
 
-const d = (v: string | Date | null): string | null => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 
 /** Coupon codes: validated for the guest on the website, applied to bookings, managed by staff. */
 @Injectable()
@@ -43,8 +42,8 @@ export class CouponsService {
     const c = await (manager ? manager.findOne(Coupon, { where: { code } }) : this.repo.findOne({ where: { code } }));
     if (!c || !c.active) throw new NotFoundException('This code is not valid');
     const today = parkToday();
-    if (c.validFrom && d(c.validFrom)! > today) throw new NotFoundException('This code is not active yet');
-    if (c.validTo && d(c.validTo)! < today) throw new NotFoundException('This code has expired');
+    if (c.validFrom && isoDay(c.validFrom) > today) throw new NotFoundException('This code is not active yet');
+    if (c.validTo && isoDay(c.validTo) < today) throw new NotFoundException('This code has expired');
     if (c.maxUses !== null && c.uses >= c.maxUses) throw new NotFoundException('This code has been fully used');
     return { code: c.code, kind: c.kind, value: c.value, note: c.note };
   }
@@ -94,7 +93,7 @@ export class CouponsService {
 function toRow(c: Coupon): CouponRow {
   return {
     code: c.code, kind: c.kind, value: c.value, note: c.note, active: c.active,
-    validFrom: d(c.validFrom), validTo: d(c.validTo), maxUses: c.maxUses, uses: c.uses,
+    validFrom: isoDayOrNull(c.validFrom), validTo: isoDayOrNull(c.validTo), maxUses: c.maxUses, uses: c.uses,
     createdBy: c.createdBy, createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
   };
 }

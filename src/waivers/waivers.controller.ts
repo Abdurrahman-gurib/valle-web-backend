@@ -11,6 +11,7 @@ import { TicketQueryDto } from '../tickets/ticket.dto';
 import { IsCalendarDate } from '../common/validation';
 import { CheckInDto, SignWaiverDto } from './waiver.dto';
 import { GateDayRow, GateView, WaiverPublicView, WaiversService } from './waivers.service';
+import { sendPdf } from '../common/http';
 import { parkToday } from '../common/park-time';
 
 /** Query classes come before the controllers: decorators read them when the class body is evaluated. */
@@ -24,12 +25,6 @@ class GateDayQueryDto {
   @IsOptional()
   @IsCalendarDate()
   date?: string;
-}
-
-function sendPdf(res: Response, pdf: Buffer, filename: string): void {
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-  res.send(pdf);
 }
 
 const WAIVER_LIMIT = Number(process.env.BOOKING_RATE_LIMIT) > 0 ? Number(process.env.BOOKING_RATE_LIMIT) * 3 : 30;

@@ -108,8 +108,8 @@ export function parseBomTable(html: string): { asOf: string; ttBuying: Record<st
   const dates = [...byDate.keys()].sort();
   if (dates.length === 0) return null;
   const asOf = dates[dates.length - 1];
-  const ttBuying = byDate.get(asOf)!;
-  if (!ttBuying.USD && !ttBuying.EUR) return null;
+  const ttBuying = byDate.get(asOf);
+  if (!ttBuying || (!ttBuying.USD && !ttBuying.EUR)) return null;
   return { asOf, ttBuying };
 }
 

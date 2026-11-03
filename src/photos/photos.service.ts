@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { noBooking } from '../common/lookup';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Booking } from '../entities/booking.entity';
@@ -85,19 +86,19 @@ export class PhotosService {
   }
 
   /** Marks the set ready; the caller sends the "your photos are ready" message. */
-  async markReady(refCode: string): Promise<Booking> {
+  async markReady(refCode: string): Promise<Booking & { photosReadyAt: Date }> {
     const b = await this.booking(refCode);
     const n = await this.photoRepo.count({ where: { bookingId: b.id } });
     if (n === 0) throw new ConflictException('Upload the photos first');
-    b.photosReadyAt = new Date();
-    await this.bookingRepo.update({ id: b.id }, { photosReadyAt: b.photosReadyAt });
-    return b;
+    const photosReadyAt = new Date();
+    await this.bookingRepo.update({ id: b.id }, { photosReadyAt });
+    return Object.assign(b, { photosReadyAt });
   }
 
   private async booking(refCode: string, token?: string): Promise<Booking> {
     if (token !== undefined) return this.tickets.requireBooking(refCode, token);
     const b = await this.bookingRepo.findOne({ where: { refCode: refCode.toUpperCase() } });
-    if (!b) throw new NotFoundException(`No booking ${refCode}`);
+    if (!b) throw noBooking(refCode);
     return b;
   }
 }

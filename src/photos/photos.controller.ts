@@ -97,6 +97,6 @@ export class StaffPhotosController {
   async ready(@Param('refCode') refCode: string): Promise<{ email: boolean; whatsapp: boolean; photosReadyAt: string }> {
     const b = await this.photos.markReady(refCode);
     const sent = await this.messaging.sendPhotosReady(b, (await this.photos.set(refCode)).count);
-    return { ...sent, photosReadyAt: b.photosReadyAt!.toISOString() };
+    return { ...sent, photosReadyAt: b.photosReadyAt.toISOString() };
   }
 }

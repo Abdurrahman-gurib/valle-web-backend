@@ -1,6 +1,7 @@
 import { Controller, Get, Header, Param, Query, Res } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { sendPdf } from '../common/http';
 import { TicketQueryDto } from './ticket.dto';
 import { TicketService, TicketView } from './ticket.service';
 
@@ -21,10 +22,7 @@ export class TicketsController {
   @ApiOperation({ summary: "The guest's receipt as PDF (needs the token)" })
   async receipt(@Param('refCode') refCode: string, @Query() q: TicketQueryDto, @Res() res: Response): Promise<void> {
     const pdf = await this.tickets.receiptPdf(refCode.toUpperCase(), q.t);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="valle-receipt-${refCode.toUpperCase()}.pdf"`);
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.send(pdf);
+    sendPdf(res, pdf, `valle-receipt-${refCode.toUpperCase()}.pdf`, 'private, no-store');
   }
 
   @Get(':refCode/qr.png')

@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import * as QRCode from 'qrcode';
 import { IsNull, Repository } from 'typeorm';
+import { escapeHtmlStrict as escapeHtml } from '../../common/html';
 import { StaffPasswordReset, StaffUser } from '../../entities';
 import { MailService } from '../../notifications/mail.service';
 import { StaffAuthService } from './staff-auth.service';
@@ -197,8 +198,4 @@ export class StaffSecurityService {
     if (!user || !user.active) throw new UnauthorizedException('Not signed in');
     return user;
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 }

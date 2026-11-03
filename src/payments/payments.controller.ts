@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Header, Headers, HttpCode, NotFoundException, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { escapeHtmlStrict } from '../common/html';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -19,7 +20,7 @@ class SandboxOutcomeDto {
   @IsOptional() @IsString() @Length(0, 64) k?: string;
 }
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+const esc = escapeHtmlStrict;
 
 @ApiTags('payments')
 @Controller('payments')

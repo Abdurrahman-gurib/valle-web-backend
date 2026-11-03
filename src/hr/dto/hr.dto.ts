@@ -16,6 +16,7 @@ import {
   IsSafeText,
   MAX_PAGE,
 } from '../../common/validation';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../common/paging';
 import {
   APPLICATION_STATUSES,
   ApplicationStatus,
@@ -34,9 +35,8 @@ import {
 export const CREATABLE_VACANCY_STATUSES = ['draft', 'published'] as const;
 export type CreatableVacancyStatus = (typeof CREATABLE_VACANCY_STATUSES)[number];
 
-/** Same clamps as the reservations dashboard, so both lists page alike. */
-export const DEFAULT_PAGE_SIZE = 25;
-export const MAX_PAGE_SIZE = 100;
+/** Same clamps as the reservations dashboard (common/paging), so both lists page alike. */
+export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE };
 
 export const TITLE_MAX_LENGTH = 120;
 export const SUMMARY_MAX_LENGTH = 280;

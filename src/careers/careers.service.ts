@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { localIsoDayOrNull } from '../common/park-time';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InboxNotifierService } from '../notifications/inbox-notifier.service';
@@ -129,14 +130,6 @@ export class CareersService {
 
 // --------------------------------------------------------------------- mappers
 
-/** `date` columns arrive as strings; tolerate a Date in case a driver parses them. */
-function toDateString(value: string | Date | null): string | null {
-  if (value === null) return null;
-  return value instanceof Date
-    ? value.toLocaleDateString('en-CA')
-    : String(value).slice(0, 10);
-}
-
 function toVacancyCard(v: JobVacancy): VacancyCard {
   return {
     slug: v.slug,
@@ -146,8 +139,8 @@ function toVacancyCard(v: JobVacancy): VacancyCard {
     employment: v.employment,
     summary: v.summary,
     salaryRange: v.salaryRange,
-    closesOn: toDateString(v.closesOn),
-    postedOn: toDateString(v.createdAt) ?? '',
+    closesOn: localIsoDayOrNull(v.closesOn),
+    postedOn: localIsoDayOrNull(v.createdAt) ?? '',
   };
 }
 

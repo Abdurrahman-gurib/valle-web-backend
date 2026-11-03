@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { sendPdf } from '../../common/http';
 import { PostponeDto, RecordPaymentDto, RefundDto } from './dto/front-office.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentStaff } from '../auth/current-staff.decorator';
@@ -105,10 +106,7 @@ export class StaffBookingsController {
   @ApiOperation({ summary: 'Receipt PDF for the cashier / the guest' })
   async receipt(@Param('refCode') refCode: string, @Res() res: Response): Promise<void> {
     const pdf = await this.staffBookings.receiptPdf(refCode);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="valle-receipt-${refCode}.pdf"`);
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.send(pdf);
+    sendPdf(res, pdf, `valle-receipt-${refCode}.pdf`, 'private, no-store');
   }
 
   @Post('bookings/:refCode/resend-waiver')

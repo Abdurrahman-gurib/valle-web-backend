@@ -1,16 +1,13 @@
 import PDFDocument from 'pdfkit';
+import { rupees } from '../common/money';
+import { dayMonthYear } from '../common/park-time';
 import type { Booking, BookingLine } from '../entities';
 
 const PURPLE = '#340057';
 const VIOLET = '#7333FF';
 const GREY = '#6B5B85';
-const rs = (n: number) => 'Rs ' + Math.round(n).toLocaleString('en-US');
-const fmtDate = (v: string | Date | null): string => {
-  if (!v) return '';
-  const s = v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10);
-  const [y, m, d] = s.split('-');
-  return `${d}/${m}/${y}`;
-};
+const rs = (n: number) => rupees(Math.round(n));
+const fmtDate = (v: string | Date | null): string => (v ? dayMonthYear(v) : '');
 const METHOD: Record<string, string> = { cash: 'Cash', card: 'Card', juice: 'Juice (MCB)', online: 'Online', other: 'Other' };
 const KIND: Record<string, string> = { foc: 'FOC pass', percent: 'Discount', amount: 'Discount', entry_free: 'Free park entry', none: '' };
 

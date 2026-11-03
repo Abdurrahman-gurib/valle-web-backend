@@ -14,15 +14,15 @@ import {
   IsSafeText,
   MAX_PAGE,
 } from '../../../common/validation';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../../common/paging';
+
+export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE };
 
 export const BOOKING_STATUSES = ['confirmed', 'arrived', 'cancelled', 'postponed'] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
-export const DEFAULT_PAGE_SIZE = 25;
 export const SORTS = ['newest', 'oldest', 'visit_asc', 'visit_desc', 'total_desc', 'total_asc', 'guest'] as const;
 export type BookingSort = (typeof SORTS)[number];
-
-export const MAX_PAGE_SIZE = 100;
 
 /** Shared page/pageSize query params. */
 export class PageQueryDto {

@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { escapeHtml as esc } from '../common/html';
+import { parkDateTime } from '../common/park-time';
 import type { Booking, Waiver } from '../entities';
 import { MailService } from '../notifications/mail.service';
 import { WhatsAppService } from '../notifications/whatsapp.service';
@@ -12,7 +14,6 @@ export interface CopySent {
   whatsapp: boolean;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
 
 const SUBJECT: Record<TermsLang, string> = {
   en: 'Your signed Disclaimer Form',
@@ -104,7 +105,7 @@ export class WaiverCopyService {
     <hr style="border:0;border-top:1px dashed #D9CCF2;margin:16px 0">
     <div style="font-size:11px;letter-spacing:.06em;color:#7333FF">${esc((w.isMinor ? L.sigGuardian : L.sigParticipant).toUpperCase())}</div>
     <img src="cid:waiver-signature" alt="signature" width="220" style="display:block;max-width:220px;border:1px solid #EBE2FF;border-radius:10px;margin:6px 0;background:#FFFFFF">
-    <div style="font-size:13px"><strong>${esc(w.signedBy)}</strong> · ${esc(w.signedAt.toLocaleString('en-GB', { timeZone: 'Indian/Mauritius', hour12: false }))} (Mauritius) · IP ${esc(w.ip || '-')} · ${esc(w.termsVersion)}</div>
+    <div style="font-size:13px"><strong>${esc(w.signedBy)}</strong> · ${esc(parkDateTime(w.signedAt))} (Mauritius) · IP ${esc(w.ip || '-')} · ${esc(w.termsVersion)}</div>
   </div>
   <p style="text-align:center;font-size:11px;color:#7A6A93;margin:16px 0 0">Mare Anguilles Farms Ltd · VALLÉ Advenature™ Park · B102, Mare Anguilles, Chamouny · +230 660 44 77</p>
 </div></body></html>`;

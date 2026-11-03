@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { partyText, rupees } from '../common/money';
 import type { Booking, BookingLine } from '../entities';
 import { MailService } from './mail.service';
 
@@ -29,8 +30,8 @@ export class BookingNotifierService {
 
   /** Builds the message; exported for tests and for the send below. */
   render(booking: Booking, lines: BookingLine[]): { subject: string; text: string } {
-    const party = `${booking.adults} adult${booking.adults === 1 ? '' : 's'}` + (booking.kids ? ` · ${booking.kids} child${booking.kids === 1 ? '' : 'ren'}` : '');
-    const rs = (n: number) => 'Rs ' + n.toLocaleString('en-US');
+    const party = partyText(booking.adults, booking.kids, ' · ');
+    const rs = rupees;
     const items = lines.map((l) => `  - ${l.label}: ${rs(l.amount)}`).join('\n');
     const subject = `New booking ${booking.refCode} · ${booking.visitDate} ${booking.slot} · ${booking.guestName}`;
     const text = [

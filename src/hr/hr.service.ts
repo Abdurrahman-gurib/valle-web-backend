@@ -16,15 +16,13 @@ import type {
 import type { StaffPrincipal } from '../staff/auth/staff-auth.types';
 import {
   CreateVacancyDto,
-  DEFAULT_PAGE_SIZE,
-  HrPageQueryDto,
   ListApplicationsQueryDto,
   ListVacanciesQueryDto,
-  MAX_PAGE_SIZE,
   UpdateApplicationDto,
   UpdateVacancyDto,
 } from './dto/hr.dto';
-import { PARK_TZ, parkToday } from '../common/park-time';
+import { resolvePaging } from '../common/paging';
+import { addDays, localIsoDayOrNull, PARK_TZ, parkToday, toIso } from '../common/park-time';
 
 /** "This week" is the last seven park days, today included. */
 const WEEK_DAYS = 7;
@@ -408,19 +406,6 @@ export function slugify(title: string): string {
   return slug || 'vacancy';
 }
 
-/** Same clamping as StaffBookingsService: the DTO validates, this enforces. */
-function resolvePaging(query: HrPageQueryDto): {
-  page: number;
-  pageSize: number;
-} {
-  const page = Math.max(1, Math.trunc(Number(query.page) || 1));
-  const pageSize = Math.min(
-    MAX_PAGE_SIZE,
-    Math.max(1, Math.trunc(Number(query.pageSize) || DEFAULT_PAGE_SIZE)),
-  );
-  return { page, pageSize };
-}
-
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === 'object' &&
@@ -430,25 +415,7 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-function daysAgo(day: string, days: number): string {
-  const from = new Date(`${day}T00:00:00Z`);
-  from.setUTCDate(from.getUTCDate() - days);
-  return from.toISOString().slice(0, 10);
-}
-
-/** `date` columns arrive as strings; tolerate a Date in case a driver parses them. */
-function toDateString(value: string | Date | null): string | null {
-  if (value === null) return null;
-  return value instanceof Date
-    ? value.toLocaleDateString('en-CA')
-    : String(value).slice(0, 10);
-}
-
-function toIso(value: string | Date): string {
-  return value instanceof Date
-    ? value.toISOString()
-    : new Date(value).toISOString();
-}
+const daysAgo = (day: string, days: number): string => addDays(day, -days);
 
 function toVacancyRow(v: JobVacancy, applicationCount: number): HrVacancyRow {
   return {
@@ -464,7 +431,7 @@ function toVacancyRow(v: JobVacancy, applicationCount: number): HrVacancyRow {
     benefits: v.benefits,
     salaryRange: v.salaryRange,
     status: v.status,
-    closesOn: toDateString(v.closesOn),
+    closesOn: localIsoDayOrNull(v.closesOn),
     applicationCount,
     createdAt: toIso(v.createdAt),
     updatedAt: toIso(v.updatedAt),

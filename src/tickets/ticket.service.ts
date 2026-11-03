@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import { Booking, BookingLine, Setting, Waiver } from '../entities';
 import { parseWaiverActivities, waiverRequiredCount } from '../waivers/waiver-rules';
 import { renderReceiptPdf } from './receipt-pdf';
+import { isoDay } from '../common/park-time';
 import { resolveJwtSecret } from '../staff/auth/jwt.config';
 
 /** What the guest's ticket page shows. No internal note, no money breakdown beyond the lines. */
@@ -40,7 +41,6 @@ export interface TicketView {
   group?: { kind: string; organisation: string; leaderName: string; participants: { name: string; age?: number | null }[]; depositAmount: number };
 }
 
-const dateStr = (v: string | Date): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 
 /**
  * A guest's ticket: the booking reference plus an unguessable token derived
@@ -136,7 +136,7 @@ export class TicketService {
     return {
       refCode: b.refCode,
       guestName: b.guestName,
-      visitDate: dateStr(b.visitDate),
+      visitDate: isoDay(b.visitDate),
       slot: b.slot,
       adults: b.adults,
       kids: b.kids,
