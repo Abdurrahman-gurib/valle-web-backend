@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ageOn, flagsFor, parseAgeLabel, parseLimitsSetting, waiverRequiredCount } from './waiver-rules';
 import { WaiversService, parkToday } from './waivers.service';
@@ -102,6 +104,35 @@ describe('waiver rules', () => {
   it('keeps only numeric limits from the settings row', () => {
     expect(parseLimitsSetting('{"zipline":{"maxWeightKg":120,"note":"x"},"bad":5}')).toEqual({ zipline: { maxWeightKg: 120 } });
     expect(parseLimitsSetting('not json')).toEqual({});
+  });
+
+  it('applies the migration 029 limits at the gate: Giant Swing weights, Kids Park heights', async () => {
+    // the JSON merged by migration 029, on top of the live value
+    const sql = readFileSync(join(__dirname, '../../database/migrations/029-giant-swing.sql'), 'utf8');
+    const merged = { bicycle: { maxWeightKg: 100 }, ...JSON.parse(sql.match(/value::jsonb \|\| '(\{.*?\})'::jsonb/)![1]) };
+    expect(merged.bicycle).toEqual({ maxWeightKg: 100 });
+    expect(parseAgeLabel('12+')).toEqual({ minAge: 12 });
+    const svc = new WaiversService(
+      {} as never, {} as never, {} as never, {} as never,
+      { find: jest.fn(async () => [{ experienceId: 'giantswing' }, { experienceId: 'coaster' }, { experienceId: 'pirate' }]) } as never,
+      {} as never,
+      { find: jest.fn(async () => [
+        { id: 'giantswing', name: 'The Giant Swing', ageLabel: '12+' },
+        { id: 'coaster', name: 'Roller Coaster Express', ageLabel: '4–12' },
+        { id: 'pirate', name: 'Pirate Ship', ageLabel: '12+' },
+      ]) } as never,
+      { findOne: jest.fn(async () => ({ key: 'waiver_limits', value: JSON.stringify(merged) })) } as never,
+    );
+    const acts = await svc.activitiesFor('b1');
+    expect(acts.find((a) => a.id === 'giantswing')?.limits).toEqual({ minAge: 12, minWeightKg: 40, maxWeightKg: 85 });
+    expect(acts.find((a) => a.id === 'pirate')?.limits).toEqual({ minAge: 12, minHeightCm: 120 });
+    const giant = acts.filter((a) => a.id === 'giantswing');
+    const adult = { birthDate: '1990-01-01', heightCm: 170 };
+    expect(flagsFor({ ...adult, weightKg: 35 }, '2026-11-03', giant)).toEqual([{ level: 'stop', activity: 'The Giant Swing', message: '35 kg, minimum 40 kg' }]);
+    expect(flagsFor({ ...adult, weightKg: 90 }, '2026-11-03', giant)).toEqual([{ level: 'stop', activity: 'The Giant Swing', message: '90 kg, maximum 85 kg' }]);
+    expect(flagsFor({ ...adult, weightKg: 70 }, '2026-11-03', giant)).toEqual([]);
+    const coaster = acts.filter((a) => a.id === 'coaster');
+    expect(flagsFor({ birthDate: '2018-06-01', heightCm: 110, weightKg: 22 }, '2026-11-03', coaster)).toEqual([{ level: 'stop', activity: 'Roller Coaster Express', message: '110 cm, minimum 120 cm' }]);
   });
 });
 

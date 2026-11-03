@@ -303,6 +303,7 @@ export class CatalogService {
           cap: s.cap,
           ...(s.pos != null ? { pos: s.pos } : {}),
         })),
+        ...(g.video ? { video: { src: g.video, poster: g.videoPoster ?? gShots[0]?.src ?? '' } } : {}),
       };
       GAL[key] = gal;
     }

@@ -367,7 +367,7 @@
       "price": 200,
       "mode": "pp",
       "img": "/images/pirateship.avif",
-      "blurb": "Set sail on gentle thrills: pirate adventures for the smallest buccaneers.",
+      "blurb": "All hands on deck: the ship swings higher with every pass, for buccaneers aged 12 and up.",
       "gtk": [
         {
           "t": "Minimum height 1.2 m"
@@ -517,6 +517,32 @@
         },
         {
           "t": "Pay at the kiosk"
+        }
+      ]
+    },
+    {
+      "id": "giantswing",
+      "name": "The Giant Swing",
+      "cat": "adventure",
+      "thrill": 4,
+      "dur": "15 MIN",
+      "age": "12+",
+      "price": 700,
+      "mode": "pp",
+      "img": "/images/giant-swing/giant-swing-06.webp",
+      "blurb": "Two giant arcs high above the valley: strap in, lift off and swing out over the hills.",
+      "gtk": [
+        {
+          "t": "Two rides per ticket"
+        },
+        {
+          "t": "Riders from 12 years"
+        },
+        {
+          "t": "Weight 40 kg to 85 kg"
+        },
+        {
+          "t": "Harnessed seat, helmet and briefing by our team"
         }
       ]
     }
@@ -1637,6 +1663,45 @@
           "cap": "A local storyteller for the whole three hours."
         }
       ]
+    },
+    "giantswing": {
+      "eyebrow": "THE GIANT SWING · 2 RIDES PER TICKET",
+      "t1": "Lift off,",
+      "t2": "swing out",
+      "copy": "Strap into the seat, rise high above the platform and let go: two giant arcs out over the treetops, with the whole valley below your feet.",
+      "foot": "ABOUT 15 MINUTES · RIDERS 12+ · 40 TO 85 KG",
+      "cta": "Add the Giant Swing to my day →",
+      "shots": [
+        {
+          "src": "/images/giant-swing/giant-swing-03.webp",
+          "tag": "THE TOP",
+          "cap": "Feet up, nothing but sky."
+        },
+        {
+          "src": "/images/giant-swing/giant-swing-04.webp",
+          "tag": "THE ARC",
+          "cap": "Out over the treetops."
+        },
+        {
+          "src": "/images/giant-swing/giant-swing-01.webp",
+          "tag": "STRAPPED IN",
+          "cap": "Harness checked, helmet on."
+        },
+        {
+          "src": "/images/giant-swing/giant-swing-02.webp",
+          "tag": "SIDE BY SIDE",
+          "cap": "Two swings: ride next to a friend."
+        },
+        {
+          "src": "/images/giant-swing/giant-swing-05.webp",
+          "tag": "THE VALLEY",
+          "cap": "The whole swing, with the hills all around."
+        }
+      ],
+      "video": {
+        "src": "/images/giant-swing/giant-swing.mp4",
+        "poster": "/images/giant-swing/giant-swing-04.webp"
+      }
     }
   },
   "COMBO": [
@@ -1767,6 +1832,10 @@
     "miniexc": [
       200,
       300
+    ],
+    "giantswing": [
+      700,
+      700
     ]
   },
   "PL": {
@@ -2082,6 +2151,13 @@
         "n": "Pirate Ship",
         "rr": 200,
         "nr": 300
+      }
+    ],
+    "giantswing": [
+      {
+        "n": "Giant Swing · 2 rides",
+        "rr": 700,
+        "nr": 700
       }
     ]
   },

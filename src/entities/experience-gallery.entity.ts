@@ -23,4 +23,11 @@ export class ExperienceGallery {
 
   @Column({ name: 'cta', type: 'text' })
   cta: string;
+
+  /** Optional clip (migration 029), played muted in place of the lead photo. */
+  @Column({ name: 'video', type: 'text', nullable: true })
+  video: string | null;
+
+  @Column({ name: 'video_poster', type: 'text', nullable: true })
+  videoPoster: string | null;
 }
