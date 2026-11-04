@@ -107,7 +107,7 @@ export class WaiverCopyService {
     <img src="cid:waiver-signature" alt="signature" width="220" style="display:block;max-width:220px;border:1px solid #EBE2FF;border-radius:10px;margin:6px 0;background:#FFFFFF">
     <div style="font-size:13px"><strong>${esc(w.signedBy)}</strong> · ${esc(parkDateTime(w.signedAt))} (Mauritius) · IP ${esc(w.ip || '-')} · ${esc(w.termsVersion)}</div>
   </div>
-  <p style="text-align:center;font-size:11px;color:#7A6A93;margin:16px 0 0">Mare Anguilles Farms Ltd · VALLÉ Advenature™ Park · B102, Mare Anguilles, Chamouny · +230 660 44 77</p>
+  <p style="text-align:center;font-size:11px;color:#7A6A93;margin:16px 0 0">Mare Anguilles Farms Ltd · VALLÉ Advenature™ Park · B102, Mare Anguilles, Chamouny · +230 660 4477</p>
 </div></body></html>`;
     return { subject, text, html };
   }

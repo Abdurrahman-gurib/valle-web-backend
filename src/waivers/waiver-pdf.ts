@@ -161,7 +161,7 @@ function drawSignature(p: Page, w: Waiver, L: Labels, signedAt: Date, siteUrl: s
     doc.y = y + 6;
   }
   para(`${w.signedBy}  ·  ${fmtDate(signedAt)}`, { size: 9.5, gap: 10 });
-  doc.font('Helvetica').fontSize(8).fillColor(GREY).text(`${siteUrl}  ·  B102, Mare Anguilles, Chamouny, Mauritius  ·  +230 660 44 77`, M, doc.y, { width: CW, align: 'center' });
+  doc.font('Helvetica').fontSize(8).fillColor(GREY).text(`${siteUrl}  ·  B102, Mare Anguilles, Chamouny, Mauritius  ·  +230 660 4477`, M, doc.y, { width: CW, align: 'center' });
 }
 
 export function renderWaiverPdf(w: Waiver, b: Booking, opts: { siteUrl: string }): Promise<Buffer> {

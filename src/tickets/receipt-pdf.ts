@@ -83,7 +83,7 @@ export function renderReceiptPdf(b: Booking, lines: BookingLine[], opts: { siteU
 
     doc.font('Helvetica').fontSize(8).fillColor(GREY).text('No refund on cancellation once booked and paid; rain or weather is not a ground for cancellation. A visit stopped by the park for weather is postponed to a date of your choice (Disclaimer Form, clause 12).', M, doc.y, { width: CW });
     doc.y += 6;
-    doc.text(`${opts.siteUrl}  ·  +230 660 44 77  ·  sales@vallepark.com`, M, doc.y, { width: CW, align: 'center' });
+    doc.text(`${opts.siteUrl}  ·  +230 660 4477  ·  sales@vallepark.com`, M, doc.y, { width: CW, align: 'center' });
     doc.end();
   });
 }

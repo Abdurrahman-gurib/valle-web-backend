@@ -42,7 +42,7 @@ const TEMPLATES = [
         text:
           'Hi {{1}}, your booking at VALLÉ Advenature Park is confirmed.\n\n' +
           'Reference: {{2}}\nVisit: {{3}}\nParty: {{4}}\nPayment: {{5}}\n\n' +
-          'Open your ticket below and show the QR code at the gate. Need to change or cancel? Reply here or call +230 660 44 77.',
+          'Open your ticket below and show the QR code at the gate. Need to change or cancel? Reply here or call +230 660 4477.',
         example: { body_text: [['Asha', 'VAL-1234-26', 'Friday 2 October 2026, morning arrival 09:00 to 12:00', '2 adults and 1 child', 'Rs 6,200 to pay on arrival']] },
       },
       { type: 'FOOTER', text: 'B102, Mare Anguilles, Chamouny' },
@@ -62,7 +62,7 @@ const TEMPLATES = [
           'Bring closed shoes, sunscreen and water. Your ticket and QR code are one tap away below.',
         example: { body_text: [['Asha', 'Friday 2 October 2026, morning arrival 09:00 to 12:00', 'Rs 6,200 to pay on arrival']] },
       },
-      { type: 'FOOTER', text: 'Questions? Reply here or call +230 660 44 77' },
+      { type: 'FOOTER', text: 'Questions? Reply here or call +230 660 4477' },
       button,
     ],
   },

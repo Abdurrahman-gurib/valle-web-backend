@@ -9,7 +9,7 @@ import type { Booking } from '../entities';
  */
 
 export const PARK_ADDRESS = 'B102, Mare Anguilles, Chamouny, Mauritius';
-export const PARK_PHONE = '+230 660 44 77';
+export const PARK_PHONE = '+230 660 4477';
 export const MAPS = 'https://maps.google.com/?q=Vall%C3%A9+Advenature+Park+Chamouny';
 
 export const slotLabel = (slot: string): string => (slot === 'morning' ? 'Morning arrival, 09:00 to 12:00' : 'Afternoon arrival, 12:00 to 15:30');

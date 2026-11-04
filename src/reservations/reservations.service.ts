@@ -51,7 +51,7 @@ export class ReservationsService {
         `Hi ${r.guestName},`, ``,
         `We have your request for a table of ${r.party} at ${restaurantName} on ${r.visitDate} at ${r.visitTime}. The team confirms it shortly by e-mail or phone.`,
         pre,
-        `Changes or questions: reply to this e-mail or call +230 660 44 77.`, ``,
+        `Changes or questions: reply to this e-mail or call +230 660 4477.`, ``,
         `VALLÉ Advenature Park`,
       ].join('\n'),
     });
@@ -75,8 +75,8 @@ export class ReservationsService {
         to: r.email,
         subject: `${status === 'confirmed' ? 'Confirmed' : 'Cancelled'}: your table at ${row.restaurantName} · ${r.visitDate} ${r.visitTime}`,
         text: status === 'confirmed'
-          ? `Hi ${r.guestName},\n\nYour table of ${r.party} at ${row.restaurantName} on ${r.visitDate} at ${r.visitTime} is confirmed. See you then!\n\nVALLÉ Advenature Park · +230 660 44 77`
-          : `Hi ${r.guestName},\n\nWe could not keep a table of ${r.party} at ${row.restaurantName} on ${r.visitDate} at ${r.visitTime}. Call +230 660 44 77 and we will find another time.\n\nVALLÉ Advenature Park`,
+          ? `Hi ${r.guestName},\n\nYour table of ${r.party} at ${row.restaurantName} on ${r.visitDate} at ${r.visitTime} is confirmed. See you then!\n\nVALLÉ Advenature Park · +230 660 4477`
+          : `Hi ${r.guestName},\n\nWe could not keep a table of ${r.party} at ${row.restaurantName} on ${r.visitDate} at ${r.visitTime}. Call +230 660 4477 and we will find another time.\n\nVALLÉ Advenature Park`,
       }).catch(() => false);
     }
     return row;

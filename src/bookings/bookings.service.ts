@@ -262,7 +262,7 @@ export class BookingsService {
       ? await this.notifier.mail.send({
           to: email,
           subject: 'Your VALLÉ day, saved',
-          text: `Hi,\n\nYour booking at VALLÉ Advenature Park is saved, not booked yet. Pick it up where you left off, any time in the next 14 days:\n\n${link}\n\nNothing is reserved until you confirm on that page. Questions? Call +230 660 44 77.\n\nVALLÉ Advenature Park`,
+          text: `Hi,\n\nYour booking at VALLÉ Advenature Park is saved, not booked yet. Pick it up where you left off, any time in the next 14 days:\n\n${link}\n\nNothing is reserved until you confirm on that page. Questions? Call +230 660 4477.\n\nVALLÉ Advenature Park`,
         })
       : false;
     return { id: d.id, sent };
