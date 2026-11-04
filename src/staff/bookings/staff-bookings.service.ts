@@ -204,9 +204,18 @@ export class StaffBookingsService {
     const booking = await this.tickets.requireBooking(refCode, token);
     this.guestCanChange(booking);
     const patch = guestPatch(booking, dto);
+    await this.checkGuestParty(booking, dto);
     const detail = await this.update(refCode, patch, GUEST);
     void this.afterGuestChange(refCode, describeGuestChange(dto, detail) || 'changed');
     return this.tickets.view(refCode, token);
+  }
+
+  /** The guest's new lines (or the lines kept) must fit the new party, with no child below a 12+ minimum. */
+  private async checkGuestParty(booking: Booking, dto: GuestChangeDto): Promise<void> {
+    const items = dto.items ?? (await this.lineRepo.find({ where: { bookingId: booking.id } }))
+      .filter((l) => l.experienceId || l.productKey)
+      .map((l) => ({ id: l.experienceId ?? 'product:' + (l.productKey ?? ''), adults: l.adults, kids: l.kids }));
+    await this.bookings.checkParty(items, { adults: dto.adults ?? booking.adults, kids: dto.kids ?? booking.kids, infants: dto.infants ?? booking.infants ?? 0 });
   }
 
   async guestCancel(refCode: string, token: string | undefined, reason: string): Promise<TicketView> {
@@ -258,7 +267,7 @@ export class StaffBookingsService {
   }
 
   private withTicket(detail: BookingDetail): BookingDetail {
-    return { ...detail, ticketUrl: this.tickets.ticketUrl(detail.refCode) };
+    return { ...detail, ticketUrl: this.tickets.ticketUrl(detail.refCode, detail.lang) };
   }
 
   private async findOr404(refCode: string): Promise<Booking> {
@@ -332,6 +341,7 @@ export class StaffBookingsService {
         slot: patch.slot ?? booking.slot,
         adults: patch.adults ?? booking.adults,
         kids: patch.kids ?? booking.kids,
+        infants: patch.infants ?? booking.infants ?? 0,
         items: placesItems(patch, lines),
         exceptBookingId: booking.id,
       },
@@ -366,7 +376,7 @@ export class StaffBookingsService {
     const priced = computeBooking(
       experiences,
       entrySettings(settingsMap(settings)),
-      { adults: patch.adults ?? booking.adults, kids: patch.kids ?? booking.kids, rate: patch.rate ?? booking.rate, items },
+      { adults: patch.adults ?? booking.adults, kids: patch.kids ?? booking.kids, infants: patch.infants ?? booking.infants ?? 0, rate: patch.rate ?? booking.rate, items },
       priceRows,
       products,
     );
@@ -465,7 +475,7 @@ export class StaffBookingsService {
     const [todayRaw, unansweredChats] = await Promise.all([
       this.visitsOn(today)
         .select('COALESCE(SUM(b.total), 0)', 'sum')
-        .addSelect('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
+        .addSelect('COALESCE(SUM(b.adults + b.kids + b.infants), 0)', 'guests')
         .getRawOne<{ sum: string | number | null; guests: string | number | null }>(),
       this.chatRepo.count({ where: { status: 'open', unreadStaff: MoreThan(0) } }),
     ]);
@@ -562,6 +572,7 @@ function guestPatch(booking: Booking, dto: GuestChangeDto): UpdateBookingDto {
   if (dto.slot !== undefined) patch.slot = dto.slot;
   if (dto.adults !== undefined) patch.adults = dto.adults;
   if (dto.kids !== undefined) patch.kids = dto.kids;
+  if (dto.infants !== undefined) patch.infants = dto.infants;
   if (dto.items !== undefined) patch.items = dto.items;
   if (Object.keys(patch).length === 0) throw new BadRequestException('Nothing to change');
   return patch;
@@ -572,7 +583,7 @@ function describeGuestChange(dto: GuestChangeDto, detail: BookingDetail): string
   return [
     dto.visitDate !== undefined ? `date -> ${dto.visitDate}` : '',
     dto.slot !== undefined ? `slot -> ${dto.slot}` : '',
-    dto.adults !== undefined || dto.kids !== undefined ? `party -> ${detail.adults} adults, ${detail.kids} children` : '',
+    dto.adults !== undefined || dto.kids !== undefined || dto.infants !== undefined ? `party -> ${detail.adults} adults, ${detail.kids} children, ${detail.infants ?? 0} under 6` : '',
     dto.items !== undefined ? 'experiences changed' : '',
   ].filter(Boolean).join(', ');
 }

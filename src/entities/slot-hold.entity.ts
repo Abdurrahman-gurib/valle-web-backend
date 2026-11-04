@@ -24,6 +24,10 @@ export class SlotHold {
   @Column({ name: 'kids', type: 'int', default: 0 })
   kids: number;
 
+  /** Children under 6 (migration 030). */
+  @Column({ name: 'infants', type: 'int', default: 0 })
+  infants: number;
+
   @Column({ name: 'items', type: 'jsonb', default: () => "'[]'" })
   items: HeldItem[];
 

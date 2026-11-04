@@ -30,7 +30,7 @@ export class BookingNotifierService {
 
   /** Builds the message; exported for tests and for the send below. */
   render(booking: Booking, lines: BookingLine[]): { subject: string; text: string } {
-    const party = partyText(booking.adults, booking.kids, ' · ');
+    const party = partyText(booking.adults, booking.kids, ' · ', booking.infants ?? 0);
     const rs = rupees;
     const items = lines.map((l) => `  - ${l.label}: ${rs(l.amount)}`).join('\n');
     const subject = `New booking ${booking.refCode} · ${booking.visitDate} ${booking.slot} · ${booking.guestName}`;

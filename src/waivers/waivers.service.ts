@@ -11,9 +11,12 @@ import {
   WAIVER_TERMS_VERSION,
   parseAgeLabel,
   parseLimitsSetting,
+  gateChecks,
+  lineActivities,
   parseWaiverActivities,
   waiverRequiredCount,
 } from './waiver-rules';
+import { productActivityMap } from './waiver-products';
 import {
   newWaiverRecord, signerFor, stopCount, toGateWaiver, toHistory,
   type GateDayRow, type GateView, type WaiverPublicView,
@@ -46,7 +49,12 @@ export class WaiversService {
       this.lineRepo.find({ where: { bookingId: b.id } }),
       this.waiverActivities(),
     ]);
-    return waiverRequiredCount(lines, activities, b);
+    return waiverRequiredCount(lines, activities, b, await this.packagesOf(lines));
+  }
+
+  /** What the package lines contain, as experience ids. */
+  private packagesOf(lines: BookingLine[]): Promise<Map<string, string[]>> {
+    return productActivityMap(this.lineRepo.manager, lines.map((l) => l.productKey));
   }
 
   /** Settings row `waiver_activities`: the experiences that need a signed waiver. */
@@ -62,7 +70,20 @@ export class WaiversService {
   /** Activities in the booking that carry limits, with ages from the catalog and weights/heights from settings. */
   async activitiesFor(bookingId: string): Promise<GateActivity[]> {
     const lines = await this.lineRepo.find({ where: { bookingId } });
-    const ids = [...new Set(lines.map((l) => l.experienceId).filter((x): x is string => !!x))];
+    const packages = await this.packagesOf(lines);
+    // the most people any line puts on each activity (a package line counts for what it contains)
+    const people = new Map<string, { adults: number; kids: number }>();
+    const everyone = new Set<string>(); // flat lines (a buggy) count no heads: the whole party
+    for (const l of lines) {
+      for (const id of lineActivities(l, packages)) {
+        const a = l.adults ?? 0, k = l.kids ?? 0;
+        if (a + k === 0) { everyone.add(id); continue; }
+        const cur = people.get(id) ?? { adults: 0, kids: 0 };
+        people.set(id, { adults: Math.max(cur.adults, a), kids: Math.max(cur.kids, k) });
+      }
+    }
+    for (const id of everyone) people.delete(id);
+    const ids = [...new Set([...people.keys(), ...everyone])];
     if (!ids.length) return [];
     const [exps, setting] = await Promise.all([
       this.expRepo.find({ where: { id: In(ids) } }),
@@ -70,7 +91,7 @@ export class WaiversService {
     ]);
     const extra = parseLimitsSetting(setting?.value);
     return exps
-      .map((e) => ({ id: e.id, name: e.name, limits: { ...parseAgeLabel(e.ageLabel), ...(extra[e.id] ?? {}) } }))
+      .map((e) => ({ id: e.id, name: e.name, limits: { ...parseAgeLabel(e.ageLabel), ...(extra[e.id] ?? {}) }, people: people.get(e.id) }))
       .filter((a) => Object.keys(a.limits).length > 0);
   }
 
@@ -177,7 +198,7 @@ export class WaiversService {
       this.currentWaivers(b.id),
       this.activitiesFor(b.id),
     ]);
-    const rows = waivers.map((w) => toGateWaiver(w, visit, activities));
+    const rows = waivers.map((w) => toGateWaiver(w, visit, activities, b));
     const superseded = await this.waiverRepo.find({ where: { bookingId: b.id, supersededAt: Not(IsNull()) }, order: { supersededAt: 'DESC' } });
     const required = await this.required(b);
     return {
@@ -188,6 +209,7 @@ export class WaiversService {
       slot: b.slot,
       adults: b.adults,
       kids: b.kids,
+      infants: b.infants ?? 0,
       status: b.status,
       payMode: b.payMode,
       total: b.total,
@@ -198,13 +220,14 @@ export class WaiversService {
       isToday: visit === parkToday(),
       lines: lines.map((l) => ({ label: l.label, amount: l.amount })),
       activities,
+      checkAtGate: gateChecks(activities, b),
       required,
       signedCount: rows.length,
       missing: Math.max(0, required - rows.length),
       stops: stopCount(rows),
       waivers: rows,
       history: toHistory(superseded),
-      waiverUrl: this.tickets.waiverUrl(b.refCode),
+      waiverUrl: this.tickets.waiverUrl(b.refCode, b.lang),
     };
   }
 
@@ -213,7 +236,7 @@ export class WaiversService {
     const rows = await this.bookingRepo
       .createQueryBuilder('b')
       .leftJoin(Waiver, 'w', 'w.booking_id = b.id AND w.superseded_at IS NULL')
-      .select(['b.ref_code AS "refCode"', 'b.guest_name AS "guestName"', 'b.slot AS slot', 'b.adults + b.kids AS party', 'b.status AS status', 'b.total - b.paid_amount AS balance', 'COUNT(w.id)::int AS signed'])
+      .select(['b.ref_code AS "refCode"', 'b.guest_name AS "guestName"', 'b.slot AS slot', 'b.adults + b.kids + b.infants AS party', 'b.status AS status', 'b.total - b.paid_amount AS balance', 'COUNT(w.id)::int AS signed'])
       .where('b.visit_date = :date', { date })
       .andWhere('b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] })
       .groupBy('b.id')
@@ -225,7 +248,7 @@ export class WaiversService {
     for (const r of rows) {
       const b = await this.bookingRepo.findOne({ where: { refCode: r.refCode } });
       const lines = b ? await this.lineRepo.find({ where: { bookingId: b.id } }) : [];
-      out.push({ ...r, party: b ? waiverRequiredCount(lines, acts, b) : Number(r.party), signed: Number(r.signed), balance: Math.max(0, Number(r.balance)) });
+      out.push({ ...r, party: b ? waiverRequiredCount(lines, acts, b, await this.packagesOf(lines)) : Number(r.party), signed: Number(r.signed), balance: Math.max(0, Number(r.balance)) });
     }
     return out;
   }

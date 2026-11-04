@@ -401,6 +401,8 @@ describe('StaffBookingsService.list', () => {
       slot: 'morning',
       adults: 2,
       kids: 1,
+      infants: 0,
+      lang: 'en',
       rate: 'rr',
       guestName: 'Ariane Léger',
       email: 'ariane@example.com',

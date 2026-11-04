@@ -27,6 +27,10 @@ export class GuestChangeDto {
   @IsOptional() @IsInt() @Min(0) @Max(12)
   kids?: number;
 
+  @ApiPropertyOptional({ minimum: 0, maximum: 12, description: 'Children under 6' })
+  @IsOptional() @IsInt() @Min(0) @Max(12)
+  infants?: number;
+
   @ApiPropertyOptional({ type: [BookingItemDto], description: 'The full new list of experiences' })
   @IsOptional() @IsArray() @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => BookingItemDto)
   items?: BookingItemDto[];

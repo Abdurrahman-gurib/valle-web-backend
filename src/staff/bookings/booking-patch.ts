@@ -17,6 +17,7 @@ export interface BookingPatch {
   slot?: 'morning' | 'afternoon';
   adults?: number;
   kids?: number;
+  infants?: number;
   rate?: 'rr' | 'nr';
   guestName?: string;
   phone?: string;
@@ -46,10 +47,10 @@ export interface PatchItem {
 }
 
 /** Editing any of these re-prices the booking from its own experience lines. */
-export const MONEY_FIELDS = ['adults', 'kids', 'rate', 'items', 'adjustmentKind', 'adjustmentValue', 'adjustmentNote', 'couponCode'] as const;
+export const MONEY_FIELDS = ['adults', 'kids', 'infants', 'rate', 'items', 'adjustmentKind', 'adjustmentValue', 'adjustmentNote', 'couponCode'] as const;
 
 /** Changing any of these needs room in the (new) slot. */
-export const PLACE_FIELDS = ['visitDate', 'slot', 'adults', 'kids', 'status'] as const;
+export const PLACE_FIELDS = ['visitDate', 'slot', 'adults', 'kids', 'infants', 'status'] as const;
 
 /**
  * Keeps only the fields the operator actually sent, trimmed. Absent keys are
@@ -63,6 +64,7 @@ export function normalizePatch(dto: UpdateBookingDto): BookingPatch {
   if (dto.slot !== undefined) patch.slot = dto.slot;
   if (dto.adults !== undefined) patch.adults = dto.adults;
   if (dto.kids !== undefined) patch.kids = dto.kids;
+  if (dto.infants !== undefined) patch.infants = dto.infants;
   if (dto.rate !== undefined) patch.rate = dto.rate;
   if (dto.guestName !== undefined) patch.guestName = dto.guestName.trim();
   if (dto.phone !== undefined) patch.phone = dto.phone.trim();
@@ -97,6 +99,8 @@ export function currentValue(b: Booking, field: PatchField): string | number {
       return b.adults;
     case 'kids':
       return b.kids;
+    case 'infants':
+      return b.infants ?? 0;
     case 'rate':
       return b.rate;
     case 'guestName':
@@ -149,6 +153,7 @@ export function applyPatch(b: Booking, patch: BookingPatch): void {
   if (patch.slot !== undefined) b.slot = patch.slot;
   if (patch.adults !== undefined) b.adults = patch.adults;
   if (patch.kids !== undefined) b.kids = patch.kids;
+  if (patch.infants !== undefined) b.infants = patch.infants;
   if (patch.rate !== undefined) b.rate = patch.rate;
   if (patch.guestName !== undefined) b.guestName = patch.guestName;
   if (patch.phone !== undefined) b.phone = patch.phone;

@@ -113,6 +113,8 @@ export interface PlacesRequest {
   slot: SlotKey;
   adults: number;
   kids: number;
+  /** Children under 6: free, but they take a place in the slot. */
+  infants?: number;
   items: { id: string; adults?: number; kids?: number; units?: number; time?: string }[];
   /** The guest's own hold: not counted against them. */
   holdId?: string;
@@ -121,14 +123,14 @@ export interface PlacesRequest {
 }
 
 
-export interface ExperienceInfo { name: string; priceMode: 'pp' | 'flat' | 'entry' | 'kiosk' }
+export interface ExperienceInfo { name: string; priceMode: 'pp' | 'flat' | 'entry' | 'kiosk'; ageLabel?: string | null }
 
 const LIVE = `status NOT IN ('cancelled','postponed')`;
 
 /** Guests held for (date, slot) by live holds other than the caller's. */
 async function heldGuests(manager: EntityManager, date: string, slot: SlotKey, holdId?: string): Promise<number> {
   const rows = await manager.query(
-    `SELECT COALESCE(SUM(adults + kids), 0)::int AS guests FROM slot_holds WHERE visit_date = $1 AND slot = $2 AND expires_at > now() AND ($3::uuid IS NULL OR id <> $3::uuid)`,
+    `SELECT COALESCE(SUM(adults + kids + infants), 0)::int AS guests FROM slot_holds WHERE visit_date = $1 AND slot = $2 AND expires_at > now() AND ($3::uuid IS NULL OR id <> $3::uuid)`,
     [date, slot, holdId ?? null],
   ) as { guests: number }[];
   return Number(rows[0]?.guests) || 0;
@@ -180,11 +182,11 @@ export async function reservePlaces(manager: EntityManager, req: PlacesRequest, 
   await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`slot:${req.visitDate}:${req.slot}`]);
 
   const booked = await manager.query(
-    `SELECT COALESCE(SUM(adults + kids), 0)::int AS guests FROM bookings WHERE visit_date = $1 AND slot = $2 AND ${LIVE} AND ($3::uuid IS NULL OR id <> $3::uuid)`,
+    `SELECT COALESCE(SUM(adults + kids + infants), 0)::int AS guests FROM bookings WHERE visit_date = $1 AND slot = $2 AND ${LIVE} AND ($3::uuid IS NULL OR id <> $3::uuid)`,
     [req.visitDate, req.slot, req.exceptBookingId ?? null],
   ) as { guests: number }[];
   const taken = (Number(booked[0]?.guests) || 0) + (await heldGuests(manager, req.visitDate, req.slot, req.holdId));
-  if (taken + req.adults + req.kids > cal.slotCapacity) throw new ConflictException(SLOT_FULL_MESSAGE);
+  if (taken + req.adults + req.kids + (req.infants ?? 0) > cal.slotCapacity) throw new ConflictException(SLOT_FULL_MESSAGE);
 
   for (const item of req.items) {
     if (item.id.startsWith('product:')) continue; // packages, combos, VIP, photo, cinematic: no per-activity limit

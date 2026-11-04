@@ -12,7 +12,7 @@ import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm
 import { ChatGateway } from '../chat/chat.gateway';
 import { settingsMap } from '../common/collections';
 import { parkToday } from '../common/park-time';
-import { Booking, BookingDraft, BookingLine, Experience, PriceListEntry, Product, Setting, SlotHold } from '../entities';
+import { Booking, BookingDraft, BookingLine, Experience, PriceListEntry, Product, Setting, SlotHold, isProductId, productKeyOf } from '../entities';
 import { HOLD_MINUTES, parseCalendar, reservePlaces, type Calendar, type ExperienceInfo, type SlotKey } from './capacity';
 import {
   addBookedLoads, addHeldGuests, applyActivityLevels, applySessionLevels, applySlotLevels, availabilityWindow, emptyDays, tallyTaken,
@@ -30,6 +30,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { toBookingRow } from '../staff/bookings/booking-row';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { adjustmentAmount, computeBooking, entrySettings, groupDepositAmount, PricedBooking } from './pricing';
+import { assertAgeMinimums, assertLinesFitParty, type LineInfo } from './party-rules';
 
 export { AVAILABILITY_MAX_DAYS, busyLevel, type AvailabilityDay, type BusyLevel, type SlotLoad } from './availability';
 export type { BookingResponse } from './booking-records';
@@ -43,7 +44,7 @@ const DAY_MS = 86_400_000;
 
 /** An item of a hold: what the guest picked so far. */
 export interface HoldItem { id: string; adults?: number; kids?: number; units?: number; time?: string }
-export interface HoldRequest { visitDate: string; slot: SlotKey; adults: number; kids: number; items: HoldItem[]; holdId?: string }
+export interface HoldRequest { visitDate: string; slot: SlotKey; adults: number; kids: number; infants?: number; items: HoldItem[]; holdId?: string }
 
 /** Everything create() works out before it writes, handed to each write attempt. */
 interface PreparedBooking {
@@ -104,7 +105,22 @@ export class BookingsService {
   /** name + price mode per experience, for the capacity check's wording and units. */
   async experienceInfo(): Promise<Map<string, ExperienceInfo>> {
     const rows = await this.experienceRepo.find();
-    return new Map(rows.map((e) => [e.id, { name: e.name, priceMode: e.priceMode }]));
+    return new Map(rows.map((e) => [e.id, { name: e.name, priceMode: e.priceMode, ageLabel: e.ageLabel }]));
+  }
+
+  /** Name and age label of every experience and product, for the party rules' messages. */
+  async lineInfo(): Promise<(id: string) => LineInfo | undefined> {
+    const [exps, products] = await Promise.all([this.experienceRepo.find(), this.productRepo.find()]);
+    const byExp = new Map(exps.map((e) => [e.id, { name: e.name, ageLabel: e.ageLabel }]));
+    const byProduct = new Map(products.map((p) => [p.key, { name: p.name }]));
+    return (id: string) => (isProductId(id) ? byProduct.get(productKeyOf(id)) : byExp.get(id));
+  }
+
+  /** The line rules every path applies: no line above the party, no child below a 12+ minimum. */
+  async checkParty(items: { id: string; adults?: number; kids?: number }[], party: { adults: number; kids: number; infants?: number }): Promise<void> {
+    const info = await this.lineInfo();
+    assertLinesFitParty(items, party, info);
+    assertAgeMinimums(items, info);
   }
 
   /**
@@ -120,7 +136,7 @@ export class BookingsService {
       .select('b.visitDate', 'date')
       .addSelect('b.slot', 'slot')
       .addSelect('COUNT(*)', 'bookings')
-      .addSelect('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
+      .addSelect('COALESCE(SUM(b.adults + b.kids + b.infants), 0)', 'guests')
       .where('b.visitDate BETWEEN :from AND :to', { from, to })
       .andWhere('b.status NOT IN (:...gone)', { gone: ['cancelled', 'postponed'] })
       .groupBy('b.visitDate')
@@ -131,7 +147,7 @@ export class BookingsService {
       .createQueryBuilder('h')
       .select('h.visitDate', 'date')
       .addSelect('h.slot', 'slot')
-      .addSelect('COALESCE(SUM(h.adults + h.kids), 0)', 'guests')
+      .addSelect('COALESCE(SUM(h.adults + h.kids + h.infants), 0)', 'guests')
       .where('h.visitDate BETWEEN :from AND :to', { from, to })
       .andWhere('h.expiresAt > now()')
       .groupBy('h.visitDate')
@@ -214,13 +230,14 @@ export class BookingsService {
    * an earlier hold of the same guest is replaced.
    */
   async hold(input: HoldRequest): Promise<{ holdId: string; expiresAt: string }> {
+    await this.checkParty(input.items, input);
     const [cal, experiences] = await Promise.all([this.calendar(), this.experienceInfo()]);
     const visitDate = input.visitDate.slice(0, 10);
     return this.dataSource.transaction(async (manager) => {
       if (input.holdId) await manager.delete(SlotHold, { id: input.holdId });
       await reservePlaces(manager, { ...input, visitDate }, cal, experiences);
       const saved = await manager.save(SlotHold, manager.create(SlotHold, {
-        visitDate, slot: input.slot, adults: input.adults, kids: input.kids, items: input.items.map((i) => ({ id: i.id, adults: i.adults ?? 0, kids: i.kids ?? 0, units: i.units ?? 0, ...(i.time ? { time: i.time } : {}) })),
+        visitDate, slot: input.slot, adults: input.adults, kids: input.kids, infants: input.infants ?? 0, items: input.items.map((i) => ({ id: i.id, adults: i.adults ?? 0, kids: i.kids ?? 0, units: i.units ?? 0, ...(i.time ? { time: i.time } : {}) })),
         expiresAt: new Date(Date.now() + HOLD_MINUTES * 60_000),
       }));
       return { holdId: saved.id, expiresAt: saved.expiresAt.toISOString() };
@@ -265,6 +282,7 @@ export class BookingsService {
     if (done) return this.responseFor(done);
 
     const contact = this.validateRequest(dto);
+    await this.checkParty(dto.items, { adults: dto.adults, kids: dto.kids, infants: dto.infants ?? 0 });
     const { priced, settings } = await this.price(dto, contact.visitDate);
 
     // A promo / partner code: validated now, counted inside the booking transaction.
@@ -314,13 +332,10 @@ export class BookingsService {
     }
 
     // Ordinary bookings keep the 12-person cap; a group says who it is and gets a bigger party.
-    const party = dto.adults + dto.kids;
-    if (!dto.group && (dto.adults > 12 || dto.kids > 12)) throw new BadRequestException('Parties over 12 book as a group (school, company or club)');
+    const party = dto.adults + dto.kids + (dto.infants ?? 0);
+    if (!dto.group && (dto.adults > 12 || dto.kids > 12 || (dto.infants ?? 0) > 12)) throw new BadRequestException('Parties over 12 book as a group (school, company or club)');
     if (dto.group && party < 10) throw new BadRequestException('A group booking is for 10 people or more');
     if (dto.group && (dto.group.participants?.length ?? 0) > party) throw new BadRequestException('More participants listed than people in the party');
-    for (const item of dto.items) {
-      if ((item.adults ?? 0) > dto.adults || (item.kids ?? 0) > dto.kids) throw new BadRequestException('An experience cannot count more people than the party');
-    }
 
     const visitDate = dto.visitDate.slice(0, 10);
     // "Today" is whatever day it is at the park, not on the server.
@@ -342,7 +357,7 @@ export class BookingsService {
     const priced = computeBooking(
       experiences,
       entrySettings(settings),
-      { adults: dto.adults, kids: dto.kids, rate: dto.rate, items: dto.items, visitDate },
+      { adults: dto.adults, kids: dto.kids, infants: dto.infants ?? 0, rate: dto.rate, items: dto.items, visitDate },
       priceRows,
       products,
     );
@@ -360,8 +375,9 @@ export class BookingsService {
     return bookingResponse(
       saved,
       priced.lines,
-      { ticketUrl: this.tickets?.ticketUrl(saved.refCode), qrUrl: this.tickets?.qrUrl(saved.refCode) },
+      { ticketUrl: this.tickets?.ticketUrl(saved.refCode, saved.lang), qrUrl: this.tickets?.qrUrl(saved.refCode) },
       checkout,
+      prepared.settings.get('group_bank_details') ?? '',
     );
   }
 
@@ -371,7 +387,7 @@ export class BookingsService {
     // The slot, the day and every capped activity must really have room: the picker is only advisory.
     await reservePlaces(
       manager,
-      { visitDate: contact.visitDate, slot: dto.slot, adults: dto.adults, kids: dto.kids, items: dto.items, holdId: dto.holdId },
+      { visitDate: contact.visitDate, slot: dto.slot, adults: dto.adults, kids: dto.kids, infants: dto.infants ?? 0, items: dto.items, holdId: dto.holdId },
       prepared.cal,
       prepared.experienceInfo,
     );
@@ -435,6 +451,7 @@ export class BookingsService {
   /** The create() response for a booking already written (a retried attempt). */
   private async responseFor(b: Booking): Promise<BookingResponse> {
     const lines = await this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } });
-    return bookingResponse(b, lines, { ticketUrl: this.tickets?.ticketUrl(b.refCode), qrUrl: this.tickets?.qrUrl(b.refCode) });
+    const bank = b.depositAmount ? (await this.settingRepo.findOne({ where: { key: 'group_bank_details' } }))?.value ?? '' : '';
+    return bookingResponse(b, lines, { ticketUrl: this.tickets?.ticketUrl(b.refCode, b.lang), qrUrl: this.tickets?.qrUrl(b.refCode) }, null, bank);
   }
 }

@@ -8,6 +8,7 @@ import { ParkStatusService } from '../weather/park-status.service';
 import { Waiver } from '../entities/waiver.entity';
 import { Setting } from '../entities/setting.entity';
 import { parseWaiverActivities, waiverRequiredCount } from '../waivers/waiver-rules';
+import { productActivityMap } from '../waivers/waiver-products';
 import { MailService } from './mail.service';
 import { WhatsAppService, type BookingMessage } from './whatsapp.service';
 import { escapeHtml as esc } from '../common/html';
@@ -107,8 +108,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       `${visitDay(b)} · ${slotLabel(b.slot)}`,
       `${party(b)} · ${this.payLine(b)}`,
       ``,
-      `Your ticket with QR code: ${this.tickets.ticketUrl(b.refCode)}`,
-      `Sign the safety waiver for everyone in your party ${this.waiverDeadline(b)} and skip the paperwork at the gate: ${this.tickets.waiverUrl(b.refCode)}`,
+      `Your ticket with QR code: ${this.tickets.ticketUrl(b.refCode, b.lang)}`,
+      `Sign the safety waiver for everyone in your party ${this.waiverDeadline(b)} and skip the paperwork at the gate: ${this.tickets.waiverUrl(b.refCode, b.lang)}`,
       `Show it at the gate. Directions: ${MAPS}`,
       `Questions? Reply here or call ${PARK_PHONE}.`,
     ].join('\n');
@@ -117,8 +118,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   /** Subject, text and HTML of the ticket e-mail (exported for tests). */
   renderTicketEmail(b: Booking, lines: BookingLine[]): { subject: string; text: string; html: string } {
     const visit = visitDay(b);
-    const url = this.tickets.ticketUrl(b.refCode);
-    const waiver = this.tickets.waiverUrl(b.refCode);
+    const url = this.tickets.ticketUrl(b.refCode, b.lang);
+    const waiver = this.tickets.waiverUrl(b.refCode, b.lang);
     const paidInFull = (b.paidAmount ?? 0) >= b.total;
     const pay = paidInFull ? `Paid: ${rs(b.total)}` : `${this.payLine(b).replace(/^Rs/, 'To pay on arrival: Rs').replace(' to pay on arrival', '')} (cash or card at the gate)`;
     const subject = `Your VALLÉ ticket ${b.refCode} · ${visit}`;
@@ -201,7 +202,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     return [
       `Hi ${firstName(b)}, one thing before your visit to VALLÉ Advenature™ Park on ${visitDay(b)}:`,
       `each participant needs a signed safety waiver (Disclaimer Form). Sign it on your phone ${this.waiverDeadline(b)}, one per person, and skip the paperwork at the gate:`,
-      this.tickets.waiverUrl(b.refCode),
+      this.tickets.waiverUrl(b.refCode, b.lang),
       ``,
       `Booking ${b.refCode} · questions? Reply here or call ${PARK_PHONE}.`,
     ].join('\n');
@@ -211,7 +212,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   async sendWaiverLink(b: Booking, waivers?: { signed: number; required: number }): Promise<{ email: boolean; whatsapp: boolean }> {
     const text = this.waiverLinkText(b);
     const left = waivers && waivers.required > 0 ? `${waivers.required - waivers.signed} of ${waivers.required} still to sign · ` : '';
-    const url = this.tickets.waiverUrl(b.refCode);
+    const url = this.tickets.waiverUrl(b.refCode, b.lang);
     const html = emailFrame({
       title: 'Sign your waivers before you arrive',
       titleSize: 24,
@@ -250,7 +251,8 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       this.lineRepo.find({ where: { bookingId: b.id } }),
       this.settingRepo.findOne({ where: { key: 'waiver_activities' } }),
     ]);
-    return { signed, required: waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b) };
+    const packages = await productActivityMap(this.lineRepo.manager, lines.map((l) => l.productKey));
+    return { signed, required: waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b, packages) };
   }
 
   /**
@@ -259,17 +261,17 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
    */
   reminderText(b: Booking, statusLine = '', waivers?: { signed: number; required: number }): string {
     const waiverLine = !waivers || waivers.required === 0
-      ? `Waivers: sign them tonight and skip the queue at the gate: ${this.tickets.waiverUrl(b.refCode)}`
+      ? `Waivers: sign them tonight and skip the queue at the gate: ${this.tickets.waiverUrl(b.refCode, b.lang)}`
       : waivers.signed >= waivers.required
         ? `Waivers: all ${waivers.required} signed, thank you. Straight to the briefing tomorrow.`
-        : `⚠️ Waivers: ${waivers.required - waivers.signed} of ${waivers.required} still unsigned. Sign tonight (2 minutes each) or fill them in at the desk before the briefing: ${this.tickets.waiverUrl(b.refCode)}`;
+        : `⚠️ Waivers: ${waivers.required - waivers.signed} of ${waivers.required} still unsigned. Sign tonight (2 minutes each) or fill them in at the desk before the briefing: ${this.tickets.waiverUrl(b.refCode, b.lang)}`;
     return [
       `See you tomorrow at VALLÉ Advenature™ Park, ${b.guestName.split(' ')[0]}! 🌴`,
       `${visitDay(b)} · ${slotLabel(b.slot)} · ${party(b)}`,
       ...(statusLine ? [`⚠️ ${statusLine}`] : []),
       (b.paidAmount ?? 0) >= b.total ? 'Already paid.' : `${this.payLine(b)} (cash or card).`,
       ``,
-      `Your ticket: ${this.tickets.ticketUrl(b.refCode)}`,
+      `Your ticket: ${this.tickets.ticketUrl(b.refCode, b.lang)}`,
       waiverLine,
       `Directions: ${MAPS}`,
       `Bring closed shoes, sunscreen and water. Reply here or call ${PARK_PHONE} if anything changes.`,
@@ -297,7 +299,7 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
 
   /** "Your photos are ready": the ticket page now carries the visit photos. */
   async sendPhotosReady(b: Booking, count: number): Promise<{ email: boolean; whatsapp: boolean }> {
-    const url = this.tickets.ticketUrl(b.refCode) + '#photos';
+    const url = this.tickets.ticketUrl(b.refCode, b.lang) + '#photos';
     const first = firstName(b);
     const text = [
       `Hi ${first}, your photos from VALLÉ Advenature™ Park are ready! 📸`,

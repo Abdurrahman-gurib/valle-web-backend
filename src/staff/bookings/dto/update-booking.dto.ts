@@ -62,6 +62,13 @@ export class UpdateBookingDto {
   @Max(12)
   kids?: number;
 
+  @ApiPropertyOptional({ minimum: 0, maximum: 12, example: 1, description: 'Children under 6' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(12)
+  infants?: number;
+
   @ApiPropertyOptional({
     enum: ['rr', 'nr'],
     description: 'rr = resident, nr = non-resident',
