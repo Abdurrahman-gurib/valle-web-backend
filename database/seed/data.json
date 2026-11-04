@@ -687,10 +687,10 @@
       "tag": "Dine beside the cascading Chamouzé waterfall, mid-trail.",
       "cuisine": "Mauritian & European fusion",
       "hours": "Daily · 11:30 – 16:30",
-      "price": "Menus Rs 700 – 4,250",
+      "price": "Package menus from Rs 2,700",
       "setting": "Beside the waterfall",
       "about": "A terrace set right against the Chamouzé falls, close enough to feel the spray. The kitchen pairs Mauritian classics with European technique: palm-heart salads, grilled catch of the day and slow braises, plus a kids menu for small adventurers. Come up for lunch between two ziplines, or settle in for the afternoon with the waterfall as your soundtrack.",
-      "detail": "Set menus from Rs 700 to Rs 4,250 · vegetarian options · the only restaurant in Mauritius where a zipline crosses the view.",
+      "detail": "Package menus from Rs 2,700 per person · à la carte and a kids menu · vegetarian options · the only restaurant in Mauritius where a zipline crosses the view.",
       "menuPdf": "/menus/le-chamouze-menu.pdf",
       "gallery": [
         "/images/lechamouze.avif",
@@ -1356,7 +1356,7 @@
         "badge": "AGES 55 AND ABOVE",
         "color": "#33FF74",
         "fg": "#340057",
-        "img": "/images/trail-tortoise.webp",
+        "img": "/images/valle-waterfall-nature-trail-mauritius.avif",
         "single": "Rs 1,100",
         "dbl": "",
         "hero": "A gentle day in the valley",
@@ -1464,7 +1464,7 @@
       "t1": "The whole family,",
       "t2": "one buggy",
       "copy": "A side-by-side with a roof, belts and room for three. The same rivers and forest tracks as the quad, except everyone rides together and nobody gets left at the gate.",
-      "foot": "FROM RS 3,200 PER BUGGY · DRIVER 16+ WITH LICENCE · HELMETS PROVIDED",
+      "foot": "DRIVER 16+ WITH LICENCE · HELMETS PROVIDED",
       "cta": "Add the buggy to my day →",
       "shots": [
         {
@@ -1494,7 +1494,7 @@
       "t1": "Mud, rivers,",
       "t2": "no traffic",
       "copy": "One hour on the Discovery track or two on the Advenature Tour, guided the whole way. River crossings, forest single track and a ridge above the Coloured Earth with the ocean behind it.",
-      "foot": "FROM RS 2,800 · DRIVING LICENCE REQUIRED · HELMETS PROVIDED",
+      "foot": "DRIVING LICENCE REQUIRED · HELMETS PROVIDED",
       "cta": "Add the quad to my day →",
       "shots": [
         {
@@ -1614,7 +1614,7 @@
       "t1": "Steer it,",
       "t2": "brake it, race it",
       "copy": "No engine, no pedals. You control the speed the whole way down a winding mountain track, past the caution chevrons and into the last banked curve. One ride is never enough.",
-      "foot": "FROM RS 500 · 1, 2 OR 3 RIDES · ADULTS AND KIDS FROM 6",
+      "foot": "1, 2 OR 3 RIDES · ADULTS AND KIDS FROM 6",
       "cta": "Add the luge to my day →",
       "shots": [
         {

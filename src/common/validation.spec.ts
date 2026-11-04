@@ -138,7 +138,8 @@ describe('control characters on public write paths', () => {
         email: 'sales@example.com',
         phone: '+230 5292 8841',
         groupSize: '25 to 50',
-        preferredDate: '2026-09-12',
+        // a date ahead of today: the quote form refuses past days
+        preferredDate: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
         message: 'Team building day.\nTwo groups, please.',
       }),
     ).toEqual([]);
