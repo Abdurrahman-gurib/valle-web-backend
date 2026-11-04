@@ -16,6 +16,7 @@ import { TicketsModule } from '../../tickets/tickets.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { CouponsModule } from '../../coupons/coupons.module';
 import { PaymentsModule } from '../../payments/payments.module';
+import { WaiversModule } from '../../waivers/waivers.module';
 import { StaffBookingsController } from './staff-bookings.controller';
 import { GuestChangesController } from './guest-changes.controller';
 import { StaffBookingsService } from './staff-bookings.service';
@@ -46,6 +47,8 @@ import { StaffBookingsService } from './staff-bookings.service';
     NotificationsModule,
     CouponsModule,
     PaymentsModule,
+    // "Mark arrived" follows the gate's waiver rule
+    WaiversModule,
   ],
   controllers: [StaffBookingsController, GuestChangesController],
   providers: [StaffBookingsService],

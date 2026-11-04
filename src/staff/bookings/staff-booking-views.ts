@@ -33,6 +33,8 @@ export interface BookingAuditRow {
  */
 export type BookingDetail = BookingRow & {
   staffNote: string;
+  /** ISO 8601, to the millisecond: sent back as `expectedUpdatedAt` so a stale edit gets a 409. */
+  updatedAt: string | null;
   /** The guest's ticket page; what the desk forwards by WhatsApp / e-mail. */
   ticketUrl?: string;
   ticketSentAt?: string | null;
@@ -79,6 +81,7 @@ export function toBookingDetail(
   return {
     ...toBookingRow(booking),
     staffNote: booking.staffNote ?? '',
+    updatedAt: booking.updatedAt ? toIso(booking.updatedAt) : null,
     ticketSentAt: booking.ticketSentAt ? toIso(booking.ticketSentAt) : null,
     reminderSentAt: booking.reminderSentAt ? toIso(booking.reminderSentAt) : null,
     lines: lines.map((l) => ({

@@ -202,3 +202,58 @@ export function placesItems(patch: BookingPatch, lines: BookingLine[]): PatchIte
     l.experienceId ? [{ id: l.experienceId, adults: l.adults, kids: l.kids, units: l.units, time: l.sessionTime ?? undefined }] : [],
   );
 }
+
+/** A party: adults and children. */
+export interface Party { adults: number; kids: number }
+
+/** A line's head-count, the part of a pricing item a party change can move. */
+interface Counted { adults?: number; kids?: number; units?: number }
+
+/**
+ * Fits experience lines to a new party, so a smaller party is never charged
+ * for guests who are no longer coming:
+ *  - a count that covered the whole of its side of the old party (all the
+ *    adults, all the children) follows the new party;
+ *  - any other count is clamped to the new party;
+ *  - per-unit lines (buggies, packages) are left alone;
+ *  - a line left with nobody on it is dropped.
+ * 2 adults + 2 children → 3 + 1: a whole-party zipline becomes 3 + 1, a
+ * Pirate Ship for the 2 children becomes 1 child.
+ */
+export function fitLinesToParty<T extends Counted>(lines: T[], from: Party, to: Party): T[] {
+  const fit = (n: number | undefined, old: number, next: number): number => {
+    const v = n ?? 0;
+    if (v <= 0) return 0;
+    if (old > 0 && v === old) return next;
+    return Math.min(v, next);
+  };
+  return lines
+    .map((l) => ((l.units ?? 0) > 0 && !(l.adults ?? 0) && !(l.kids ?? 0)
+      ? l
+      : { ...l, adults: fit(l.adults, from.adults, to.adults), kids: fit(l.kids, from.kids, to.kids) }))
+    .filter((l) => (l.adults ?? 0) + (l.kids ?? 0) + (l.units ?? 0) > 0);
+}
+
+/** Lines whose counts differ between two lists, for the trail: "zipline 2+2 → 3+1". */
+export function lineCountChanges(before: PatchItem[], after: PatchItem[]): string {
+  const key = (l: PatchItem) => l.id + '::' + (l.variant ?? '');
+  const count = (l?: PatchItem) => (l ? `${l.adults ?? 0}+${l.kids ?? 0}` : 'removed');
+  const out: string[] = [];
+  for (const b of before) {
+    const a = after.find((x) => key(x) === key(b));
+    if (!a || (a.adults ?? 0) !== (b.adults ?? 0) || (a.kids ?? 0) !== (b.kids ?? 0)) out.push(`${b.id}${b.variant ? ` (${b.variant})` : ''} ${count(b)} → ${count(a)}`);
+  }
+  return out.join(', ');
+}
+
+/** The booking's paid lines as patch items (park entry excluded: it is regenerated). */
+export function linesAsItems(lines: BookingLine[]): PatchItem[] {
+  return lines.flatMap((l) => (l.experienceId || l.productKey
+    ? [{
+      id: l.experienceId ?? 'product:' + (l.productKey ?? ''),
+      variant: l.variant || undefined,
+      adults: l.adults, kids: l.kids, units: l.units,
+      time: l.sessionTime ?? undefined,
+    }]
+    : []));
+}

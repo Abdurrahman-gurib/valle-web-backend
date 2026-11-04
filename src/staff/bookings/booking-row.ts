@@ -28,7 +28,10 @@ export interface BookingRow {
   currency: string;
   /** cashier */
   paidAmount: number;
+  /** What is still to collect; never negative (see refundDue for the other way round). */
   balance: number;
+  /** Paid more than the (re-priced) total, e.g. a coupon applied after full payment: owed back to the guest. */
+  refundDue: number;
   paidAt: string | null;
   paymentMethod: string;
   receiptNo: string;
@@ -68,6 +71,7 @@ export function toBookingRow(b: Booking): BookingRow {
     total: b.total,
     paidAmount: b.paidAmount ?? 0,
     balance: Math.max(0, b.total - (b.paidAmount ?? 0)),
+    refundDue: Math.max(0, (b.paidAmount ?? 0) - b.total),
     paidAt: b.paidAt ? toIso(b.paidAt) : null,
     paymentMethod: b.paymentMethod ?? '',
     receiptNo: b.receiptNo ?? '',

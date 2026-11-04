@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsIn, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { RecordPaymentDto } from './front-office.dto';
 import { CreateBookingDto } from '../../../bookings/dto/create-booking.dto';
 
 export const BOOKING_CHANNELS = ['phone', 'desk', 'email', 'whatsapp', 'agency', 'other'] as const;
@@ -16,4 +18,11 @@ export class CreateStaffBookingDto extends CreateBookingDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  /** Money taken at the desk in the same step (a cash walk-in); recorded like the cashier's payment. */
+  @ApiPropertyOptional({ type: RecordPaymentDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RecordPaymentDto)
+  payment?: RecordPaymentDto;
 }

@@ -74,7 +74,10 @@ export function renderReceiptPdf(b: Booking, lines: BookingLine[], opts: { siteU
 
     tag('PAYMENT');
     row(paid > 0 ? `Paid${b.paymentMethod ? ' · ' + (METHOD[b.paymentMethod] ?? b.paymentMethod) : ''}${b.paidAt ? ' · ' + fmtDate(b.paidAt) : ''}${b.receiptNo ? ' · receipt ' + b.receiptNo : ''}` : 'Paid', rs(paid));
-    row(balance > 0 ? 'Balance to pay at the gate' : 'Balance', rs(balance), true);
+    // paid more than the re-priced total (a code applied after payment): say so, never print "Balance Rs 0"
+    const refundDue = Math.max(0, paid - b.total);
+    if (refundDue > 0) row('Refund due to the guest', rs(refundDue), true);
+    else row(balance > 0 ? 'Balance to pay at the gate' : 'Balance', rs(balance), true);
     if (b.payMode === 'online' && paid === 0) { doc.font('Helvetica').fontSize(8.5).fillColor(GREY).text('Online payment pending.', M, doc.y); doc.y += 12; }
     doc.y += 10;
 

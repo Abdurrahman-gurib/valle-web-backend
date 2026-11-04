@@ -230,18 +230,21 @@ export class WaiversService {
     return out;
   }
 
+  /**
+   * The gate's rule, shared with "Mark arrived" in the back office: a booking
+   * with waivers missing, or a signed waiver over an activity limit, may only
+   * be checked in with an explicit override.
+   */
+  async arrivalCheck(refCode: string): Promise<{ blocked: boolean; missing: number; required: number; signedCount: number; stops: number; message: string }> {
+    return arrivalRule(await this.gateView(refCode));
+  }
+
   async checkIn(refCode: string, dto: CheckInDto, staff: StaffPrincipal): Promise<GateView> {
     const view = await this.gateView(refCode);
     if (view.status === 'cancelled') throw new ConflictException('This booking is cancelled');
     if (view.status === 'arrived') return view;
-    const blocked = view.missing > 0 || view.stops > 0;
-    if (blocked && !dto.override) {
-      throw new ConflictException(
-        view.missing > 0
-          ? `${view.missing} of ${view.required} waivers are not signed yet`
-          : 'A signed waiver does not meet an activity limit',
-      );
-    }
+    const { blocked, message } = arrivalRule(view);
+    if (blocked && !dto.override) throw new ConflictException(message);
     const b = await this.bookingRepo.findOneOrFail({ where: { refCode: view.refCode } });
     b.status = 'arrived';
     b.updatedAt = new Date();
@@ -256,4 +259,13 @@ export class WaiversService {
     );
     return this.gateView(view.refCode);
   }
+}
+
+/** Blocked when waivers are missing or flagged; the message the gate and the drawer show. */
+function arrivalRule(view: GateView): { blocked: boolean; missing: number; required: number; signedCount: number; stops: number; message: string } {
+  const blocked = view.missing > 0 || view.stops > 0;
+  const message = view.missing > 0
+    ? `${view.missing} of ${view.required} waivers are not signed yet`
+    : view.stops > 0 ? 'A signed waiver does not meet an activity limit' : '';
+  return { blocked, missing: view.missing, required: view.required, signedCount: view.signedCount, stops: view.stops, message };
 }
