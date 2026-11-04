@@ -18,7 +18,7 @@ import {
 } from './waiver-rules';
 import { productActivityMap } from './waiver-products';
 import {
-  newWaiverRecord, signerFor, stopCount, toGateWaiver, toHistory,
+  ageBands, newWaiverRecord, signerFor, stopCount, toGateWaiver, toHistory,
   type GateDayRow, type GateView, type WaiverPublicView,
 } from './waiver-views';
 import { auditRecord } from '../common/audit';
@@ -111,7 +111,8 @@ export class WaiversService {
       group: b.groupKind ? { leaderName: b.leaderName || b.guestName, participants: (b.participants ?? []).map((x) => x.name) } : null,
       open: this.isOpen(b),
       termsVersion: WAIVER_TERMS_VERSION,
-      activities: activities.map((a) => ({ name: a.name, ...a.limits })),
+      // the form warns a participant only about the rides their age band is on
+      activities: activities.map((a) => ({ name: a.name, ...a.limits, bands: ageBands(a.people, b) })),
     };
   }
 

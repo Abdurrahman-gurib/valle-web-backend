@@ -28,7 +28,17 @@ export interface WaiverPublicView {
   termsVersion: string;
   /** After a POST: whether the guest's copy went out. */
   copy?: CopySent;
-  activities: { name: string; minAge?: number; maxAge?: number; driveMinAge?: number; maxWeightKg?: number; minWeightKg?: number; minHeightCm?: number; maxHeightCm?: number }[];
+  activities: { name: string; minAge?: number; maxAge?: number; driveMinAge?: number; maxWeightKg?: number; minWeightKg?: number; minHeightCm?: number; maxHeightCm?: number; bands?: AgeBands }[];
+}
+
+/** Who of the party is on an activity, per age band: all of them, some (not known who), or none. */
+export interface AgeBands { adults: 'all' | 'some' | 'none'; kids: 'all' | 'some' | 'none'; infants: 'some' | 'none' }
+
+/** The bands of the party an activity's line counts (no line counts = the whole party). */
+export function ageBands(people: { adults: number; kids: number } | undefined, party: { adults: number; kids: number }): AgeBands {
+  if (!people) return { adults: 'all', kids: 'all', infants: 'some' };
+  const band = (n: number, of: number): 'all' | 'some' | 'none' => (n <= 0 || of <= 0 ? 'none' : n >= of ? 'all' : 'some');
+  return { adults: band(people.adults, party.adults), kids: band(Math.min(people.kids, party.kids), party.kids), infants: people.kids > party.kids ? 'some' : 'none' };
 }
 
 export interface GateWaiver {
