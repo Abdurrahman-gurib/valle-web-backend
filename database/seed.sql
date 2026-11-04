@@ -498,7 +498,7 @@ INSERT INTO settings (key, value) VALUES
   ('park_name', 'VALLÉ Advenature™ Park'),
   ('whatsapp', '+23052928841'),
   ('email', 'sales@vallepark.com'),
-  ('phone', '+230 660 44 77'),
+  ('phone', '+230 660 4477'),
   ('hours', 'Open daily 09:00 – 17:30');
 
 -- staff_users
