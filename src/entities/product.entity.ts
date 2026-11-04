@@ -65,8 +65,8 @@ export class Product {
   validTo: string | null;
 }
 
-/** Families whose price already includes park entry: the booking charges no entry line. */
-export const ENTRY_INCLUDED_FAMILIES = new Set(['student', 'expo']);
+/** Families whose price already includes park entry, for the people their line counts. */
+export const ENTRY_INCLUDED_FAMILIES = new Set(['student', 'expo', 'senior']);
 
 /** Whether a product can be booked for a visit date (YYYY-MM-DD); open-ended when the bounds are null. */
 export const productValidOn = (p: Pick<Product, 'validFrom' | 'validTo'>, visitDate: string): boolean =>

@@ -54,7 +54,7 @@ export function renderReceiptPdf(b: Booking, lines: BookingLine[], opts: { siteU
 
     tag('BOOKING');
     doc.font('Helvetica-Bold').fontSize(18).fillColor('#FF3358').text(b.refCode, M, doc.y);
-    doc.font('Helvetica').fontSize(9.5).fillColor(PURPLE).text(`${b.guestName} · ${b.adults} adult${b.adults === 1 ? '' : 's'}${b.kids ? ` · ${b.kids} child${b.kids === 1 ? '' : 'ren'}` : ''} · ${b.rate === 'nr' ? 'visitor rate' : 'resident rate'}`, M, doc.y + 2);
+    doc.font('Helvetica').fontSize(9.5).fillColor(PURPLE).text(`${b.guestName} · ${b.adults} adult${b.adults === 1 ? '' : 's'}${b.kids ? ` · ${b.kids} child${b.kids === 1 ? '' : 'ren'}` : ''}${b.infants ? ` · ${b.infants} under 6` : ''} · ${b.rate === 'nr' ? 'visitor rate' : 'resident rate'}`, M, doc.y + 2);
     doc.text(`Visit ${fmtDate(b.visitDate)} · ${b.slot === 'morning' ? 'morning arrival' : 'afternoon arrival'}${b.status === 'postponed' ? ' · POSTPONED, new date to be chosen' : ''}${b.status === 'cancelled' ? ' · CANCELLED' : ''}`, M, doc.y + 2);
     doc.y += 12;
 

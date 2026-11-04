@@ -236,7 +236,7 @@ describe('computeBooking', () => {
     expect(r.discount).toBe(0);
     const lugeLine = r.lines.find((l) => l.experienceId === 'luge');
     expect(lugeLine).toMatchObject({
-      label: 'Mountain Luge Kart · 0 adult',
+      label: 'Mountain Luge Kart · 0 adults',
       amount: 0,
     });
   });

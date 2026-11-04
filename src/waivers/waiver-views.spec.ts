@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Waiver, type Booking } from '../entities';
 import type { SignWaiverDto } from './waiver.dto';
-import { newWaiverRecord, signerFor, stopCount, toGateWaiver, toHistory } from './waiver-views';
+import { ageBands, newWaiverRecord, signerFor, stopCount, toGateWaiver, toHistory } from './waiver-views';
 import { WAIVER_TERMS_VERSION } from './waiver-rules';
 
 const dto = (over: Partial<SignWaiverDto> = {}): SignWaiverDto => ({
@@ -41,5 +41,19 @@ describe('waiver views', () => {
   it('lists superseded signatures', () => {
     const old = Object.assign(new Waiver(), { id: 'w0', participantName: 'Kid', version: 1, signedAt: new Date('2026-10-01T08:00:00Z'), supersededAt: new Date('2026-10-01T09:00:00Z') });
     expect(toHistory([old])).toEqual([{ id: 'w0', participantName: 'Kid', version: 1, signedAt: '2026-10-01T08:00:00.000Z', supersededAt: '2026-10-01T09:00:00.000Z' }]);
+  });
+});
+
+describe('ageBands (the public waiver form warns only about rides a participant is on)', () => {
+  it('a line for the whole party covers every band; no line counts = everyone', () => {
+    expect(ageBands(undefined, { adults: 2, kids: 1 })).toEqual({ adults: 'all', kids: 'all', infants: 'some' });
+    expect(ageBands({ adults: 2, kids: 1 }, { adults: 2, kids: 1 })).toEqual({ adults: 'all', kids: 'all', infants: 'none' });
+  });
+  it('adults only: the children are not on it; part of the adults: some', () => {
+    expect(ageBands({ adults: 2, kids: 0 }, { adults: 2, kids: 1 })).toEqual({ adults: 'all', kids: 'none', infants: 'none' });
+    expect(ageBands({ adults: 1, kids: 0 }, { adults: 3, kids: 0 })).toEqual({ adults: 'some', kids: 'none', infants: 'none' });
+  });
+  it('more children than the 6-11s: some under-6s ride', () => {
+    expect(ageBands({ adults: 0, kids: 2 }, { adults: 2, kids: 1 })).toEqual({ adults: 'none', kids: 'all', infants: 'some' });
   });
 });

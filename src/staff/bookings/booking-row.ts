@@ -14,6 +14,10 @@ export interface BookingRow {
   slot: string;
   adults: number;
   kids: number;
+  /** Children under 6 (free). */
+  infants: number;
+  /** The language the guest booked in. */
+  lang: string;
   rate: string;
   guestName: string;
   email: string;
@@ -58,6 +62,8 @@ export function toBookingRow(b: Booking): BookingRow {
     slot: b.slot,
     adults: b.adults,
     kids: b.kids,
+    infants: b.infants ?? 0,
+    lang: b.lang ?? 'en',
     rate: b.rate,
     guestName: b.guestName,
     email: b.email,

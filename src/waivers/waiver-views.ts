@@ -4,7 +4,7 @@ import { isoDay } from '../common/park-time';
 import type { Booking, Waiver } from '../entities';
 import type { CopySent } from './waiver-copy.service';
 import type { SignWaiverDto } from './waiver.dto';
-import { ageOn, flagsFor, WAIVER_TERMS_VERSION, type GateActivity, type WaiverFlag } from './waiver-rules';
+import { activitiesOf, ageOn, flagsFor, WAIVER_TERMS_VERSION, type GateActivity, type GateCheck, type WaiverFlag } from './waiver-rules';
 
 /** Oldest age a date of birth may give before it is taken for a typo. */
 const MAX_AGE = 110;
@@ -28,7 +28,17 @@ export interface WaiverPublicView {
   termsVersion: string;
   /** After a POST: whether the guest's copy went out. */
   copy?: CopySent;
-  activities: { name: string; minAge?: number; maxAge?: number; driveMinAge?: number; maxWeightKg?: number; minWeightKg?: number; minHeightCm?: number; maxHeightCm?: number }[];
+  activities: { name: string; minAge?: number; maxAge?: number; driveMinAge?: number; maxWeightKg?: number; minWeightKg?: number; minHeightCm?: number; maxHeightCm?: number; bands?: AgeBands }[];
+}
+
+/** Who of the party is on an activity, per age band: all of them, some (not known who), or none. */
+export interface AgeBands { adults: 'all' | 'some' | 'none'; kids: 'all' | 'some' | 'none'; infants: 'some' | 'none' }
+
+/** The bands of the party an activity's line counts (no line counts = the whole party). */
+export function ageBands(people: { adults: number; kids: number } | undefined, party: { adults: number; kids: number }): AgeBands {
+  if (!people) return { adults: 'all', kids: 'all', infants: 'some' };
+  const band = (n: number, of: number): 'all' | 'some' | 'none' => (n <= 0 || of <= 0 ? 'none' : n >= of ? 'all' : 'some');
+  return { adults: band(people.adults, party.adults), kids: band(Math.min(people.kids, party.kids), party.kids), infants: people.kids > party.kids ? 'some' : 'none' };
 }
 
 export interface GateWaiver {
@@ -70,6 +80,8 @@ export interface GateView {
   slot: 'morning' | 'afternoon';
   adults: number;
   kids: number;
+  /** Children under 6 (free; a parent signs for them). */
+  infants: number;
   status: string;
   payMode: string;
   total: number;
@@ -80,6 +92,8 @@ export interface GateView {
   isToday: boolean;
   lines: { label: string; amount: number }[];
   activities: GateActivity[];
+  /** Rides only part of the party is booked on: checked once at the gate, not per waiver. */
+  checkAtGate: GateCheck[];
   required: number;
   signedCount: number;
   missing: number;
@@ -160,12 +174,15 @@ export function newWaiverRecord(
 }
 
 /** A current waiver as the gate reads it, with the warnings for this visit's activities. */
-export function toGateWaiver(w: Waiver, visitDate: string, activities: GateActivity[]): GateWaiver {
+export function toGateWaiver(w: Waiver, visitDate: string, activities: GateActivity[], party?: { adults: number; kids: number }): GateWaiver {
   const birthDate = isoDay(w.birthDate);
+  const age = ageOn(birthDate, visitDate);
+  // only the rides this person is certainly on; the rest are checked once for the party
+  const mine = party ? activitiesOf(age, activities, party) : activities;
   return {
     id: w.id,
     participantName: w.participantName,
-    age: ageOn(birthDate, visitDate),
+    age,
     birthDate,
     heightCm: w.heightCm,
     weightKg: w.weightKg,
@@ -185,7 +202,7 @@ export function toGateWaiver(w: Waiver, visitDate: string, activities: GateActiv
     signature: w.signaturePng,
     lang: w.lang,
     signedAt: w.signedAt.toISOString(),
-    flags: flagsFor({ birthDate, heightCm: w.heightCm, weightKg: w.weightKg }, visitDate, activities),
+    flags: flagsFor({ birthDate, heightCm: w.heightCm, weightKg: w.weightKg }, visitDate, mine),
     version: w.version ?? 1,
   };
 }

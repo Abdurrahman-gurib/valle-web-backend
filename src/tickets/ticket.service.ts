@@ -6,6 +6,7 @@ import { Repository, IsNull } from 'typeorm';
 import QRCode from 'qrcode';
 import { Booking, BookingLine, Setting, Waiver } from '../entities';
 import { parseWaiverActivities, waiverRequiredCount } from '../waivers/waiver-rules';
+import { productActivityMap } from '../waivers/waiver-products';
 import { renderReceiptPdf } from './receipt-pdf';
 import { isoDay } from '../common/park-time';
 import { resolveJwtSecret } from '../staff/auth/jwt.config';
@@ -18,6 +19,10 @@ export interface TicketView {
   slot: 'morning' | 'afternoon';
   adults: number;
   kids: number;
+  /** Children under 6 (free). */
+  infants: number;
+  /** The language the guest booked in. */
+  lang: string;
   rate: string;
   payMode: string;
   status: string;
@@ -38,7 +43,7 @@ export interface TicketView {
   receiptUrl: string;
   postponedFrom: string | null;
   /** School / company / club booking. */
-  group?: { kind: string; organisation: string; leaderName: string; participants: { name: string; age?: number | null }[]; depositAmount: number };
+  group?: { kind: string; organisation: string; leaderName: string; participants: { name: string; age?: number | null }[]; depositAmount: number; bankDetails: string };
 }
 
 
@@ -47,6 +52,10 @@ export interface TicketView {
  * from it, so the QR code and the e-mailed link open the ticket without an
  * account, and nobody can browse other guests' bookings by guessing VAL codes.
  */
+/** The site's non-English languages: their pages live under /<lang>/. */
+const PREFIXED_LANGS = new Set(['fr', 'de', 'it', 'ar', 'ru', 'es', 'hi']);
+const langPrefix = (lang?: string | null): string => (lang && PREFIXED_LANGS.has(lang) ? '/' + lang : '');
+
 @Injectable()
 export class TicketService {
   private readonly secret: string;
@@ -86,13 +95,14 @@ export class TicketService {
     return matches(this.secret) || (this.previousSecret !== null && matches(this.previousSecret));
   }
 
-  ticketUrl(refCode: string): string {
-    return `${this.siteUrl}/ticket/${encodeURIComponent(refCode)}?t=${this.token(refCode)}`;
+  /** The ticket page, in the guest's language when it is not English (/fr/ticket/...). */
+  ticketUrl(refCode: string, lang?: string | null): string {
+    return `${this.siteUrl}${langPrefix(lang)}/ticket/${encodeURIComponent(refCode)}?t=${this.token(refCode)}`;
   }
 
-  /** The waiver form, opened with the same token as the ticket. */
-  waiverUrl(refCode: string): string {
-    return `${this.siteUrl}/waiver/${encodeURIComponent(refCode)}?t=${this.token(refCode)}`;
+  /** The waiver form, opened with the same token as the ticket, in the guest's language. */
+  waiverUrl(refCode: string, lang?: string | null): string {
+    return `${this.siteUrl}${langPrefix(lang)}/waiver/${encodeURIComponent(refCode)}?t=${this.token(refCode)}`;
   }
 
   receiptUrl(refCode: string): string {
@@ -117,12 +127,14 @@ export class TicketService {
 
   async view(refCode: string, token: string | undefined): Promise<TicketView> {
     const b = await this.requireBooking(refCode, token);
-    const [lines, signed, setting] = await Promise.all([
+    const [lines, signed, setting, bank] = await Promise.all([
       this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } }),
       this.waiverRepo.count({ where: { bookingId: b.id, supersededAt: IsNull() } }),
       this.settingRepo.findOne({ where: { key: 'waiver_activities' } }),
+      b.groupKind ? this.settingRepo.findOne({ where: { key: 'group_bank_details' } }) : Promise.resolve(null),
     ]);
-    return this.toView(b, lines, signed, waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b));
+    const packages = await productActivityMap(this.lineRepo.manager, lines.map((l) => l.productKey));
+    return this.toView(b, lines, signed, waiverRequiredCount(lines, parseWaiverActivities(setting?.value), b, packages), bank?.value ?? '');
   }
 
   /** The guest's receipt: lines, discounts, what was paid and what is left. */
@@ -132,7 +144,7 @@ export class TicketService {
     return renderReceiptPdf(b, lines, { siteUrl: this.siteUrl });
   }
 
-  toView(b: Booking, lines: BookingLine[], waiversSigned = 0, waiversRequired = b.adults + b.kids): TicketView {
+  toView(b: Booking, lines: BookingLine[], waiversSigned = 0, waiversRequired = b.adults + b.kids + (b.infants ?? 0), bankDetails = ''): TicketView {
     return {
       refCode: b.refCode,
       guestName: b.guestName,
@@ -140,14 +152,16 @@ export class TicketService {
       slot: b.slot,
       adults: b.adults,
       kids: b.kids,
+      infants: b.infants ?? 0,
+      lang: b.lang ?? 'en',
       rate: b.rate,
       payMode: b.payMode,
       status: b.status,
       total: b.total,
       lines: lines.map((l) => ({ label: l.label, amount: l.amount, experienceId: l.experienceId, productKey: l.productKey ?? null, variant: l.variant ?? '', adults: l.adults, kids: l.kids, units: l.units, time: l.sessionTime ?? null })),
-      ticketUrl: this.ticketUrl(b.refCode),
+      ticketUrl: this.ticketUrl(b.refCode, b.lang),
       qrUrl: this.qrUrl(b.refCode),
-      waiverUrl: this.waiverUrl(b.refCode),
+      waiverUrl: this.waiverUrl(b.refCode, b.lang),
       waiversSigned,
       waiversRequired,
       paidAmount: b.paidAmount ?? 0,
@@ -157,7 +171,7 @@ export class TicketService {
       couponCode: b.couponCode ?? '',
       receiptUrl: this.receiptUrl(b.refCode),
       postponedFrom: b.postponedFrom ? String(b.postponedFrom).slice(0, 10) : null,
-      ...(b.groupKind ? { group: { kind: b.groupKind, organisation: b.organisation ?? '', leaderName: b.leaderName ?? '', participants: b.participants ?? [], depositAmount: b.depositAmount ?? 0 } } : {}),
+      ...(b.groupKind ? { group: { kind: b.groupKind, organisation: b.organisation ?? '', leaderName: b.leaderName ?? '', participants: b.participants ?? [], depositAmount: b.depositAmount ?? 0, bankDetails } } : {}),
     };
   }
 }

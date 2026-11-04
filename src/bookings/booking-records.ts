@@ -27,6 +27,8 @@ export interface BookingResponse {
   paymentId?: string;
   /** Groups: rupees asked up front. */
   depositAmount?: number;
+  /** Groups with a deposit: the bank details to pay it ('' = the team sends them). */
+  bankDetails?: string;
 }
 
 /** A coupon / pass applied to a new booking, with the rupees it takes off. */
@@ -64,6 +66,8 @@ export function newBookingRecord(
     slot: dto.slot,
     adults: dto.adults,
     kids: dto.kids,
+    infants: dto.infants ?? 0,
+    lang: dto.lang ?? 'en',
     rate: dto.rate,
     guestName: dto.name,
     phone: contact.phone,
@@ -113,6 +117,7 @@ export function bookingResponse(
   lines: { label: string; amount: number }[],
   links: { ticketUrl?: string; qrUrl?: string },
   checkout: Checkout | null = null,
+  bankDetails = '',
 ): BookingResponse {
   return {
     refCode: b.refCode,
@@ -126,6 +131,6 @@ export function bookingResponse(
     ticketUrl: links.ticketUrl,
     qrUrl: links.qrUrl,
     ...(checkout ? { checkoutUrl: checkout.checkoutUrl, paymentId: checkout.paymentId } : {}),
-    ...(b.depositAmount ? { depositAmount: b.depositAmount } : {}),
+    ...(b.depositAmount ? { depositAmount: b.depositAmount, bankDetails } : {}),
   };
 }

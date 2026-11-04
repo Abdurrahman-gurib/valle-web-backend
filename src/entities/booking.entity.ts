@@ -27,6 +27,14 @@ export class Booking {
   @Column({ name: 'kids', type: 'int' })
   kids: number;
 
+  /** Children under 6: free, counted for capacity and waivers (migration 030). */
+  @Column({ name: 'infants', type: 'int', default: 0 })
+  infants: number;
+
+  /** The language the guest booked in: ticket and waiver links open in it (migration 030). */
+  @Column({ name: 'lang', type: 'text', default: 'en' })
+  lang: string;
+
   @Column({ name: 'rate', type: 'text' })
   rate: 'rr' | 'nr';
 

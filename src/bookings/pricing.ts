@@ -46,6 +46,8 @@ export interface PricingPriceRow {
 export interface PricingInput {
   adults: number;
   kids: number;
+  /** Children under 6: free entry, listed on the entry line. */
+  infants?: number;
   rate: 'rr' | 'nr';
   items: PricingItem[];
   /** Visit date (YYYY-MM-DD): products with a validity window are refused outside it. Omitted = not checked. */
@@ -75,14 +77,16 @@ export interface PricedBooking {
   advCount: number;
 }
 
-/** "2 adults · 1 child" party label, a mirror of Frontend/src/lib/format.ts. */
-export function partyLabel(adults: number, kids: number): string {
-  return (
-    adults +
-    ' adult' +
-    (adults > 1 ? 's' : '') +
-    (kids > 0 ? ' · ' + kids + ' child' + (kids > 1 ? 'ren' : '') : '')
-  );
+/**
+ * "2 adults · 1 child · 1 under 6" party label, a mirror of Frontend/src/lib/format.ts.
+ * Zero parts are left out; a party of nobody reads "0 adults".
+ */
+export function partyLabel(adults: number, kids: number, infants = 0): string {
+  const parts: string[] = [];
+  if (adults > 0) parts.push(adults === 1 ? '1 adult' : `${adults} adults`);
+  if (kids > 0) parts.push(kids === 1 ? '1 child' : `${kids} children`);
+  if (infants > 0) parts.push(`${infants} under 6`);
+  return parts.length ? parts.join(' · ') : '0 adults';
 }
 
 /**
@@ -171,16 +175,55 @@ function entryPrices(rate: 'rr' | 'nr', priceRows: PricingPriceRow[], settings: 
   };
 }
 
-/** The student price list (school groups) and the expo deals already include the entrance fee. */
-function entryIncludedFamily(items: PricingItem[], products: Product[]): string | undefined {
-  const familyOf = (id: string) => (isProductId(id) ? products.find((p) => p.key === productKeyOf(id))?.family : undefined);
-  return items.map((i) => familyOf(i.id)).find((f) => f && ENTRY_INCLUDED_FAMILIES.has(f));
+/** Who a product line's "entrance included" covers. */
+export interface EntryCoverage {
+  adults: number;
+  kids: number;
+  /** Family of the first covering line ('student', 'expo', 'senior'), or undefined. */
+  family: string | undefined;
 }
 
-function parkEntryLine(input: PricingInput, amount: number, includedFamily: string | undefined): PricedLine {
-  const what = includedFamily === 'student'
-    ? 'included with the student rate'
-    : includedFamily ? 'included with the expo deal' : partyLabel(input.adults, input.kids);
+/**
+ * The student price list, the expo deals and the senior packages include the
+ * entrance fee, but only for the people their lines count. Expo and senior
+ * lines are different people (summed); student rows are the same pupils doing
+ * several things (the largest row counts). Capped at the party.
+ */
+export function entryCoverage(items: PricingItem[], products: Product[], party: { adults: number; kids: number }): EntryCoverage {
+  const familyOf = (id: string) => (isProductId(id) ? products.find((p) => p.key === productKeyOf(id))?.family : undefined);
+  let sumA = 0, sumK = 0, maxA = 0, maxK = 0;
+  let family: string | undefined;
+  for (const item of items) {
+    const f = familyOf(item.id);
+    if (!f || !ENTRY_INCLUDED_FAMILIES.has(f)) continue;
+    family ??= f;
+    const a = item.adults || 0;
+    const k = item.kids || 0;
+    if (f === 'student') { maxA = Math.max(maxA, a); maxK = Math.max(maxK, k); }
+    else { sumA += a; sumK += k; }
+  }
+  return {
+    adults: Math.min(party.adults, sumA + maxA),
+    kids: Math.min(party.kids, sumK + maxK),
+    family,
+  };
+}
+
+const INCLUDED_WITH: Record<string, string> = {
+  student: 'included with the student rate',
+  expo: 'included with the expo deal',
+  senior: 'included with the senior package',
+};
+
+function parkEntryLine(input: PricingInput, amount: number, cover: EntryCoverage): PricedLine {
+  const payA = input.adults - cover.adults;
+  const payK = input.kids - cover.kids;
+  const covered = cover.adults + cover.kids > 0;
+  const what = !covered
+    ? partyLabel(input.adults, input.kids, input.infants ?? 0)
+    : payA + payK === 0
+    ? INCLUDED_WITH[cover.family ?? ''] ?? 'included'
+    : partyLabel(payA, payK);
   return {
     experienceId: null,
     variant: '',
@@ -307,9 +350,9 @@ export function computeBooking(
 ): PricedBooking {
   const byId = new Map(experiences.map((e) => [e.id, e]));
 
-  const includedFamily = entryIncludedFamily(input.items, products);
+  const cover = entryCoverage(input.items, products, input);
   const perHead = entryPrices(input.rate, priceRows, settings);
-  const entry = includedFamily ? 0 : perHead.adult * input.adults + perHead.child * input.kids;
+  const entry = perHead.adult * (input.adults - cover.adults) + perHead.child * (input.kids - cover.kids);
 
   // Validated in this order (products, then experiences), so the first problem reported is stable.
   const productsBooked = bookedProducts(input.items.filter((i) => isProductId(i.id)), products, input);
@@ -322,7 +365,7 @@ export function computeBooking(
   const pricedExperiences = ordered.map(({ item, exp }) => ({ exp, line: experienceLine(exp, item, input.rate, priceRows) }));
   const productLines = productsBooked.map(({ item, product }) => productLine(product, item, input.rate));
 
-  const lines: PricedLine[] = [parkEntryLine(input, entry, includedFamily), ...pricedExperiences.map((x) => x.line), ...productLines];
+  const lines: PricedLine[] = [parkEntryLine(input, entry, cover), ...pricedExperiences.map((x) => x.line), ...productLines];
   const subtotal = lines.reduce((sum, l) => sum + l.amount, 0);
   const { discount, advCount } = explorerPass(pricedExperiences);
   return {

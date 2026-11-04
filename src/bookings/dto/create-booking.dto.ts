@@ -23,6 +23,9 @@ import {
   isSuppliedValue,
 } from '../../common/validation';
 
+/** The site's languages (Frontend/src/i18n): a booking remembers the one it was made in. */
+export const BOOKING_LANGS = ['en', 'fr', 'de', 'it', 'ar', 'ru', 'es', 'hi'];
+
 export class GroupParticipantDto {
   @ApiProperty({ example: 'Ariane Léger' })
   @IsString() @IsSafeText() @IsNotEmpty() @MaxLength(120)
@@ -118,6 +121,18 @@ export class CreateBookingDto {
   @Min(0)
   @Max(400)
   kids: number;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 400, example: 1, description: 'Children under 6: free, counted for capacity and waivers' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(400)
+  infants?: number;
+
+  @ApiPropertyOptional({ enum: BOOKING_LANGS, description: 'The page language: ticket and waiver links open in it' })
+  @IsOptional()
+  @IsIn(BOOKING_LANGS)
+  lang?: string;
 
   @ApiProperty({ enum: ['rr', 'nr'], description: 'rr = resident, nr = non-resident' })
   @IsIn(['rr', 'nr'])

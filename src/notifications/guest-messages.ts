@@ -15,7 +15,7 @@ export const MAPS = 'https://maps.google.com/?q=Vall%C3%A9+Advenature+Park+Chamo
 export const slotLabel = (slot: string): string => (slot === 'morning' ? 'Morning arrival, 09:00 to 12:00' : 'Afternoon arrival, 12:00 to 15:30');
 
 /** "2 adults and 1 child" */
-export const party = (b: Booking): string => partyText(b.adults, b.kids, ' and ');
+export const party = (b: Booking): string => partyText(b.adults, b.kids, ' and ', b.infants ?? 0);
 
 /** The first word of the booking name, or the whole name when it has none. */
 export const firstName = (b: Booking): string => b.guestName.split(' ')[0] || b.guestName;

@@ -21,6 +21,10 @@ export class HoldDto {
   @IsInt() @Min(0) @Max(12)
   kids: number;
 
+  @ApiPropertyOptional({ minimum: 0, maximum: 12 })
+  @IsOptional() @IsInt() @Min(0) @Max(12)
+  infants?: number;
+
   @ApiProperty({ type: [BookingItemDto] })
   @IsArray() @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => BookingItemDto)
   items: BookingItemDto[];
