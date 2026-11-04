@@ -2,8 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { toCsv } from './csv';
-import { addDays, isoDay, parkToday, weekday } from '../../common/park-time';
-import { reconciliationTotals } from './reconciliation';
+import { addDays, isoDay, PARK_TZ, parkToday, weekday } from '../../common/park-time';
+import {
+  collectedByMethod, paymentLedger, reconciliationTotals,
+  type CollectedSplit, type LedgerEntry, type PaymentAuditRow,
+} from './reconciliation';
 
 /**
  * Sales, reconciliation and forecast figures for the back office.
@@ -31,7 +34,16 @@ export interface SalesSummary {
     revenue: number;
     entryRevenue: number;
     experienceRevenue: number;
+    /** Packages, combos, photos, cinematic and other product lines. */
+    productRevenue: number;
+    /** Whatever the subtotal holds beyond those lines (older bookings); usually 0. */
+    otherRevenue: number;
+    /** Explorer Pass + coupons, FOC passes and manual discounts. */
     discounts: number;
+    passDiscounts: number;
+    offerDiscounts: number;
+    /** Paid more than the (re-priced) total: owed back to guests. */
+    refundsDue: number;
     avgTicket: number;
     onlineRevenue: number;
     gateRevenue: number;
@@ -44,11 +56,15 @@ export interface SalesSummary {
 }
 
 export interface NationalityRow { nationality: string; bookings: number; guests: number; revenue: number; share: number }
-export interface ExperienceRow { experienceId: string; label: string; bookings: number; adults: number; kids: number; units: number; revenue: number }
+export interface ExperienceRow { experienceId: string; name: string; label: string; bookings: number; adults: number; kids: number; units: number; revenue: number }
 
 export interface ReconciliationRow {
   refCode: string; guestName: string; slot: string; payMode: string; status: string;
   adults: number; kids: number; total: number; nationality: string; phone: string; email: string;
+  /** All paid on the booking so far, and what is owed back when that exceeds the total. */
+  paid: number; refundDue: number;
+  /** The payments recorded for this booking on the reconciliation day, per method. */
+  paidToday: { method: string; amount: number }[];
 }
 export interface Reconciliation {
   date: string;
@@ -58,7 +74,7 @@ export interface Reconciliation {
     guestsExpected: number;
     guestsArrived: number;
     gateExpected: number;   // confirmed + arrived, paying at the gate
-    gateCollected: number;  // arrived, paying at the gate
+    gateCollected: number;  // value of arrived pay-at-gate bookings (not money counted: see collected)
     gateOutstanding: number; // confirmed (not yet arrived), paying at the gate
     onlinePaid: number;     // online, not cancelled
     cancelled: number;
@@ -66,6 +82,12 @@ export interface Reconciliation {
     noShows: number;        // still "confirmed" although the day has passed
     noShowAmount: number;
   };
+  /**
+   * Money actually recorded that park day (any visit date), per method, from
+   * the booking trail: what the till balances against. Refunds are negative.
+   */
+  collected: CollectedSplit;
+  payments: LedgerEntry[];
 }
 
 export interface ForecastDay {
@@ -104,11 +126,21 @@ export class ReportsService {
               COALESCE(SUM(kids), 0)::int AS kids,
               COALESCE(SUM(total), 0)::bigint AS revenue,
               COALESCE(SUM(entry_amount), 0)::bigint AS entry_revenue,
-              COALESCE(SUM(subtotal - entry_amount), 0)::bigint AS experience_revenue,
-              COALESCE(SUM(discount), 0)::bigint AS discounts,
+              COALESCE(SUM(subtotal), 0)::bigint AS subtotal,
+              COALESCE(SUM(discount), 0)::bigint AS pass_discounts,
+              COALESCE(SUM(adjustment_amount), 0)::bigint AS offer_discounts,
+              COALESCE(SUM(GREATEST(paid_amount - total, 0)), 0)::bigint AS refunds_due,
               COALESCE(SUM(CASE WHEN pay_mode = 'online' THEN total ELSE 0 END), 0)::bigint AS online_revenue,
               COALESCE(SUM(CASE WHEN pay_mode = 'gate' THEN total ELSE 0 END), 0)::bigint AS gate_revenue
          FROM bookings WHERE ${live}`,
+      [from, to],
+    );
+    // what the lines add up to, by kind: experiences and products (park entry is its own column)
+    const [lines] = await this.db.query(
+      `SELECT COALESCE(SUM(CASE WHEN l.experience_id IS NOT NULL THEN l.amount ELSE 0 END), 0)::bigint AS experience_revenue,
+              COALESCE(SUM(CASE WHEN l.experience_id IS NULL AND l.product_key IS NOT NULL THEN l.amount ELSE 0 END), 0)::bigint AS product_revenue
+         FROM booking_lines l JOIN bookings b ON b.id = l.booking_id
+        WHERE b.visit_date BETWEEN $1 AND $2 AND b.status <> 'cancelled'`,
       [from, to],
     );
     const [canc] = await this.db.query(
@@ -140,11 +172,19 @@ export class ReportsService {
     }
     const bookings = num(tot.bookings);
     const revenue = num(tot.revenue);
+    const entryRevenue = num(tot.entry_revenue);
+    const experienceRevenue = num(lines?.experience_revenue);
+    const productRevenue = num(lines?.product_revenue);
+    const passDiscounts = num(tot.pass_discounts);
+    const offerDiscounts = num(tot.offer_discounts);
     return {
       from, to,
       totals: {
         bookings, cancelled: num(canc.cancelled), guests: num(tot.guests), adults: num(tot.adults), kids: num(tot.kids),
-        revenue, entryRevenue: num(tot.entry_revenue), experienceRevenue: num(tot.experience_revenue), discounts: num(tot.discounts),
+        revenue, entryRevenue, experienceRevenue, productRevenue,
+        // entry + experiences + products + other - discounts = revenue, by construction
+        otherRevenue: num(tot.subtotal) - entryRevenue - experienceRevenue - productRevenue,
+        discounts: passDiscounts + offerDiscounts, passDiscounts, offerDiscounts, refundsDue: num(tot.refunds_due),
         avgTicket: bookings ? Math.round(revenue / bookings) : 0,
         onlineRevenue: num(tot.online_revenue), gateRevenue: num(tot.gate_revenue),
       },
@@ -172,18 +212,19 @@ export class ReportsService {
   }
 
   async experiences(from: string, to: string): Promise<ExperienceRow[]> {
-    const rows: { experience_id: string; label: string; bookings: string; adults: string; kids: string; units: string; revenue: string }[] =
+    const rows: { experience_id: string; name: string | null; label: string; bookings: string; adults: string; kids: string; units: string; revenue: string }[] =
       await this.db.query(
-        `SELECT l.experience_id, l.label, COUNT(DISTINCT l.booking_id)::int AS bookings,
+        `SELECT l.experience_id, MAX(e.name) AS name, l.label, COUNT(DISTINCT l.booking_id)::int AS bookings,
                 COALESCE(SUM(l.adults), 0)::int AS adults, COALESCE(SUM(l.kids), 0)::int AS kids,
                 COALESCE(SUM(l.units), 0)::int AS units, COALESCE(SUM(l.amount), 0)::bigint AS revenue
            FROM booking_lines l JOIN bookings b ON b.id = l.booking_id
+           LEFT JOIN experiences e ON e.id = l.experience_id
           WHERE b.visit_date BETWEEN $1 AND $2 AND b.status <> 'cancelled' AND l.experience_id IS NOT NULL
           GROUP BY l.experience_id, l.label ORDER BY revenue DESC, bookings DESC`,
         [from, to],
       );
     return rows.map((r) => ({
-      experienceId: r.experience_id, label: r.label, bookings: num(r.bookings), adults: num(r.adults), kids: num(r.kids),
+      experienceId: r.experience_id, name: r.name || r.experience_id, label: r.label, bookings: num(r.bookings), adults: num(r.adults), kids: num(r.kids),
       units: num(r.units), revenue: num(r.revenue),
     }));
   }
@@ -191,18 +232,36 @@ export class ReportsService {
   async reconciliation(date: string): Promise<Reconciliation> {
     const raw: {
       ref_code: string; guest_name: string; slot: string; pay_mode: string; status: string; adults: number; kids: number;
-      total: string; nationality: string; phone: string; email: string;
+      total: string; nationality: string; phone: string; email: string; paid_amount?: string | number;
     }[] = await this.db.query(
-      `SELECT ref_code, guest_name, slot, pay_mode, status, adults, kids, total, nationality, phone, email
+      `SELECT ref_code, guest_name, slot, pay_mode, status, adults, kids, total, nationality, phone, email, paid_amount
          FROM bookings WHERE visit_date = $1
         ORDER BY CASE slot WHEN 'morning' THEN 0 ELSE 1 END, status, guest_name`,
       [date],
     );
-    const rows: ReconciliationRow[] = raw.map((r) => ({
-      refCode: r.ref_code, guestName: r.guest_name, slot: r.slot, payMode: r.pay_mode, status: r.status,
-      adults: num(r.adults), kids: num(r.kids), total: num(r.total), nationality: r.nationality ?? '', phone: r.phone ?? '', email: r.email ?? '',
-    }));
-    return { date, rows, totals: reconciliationTotals(rows, date < parkToday()) };
+    // Money recorded that park day, whatever the visit date: one trail entry per payment.
+    const audit: { at: string | Date; ref_code: string; guest_name: string; by: string; changes: PaymentAuditRow['changes'] }[] = await this.db.query(
+      `SELECT a.created_at AS at, b.ref_code, b.guest_name, a.staff_email AS by, a.changes
+         FROM booking_audit a JOIN bookings b ON b.id = a.booking_id
+        WHERE a.changes -> 'paidAmount' IS NOT NULL
+          AND (a.created_at AT TIME ZONE CAST($2 AS text))::date = $1
+        ORDER BY a.created_at`,
+      [date, PARK_TZ],
+    );
+    const payments = paymentLedger(audit.map((a) => ({ at: a.at, refCode: a.ref_code, guestName: a.guest_name, by: a.by, changes: a.changes })));
+    const rows: ReconciliationRow[] = raw.map((r) => {
+      const paid = num(r.paid_amount);
+      const total = num(r.total);
+      const mine = new Map<string, number>();
+      for (const p of payments) if (p.refCode === r.ref_code) mine.set(p.method, (mine.get(p.method) ?? 0) + p.amount);
+      return {
+        refCode: r.ref_code, guestName: r.guest_name, slot: r.slot, payMode: r.pay_mode, status: r.status,
+        adults: num(r.adults), kids: num(r.kids), total, nationality: r.nationality ?? '', phone: r.phone ?? '', email: r.email ?? '',
+        paid, refundDue: r.status === 'cancelled' ? 0 : Math.max(0, paid - total),
+        paidToday: [...mine].map(([method, amount]) => ({ method, amount })),
+      };
+    });
+    return { date, rows, totals: reconciliationTotals(rows, date < parkToday()), collected: collectedByMethod(payments), payments };
   }
 
   async forecast(days: number): Promise<ForecastDay[]> {
@@ -276,6 +335,6 @@ export class ReportsService {
       return { filename: `nationalities_${stamp}.csv`, csv: toCsv(['Nationality', 'Bookings', 'Guests', 'Share of guests (%)', 'Revenue (Rs)'], rows.map((r) => [r.nationality, r.bookings, r.guests, r.share, r.revenue])) };
     }
     const rows = await this.experiences(from, to);
-    return { filename: `experiences_${stamp}.csv`, csv: toCsv(['Experience', 'Option', 'Bookings', 'Adults', 'Children', 'Units', 'Revenue (Rs)'], rows.map((r) => [r.experienceId, r.label, r.bookings, r.adults, r.kids, r.units, r.revenue])) };
+    return { filename: `experiences_${stamp}.csv`, csv: toCsv(['Experience', 'Option', 'Bookings', 'Adults', 'Children', 'Units', 'Revenue (Rs)'], rows.map((r) => [r.name, r.label, r.bookings, r.adults, r.kids, r.units, r.revenue])) };
   }
 }

@@ -14,7 +14,8 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsArray, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, ValidateNested } from 'class-validator';
+import { IsSafeText } from '../../../common/validation';
 import { BOOKING_STATUSES, BookingStatus } from './list-bookings.dto';
 import { BookingItemDto } from '../../../bookings/dto/create-booking.dto';
 import { ADJUSTMENT_KINDS, type AdjustmentKind } from '../../../bookings/pricing';
@@ -151,4 +152,28 @@ export class UpdateBookingDto {
   @IsString()
   @MaxLength(24)
   couponCode?: string;
+
+  /**
+   * Optimistic concurrency: the `updatedAt` the operator's screen was showing.
+   * When the booking has moved since, the edit is refused with 409 instead of
+   * silently overwriting someone else's change.
+   */
+  @ApiPropertyOptional({ example: '2026-11-04T08:15:02.123Z' })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  expectedUpdatedAt?: string;
+
+  /** Mark arrived although waivers are missing or flagged (the gate's rule); needs `reason`. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  override?: boolean;
+
+  /** Why: a waiver override, a cancellation from the day sheet. Written to the trail, not stored on the booking. */
+  @ApiPropertyOptional({ maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @IsSafeText()
+  @MaxLength(200)
+  reason?: string;
 }

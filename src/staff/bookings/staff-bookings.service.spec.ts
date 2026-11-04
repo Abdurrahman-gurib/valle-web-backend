@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
@@ -21,7 +22,8 @@ import {
 import type { StaffPrincipal } from '../auth/staff-auth.types';
 import { MAX_PAGE_SIZE } from './dto/list-bookings.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
-import { StaffBookingsService } from './staff-bookings.service';
+import { StaffBookingsService, searchTerms, toBookingRow } from './staff-bookings.service';
+import { PostponeDto } from './dto/front-office.dto';
 
 interface WhereCall {
   sql: string;
@@ -354,13 +356,13 @@ describe('StaffBookingsService.list', () => {
 
     expect(qb.wheres).toHaveLength(1);
     const [clause] = qb.wheres;
-    expect(clause.sql).toContain('b.refCode ILIKE :q');
-    expect(clause.sql).toContain('b.guestName ILIKE :q');
-    expect(clause.sql).toContain('b.email ILIKE :q');
-    expect(clause.sql).toContain('b.phone ILIKE :q');
+    expect(clause.sql).toContain('b.refCode ILIKE :q0');
+    expect(clause.sql).toContain('b.guestName ILIKE :q0');
+    expect(clause.sql).toContain('b.email ILIKE :q0');
+    expect(clause.sql).toContain('b.phone ILIKE :q0');
     // One parameter for all four columns, trimmed, and the term never inlined.
-    expect(Object.keys(clause.params)).toEqual(['q']);
-    expect(clause.params.q).toBe('%ariane%');
+    expect(Object.keys(clause.params)).toEqual(['q0']);
+    expect(clause.params.q0).toBe('%ariane%');
     expect(clause.sql).not.toContain('ariane');
   });
 
@@ -415,6 +417,7 @@ describe('StaffBookingsService.list', () => {
       currency: 'MUR',
       paidAmount: 0,
       balance: 4250,
+      refundDue: 0,
       paidAt: null,
       paymentMethod: '',
       receiptNo: '',
@@ -580,7 +583,8 @@ describe('StaffBookingsService.update: re-pricing', () => {
 
     const detail = await service.update('VAL-1234-26', { adults: 3 }, STAFF);
 
-    // The reference: price this party from scratch with the same experience lines.
+    // The reference: price this party from scratch. The zipline covered the whole
+    // party (2 + 1), so it follows the party to 3 + 1 (fitLinesToParty).
     const fresh = computeBooking(
       EXPERIENCES,
       { entryAdult: 500, entryChild: 250 },
@@ -588,7 +592,7 @@ describe('StaffBookingsService.update: re-pricing', () => {
         adults: 3,
         kids: 1,
         rate: 'rr',
-        items: [{ id: 'zipline', adults: 2, kids: 1, units: 0 }],
+        items: [{ id: 'zipline', adults: 3, kids: 1, units: 0 }],
       },
     );
 
@@ -609,11 +613,11 @@ describe('StaffBookingsService.update: re-pricing', () => {
       })),
     );
 
-    // And the concrete numbers: entry 3 × 500 + 1 × 250, zipline 2 × 1200 + 1 × 600.
+    // And the concrete numbers: entry 3 × 500 + 1 × 250, zipline 3 × 1200 + 1 × 600.
     expect(detail.entryAmount).toBe(1750);
-    expect(detail.subtotal).toBe(4750);
+    expect(detail.subtotal).toBe(5950);
     expect(detail.discount).toBe(0);
-    expect(detail.total).toBe(4750);
+    expect(detail.total).toBe(5950);
     expect(detail.lines[0].label).toBe('Park entry · 3 adults · 1 child');
 
     // The old lines were replaced, not appended to.
@@ -834,8 +838,10 @@ describe('StaffBookingsService.stats', () => {
       new FakeQueryBuilder({ raw: { sum: '128500' } }), // revenueMonth
       new FakeQueryBuilder({ raw: { sum: '9800', guests: '21' } }), // today's visits
     ]);
-    const chat = makeRepo<ChatConversation>();
-    chat.count.mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+    // open threads a visitor wrote in, then those of them still unanswered
+    const open = new FakeQueryBuilder({ count: 2 });
+    const unanswered = new FakeQueryBuilder({ count: 1 });
+    const chat = makeRepo<ChatConversation>([open, unanswered]);
 
     const stats = await build({ booking, chat }).stats();
 
@@ -848,7 +854,10 @@ describe('StaffBookingsService.stats', () => {
       revenueToday: 9800,
       revenueMonth: 128500,
     });
-    expect(chat.count).toHaveBeenCalledWith({ where: { status: 'open' } });
+    // empty threads (the widget opened, nobody wrote) are not chats to answer
+    expect(open.wheres.map((w) => w.sql).join(' ')).toContain("m.sender = 'visitor'");
+    expect(unanswered.wheres.map((w) => w.sql)).toContain('c.unreadStaff > 0');
+    expect(chat.count).not.toHaveBeenCalled();
   });
 
   it('excludes cancellations from arrivals and reports 0 revenue for an empty month', async () => {
@@ -875,5 +884,144 @@ describe('StaffBookingsService.stats', () => {
     });
     expect(arrivals.wheres[0].params).toEqual({ today });
     expect(arrivals.wheres[1].params).toEqual({ cancelled: 'cancelled' });
+  });
+});
+
+// --------------------------------------------------------------- QA fixes
+
+type ArrivalCheck = { blocked: boolean; missing: number; required: number; signedCount: number; stops: number; message: string };
+
+/** A harness whose service also has the gate's waiver rule. */
+function harnessWithWaivers(state: Partial<FakeState>, check: ArrivalCheck): Harness {
+  const h = harness(state);
+  const waivers = { arrivalCheck: jest.fn().mockResolvedValue(check) };
+  const dataSource = { transaction: h.transaction } as unknown as DataSource;
+  const service = new StaffBookingsService(
+    dataSource, makeRepo<Booking>(), makeRepo<BookingLine>(), makeRepo<BookingAudit>(), makeRepo<Quote>(), makeRepo<ChatConversation>(),
+    { calendar: () => Promise.resolve({ slotCapacity: 150, closures: [], activityCapacity: {}, sessions: {} }), experienceInfo: () => Promise.resolve(new Map()) } as unknown as BookingsService,
+    { ticketUrl: (ref: string) => 'https://example.test/ticket/' + ref } as unknown as TicketService,
+    { sendTicket: jest.fn() } as unknown as GuestMessagingService,
+    { resolve: jest.fn(), consume: jest.fn() } as never,
+    undefined, undefined, waivers as never,
+  );
+  return { ...h, service };
+}
+
+const MISSING: ArrivalCheck = { blocked: true, missing: 4, required: 4, signedCount: 0, stops: 0, message: '4 of 4 waivers are not signed yet' };
+
+describe('StaffBookingsService.update: "Mark arrived" follows the gate waiver rule', () => {
+  it('refuses with 409 and the missing count when waivers are not signed', async () => {
+    const { service, manager } = harnessWithWaivers({ booking: makeBooking() }, MISSING);
+    const err = await service.update('VAL-1234-26', { status: 'arrived' }, STAFF).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err as ConflictException).getResponse()).toMatchObject({ code: 'WAIVERS_MISSING', missing: 4, required: 4 });
+    expect(manager.state.booking?.status).toBe('confirmed');
+  });
+
+  it('needs a reason with the override, then records both in the trail', async () => {
+    const { service, manager } = harnessWithWaivers({ booking: makeBooking() }, MISSING);
+    await expect(service.update('VAL-1234-26', { status: 'arrived', override: true }, STAFF)).rejects.toBeInstanceOf(BadRequestException);
+    const detail = await service.update('VAL-1234-26', { status: 'arrived', override: true, reason: 'paper waivers at the desk' }, STAFF);
+    expect(detail.status).toBe('arrived');
+    expect(manager.state.audit[0].changes).toMatchObject({
+      status: { from: 'confirmed', to: 'arrived' },
+      waivers: { from: null, to: '0/4 signed' },
+      gateOverride: { from: null, to: 'paper waivers at the desk' },
+    });
+  });
+
+  it('lets a booking with every waiver signed through without an override', async () => {
+    const { service } = harnessWithWaivers({ booking: makeBooking() }, { ...MISSING, blocked: false, missing: 0, signedCount: 4, message: '' });
+    await expect(service.update('VAL-1234-26', { status: 'arrived' }, STAFF)).resolves.toMatchObject({ status: 'arrived' });
+  });
+});
+
+describe('StaffBookingsService.update: optimistic concurrency', () => {
+  it('refuses a save made from a stale screen with 409', async () => {
+    const { service, manager } = harness({ booking: makeBooking() });
+    const err = await service.update('VAL-1234-26', { guestName: 'Tab B', expectedUpdatedAt: '2026-08-06T09:00:00.000Z' }, STAFF).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err as ConflictException).message).toBe('This booking was changed by someone else — reload');
+    expect(manager.state.booking?.guestName).toBe('Ariane Léger');
+  });
+
+  it('accepts the save when the screen saw the current version, and returns the new one', async () => {
+    const { service } = harness({ booking: makeBooking() });
+    const detail = await service.update('VAL-1234-26', { guestName: 'Tab A', expectedUpdatedAt: '2026-08-06T09:30:00.000Z' }, STAFF);
+    expect(detail.guestName).toBe('Tab A');
+    expect(detail.updatedAt).not.toBe('2026-08-06T09:30:00.000Z');
+  });
+});
+
+describe('StaffBookingsService.update: a party change fits the activity lines', () => {
+  const PIRATE = makeExperience({ id: 'pirate', name: 'Pirate Ship', categoryId: 'kids', priceRr: 400, priceNr: 600, basePrice: 400 });
+
+  it('2 + 2 → 3 + 1: the whole-party zipline follows, the children-only Pirate Ship drops to 1 child', async () => {
+    const { service, manager } = harness({
+      booking: makeBooking({ adults: 2, kids: 2 }),
+      experiences: [makeExperience(), PIRATE],
+      lines: [
+        makeLine({ id: 1, experienceId: null, label: 'Park entry', adults: 2, kids: 2, amount: 1500 }),
+        makeLine({ id: 2, experienceId: 'zipline', label: 'Zipline', adults: 2, kids: 2, amount: 3600, sortOrder: 1 }),
+        makeLine({ id: 3, experienceId: 'pirate', label: 'Pirate Ship', adults: 0, kids: 2, amount: 400, sortOrder: 2 }),
+      ],
+    });
+    const detail = await service.update('VAL-1234-26', { adults: 3, kids: 1 }, STAFF);
+    const zip = detail.lines.find((l) => l.experienceId === 'zipline');
+    const pirate = detail.lines.find((l) => l.experienceId === 'pirate');
+    expect([zip?.adults, zip?.kids]).toEqual([3, 1]);
+    expect([pirate?.adults, pirate?.kids]).toEqual([0, 1]);
+    expect(manager.state.audit[0].changes.items).toEqual({ from: null, to: 'zipline 2+2 → 3+1, pirate 0+2 → 0+1' });
+  });
+
+  it('never charges sent lines for more guests than the party', async () => {
+    const { service } = harness({ booking: makeBooking({ adults: 2, kids: 1 }), experiences: [makeExperience()], lines: [] });
+    const detail = await service.update('VAL-1234-26', { items: [{ id: 'zipline', adults: 5, kids: 3 }] }, STAFF);
+    const zip = detail.lines.find((l) => l.experienceId === 'zipline');
+    expect([zip?.adults, zip?.kids]).toEqual([2, 1]);
+  });
+});
+
+describe('StaffBookingsService: money owed back and payments by method', () => {
+  it('shows a refund due when a code lowers the total below what was paid', () => {
+    const row = toBookingRow(makeBooking({ total: 3578, paidAmount: 3976 }));
+    expect(row.balance).toBe(0);
+    expect(row.refundDue).toBe(398);
+  });
+
+  it('keeps every method a booking was paid by, and one trail entry per payment', async () => {
+    const { service, manager } = harness({ booking: makeBooking({ total: 4250, paidAmount: 0, paymentMethod: '' }) });
+    await service.recordPayment('VAL-1234-26', { amount: 2000, method: 'cash' }, STAFF);
+    const detail = await service.recordPayment('VAL-1234-26', { amount: 2250, method: 'card' }, STAFF);
+    expect(detail.paymentMethod).toBe('cash+card');
+    expect(detail.paidAmount).toBe(4250);
+    expect(manager.state.audit.map((a) => a.changes.paymentMethod?.to)).toEqual(['card', 'cash']);
+  });
+});
+
+describe('StaffBookingsService.postpone', () => {
+  it('requires a reason of at least 3 characters', async () => {
+    const { service, transaction } = harness({ booking: makeBooking() });
+    await expect(service.postpone('VAL-1234-26', '  ', STAFF)).rejects.toBeInstanceOf(BadRequestException);
+    expect(transaction).not.toHaveBeenCalled();
+    await expect(service.postpone('VAL-1234-26', 'Heavy rain', STAFF)).resolves.toMatchObject({ status: 'postponed' });
+  });
+
+  it('is refused by the DTO when empty', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    await expect(pipe.transform({ reason: '   ' }, { type: 'body', metatype: PostponeDto })).rejects.toBeDefined();
+    await expect(pipe.transform({}, { type: 'body', metatype: PostponeDto })).rejects.toBeDefined();
+  });
+});
+
+describe('StaffBookingsService.list: search', () => {
+  it('trims, collapses spaces and matches every word on its own', async () => {
+    const qb = new FakeQueryBuilder({ many: [[], 0] });
+    await build({ booking: makeRepo<Booking>([qb]) }).list({ q: '  VAL   2857  26 ' });
+    expect(qb.wheres).toHaveLength(3);
+    expect(qb.wheres.map((w) => w.params.q0 ?? w.params.q1 ?? w.params.q2)).toEqual(['%VAL%', '%2857%', '%26%']);
+    // digits also match the phone without its spaces
+    expect(qb.wheres[1].params.d1).toBe('%2857%');
+    expect(searchTerms('  ana   peirce ')).toEqual(['ana', 'peirce']);
   });
 });

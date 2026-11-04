@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Optional,
   Injectable,
 } from '@nestjs/common';
@@ -11,7 +12,6 @@ import {
   Not,
   Repository,
   SelectQueryBuilder,
-  MoreThan,
 } from 'typeorm';
 import { adjustmentAmount, computeBooking, entrySettings, type AdjustmentKind, type PricedBooking } from '../../bookings/pricing';
 import { lineRecords } from '../../bookings/booking-records';
@@ -48,9 +48,12 @@ import { pageOffset, resolvePaging, type Paged } from '../../common/paging';
 import { isoDay, PARK_TZ, parkToday, startOfMonth, startOfNextMonth } from '../../common/park-time';
 import { toBookingRow, type BookingRow } from './booking-row';
 import {
-  applyPatch, auditAction, auditedChanges, normalizePatch, patchFields, placesItems, repricingItems, touchesMoney, touchesPlaces,
-  type BookingPatch,
+  applyPatch, auditAction, auditedChanges, fitLinesToParty, lineCountChanges, linesAsItems, normalizePatch, patchFields, patchItems,
+  placesItems, repricingItems, touchesMoney, touchesPlaces,
+  type BookingPatch, type Party,
 } from './booking-patch';
+import { WaiversService } from '../../waivers/waivers.service';
+import { mergePaymentMethod } from './payment-method';
 import { AUDIT_LIMIT, toBookingDetail, toQuoteRow, type BookingDetail, type QuoteRow, type StaffStats } from './staff-booking-views';
 
 export { toBookingRow, type BookingRow } from './booking-row';
@@ -92,6 +95,7 @@ export class StaffBookingsService {
     private readonly coupons: CouponsService,
     @Optional() private readonly payments?: PaymentsService,
     @Optional() private readonly inbox?: InboxNotifierService,
+    @Optional() private readonly waivers?: WaiversService,
   ) {}
 
   // ----------------------------------------------------------------- bookings
@@ -116,23 +120,36 @@ export class StaffBookingsService {
    * and through which channel, so the trail starts with a 'create' entry.
    */
   async createForGuest(dto: CreateStaffBookingDto, staff: StaffPrincipal): Promise<BookingDetail> {
-    const { channel, note, ...bookingDto } = dto;
+    const { channel, note, payment, ...bookingDto } = dto;
     const created = await this.bookings.create(bookingDto);
     const booking = await this.findOr404(created.refCode);
-    const stamp = `Taken by ${staff.name} (${channel})`;
+    const stamp = `Taken by ${staff.name} (${CHANNEL_LABEL[channel] ?? channel})`;
     booking.staffNote = [stamp, (note ?? '').trim()].filter(Boolean).join('\n');
     // "Paid online / by transfer" in the drawer means the money has arrived: record it,
-    // otherwise the guest's ticket would still ask them to pay at the gate.
-    if (bookingDto.payMode === 'online') {
+    // otherwise the guest's ticket would still ask them to pay at the gate. It is a
+    // transfer to the park's account, not a provider payment the drawer could refund.
+    const prepaid = bookingDto.payMode === 'online' && !payment && booking.total > 0;
+    if (prepaid) {
       booking.paidAmount = booking.total;
       booking.paidAt = new Date();
-      booking.paymentMethod = 'online';
+      booking.paymentMethod = 'transfer';
     }
     touch(booking, staff);
     await this.bookingRepo.save(booking);
     await this.auditRepo.save(
       this.auditRepo.create(auditRecord(booking.id, staff, 'create', { channel: { from: null, to: channel } })),
     );
+    if (prepaid) {
+      // one ledger entry per payment, so the day's reconciliation counts it under its method
+      await this.auditRepo.save(this.auditRepo.create(auditRecord(booking.id, staff, 'edit', {
+        paidAmount: { from: 0, to: booking.total }, paymentMethod: { from: null, to: 'transfer' },
+      })));
+    }
+    // A walk-in paying at the desk: the cashier's payment, in the same step.
+    // No amount means "paid in full": the total the server priced, coupon included.
+    if (payment && booking.total > 0) {
+      return this.recordPayment(booking.refCode, { ...payment, amount: payment.amount ?? booking.total }, staff);
+    }
     return this.detail(booking.refCode);
   }
 
@@ -159,7 +176,8 @@ export class StaffBookingsService {
       const receiptNo = input.receiptNo?.trim();
       booking.paidAmount = from + input.amount;
       booking.paidAt = new Date();
-      booking.paymentMethod = input.method;
+      // cash then card reads "cash+card": the booking does not forget the first payment
+      booking.paymentMethod = mergePaymentMethod(from > 0 ? booking.paymentMethod : '', input.method);
       if (receiptNo) booking.receiptNo = receiptNo;
       touch(booking, staff);
       await manager.save(Booking, booking);
@@ -231,6 +249,8 @@ export class StaffBookingsService {
 
   /** Weather day: the visit is postponed, money stays on the booking, the guest picks a new date later. */
   async postpone(refCode: string, reason: string, staff: StaffPrincipal): Promise<BookingDetail> {
+    const why = (reason ?? '').trim();
+    if (why.length < 3) throw new BadRequestException('Give a reason for the postponement (at least 3 characters)');
     return this.dataSource.transaction(async (manager) => {
       const booking = await lockOr404(manager, refCode);
       if (booking.status === 'cancelled') throw new BadRequestException('This booking is cancelled');
@@ -241,7 +261,7 @@ export class StaffBookingsService {
       await manager.save(Booking, booking);
       await this.writeAudit(manager, booking, staff, 'status', {
         status: { from, to: 'postponed' },
-        reason: { from: null, to: reason.trim() || 'weather' },
+        reason: { from: null, to: why },
       });
       return this.readDetail(manager, booking);
     });
@@ -287,6 +307,7 @@ export class StaffBookingsService {
 
     return this.dataSource.transaction(async (manager) => {
       const booking = await lockOr404(manager, refCode);
+      assertNotStale(booking, dto.expectedUpdatedAt);
 
       // A booking has to stay reachable, exactly as BookingsService.create insists.
       const nextEmail = patch.email ?? booking.email;
@@ -297,12 +318,18 @@ export class StaffBookingsService {
         );
       }
 
+      const linesNote = await this.fitLines(manager, booking, patch);
       const changes = auditedChanges(booking, patch);
       const changed = Object.keys(changes);
       if (changed.length === 0) {
         // Nothing moved: leave updated_at and the trail alone.
         return this.readDetail(manager, booking);
       }
+      // the trail reads "zipline 2+2 → 3+1", not the JSON of every line
+      if (changes.items && linesNote) changes.items = { from: null, to: linesNote };
+
+      if (patch.status === 'arrived' && changes.status) Object.assign(changes, await this.arrivalRule(booking.refCode, dto));
+      else if (dto.reason?.trim() && changes.status) changes.reason = { from: null, to: dto.reason.trim() };
 
       if (touchesMoney(changes)) await this.reprice(manager, booking, patch);
       await this.ensureRoom(manager, booking, patch, changes);
@@ -314,6 +341,54 @@ export class StaffBookingsService {
 
       return this.readDetail(manager, booking);
     });
+  }
+
+  /**
+   * A new party never leaves the lines charging for guests who are not coming:
+   * requested lines are clamped to the party, and when the party moves without
+   * new lines the booking's own lines are fitted to it (fitLinesToParty). The
+   * patch then carries the fitted lines, so re-pricing, the capacity check and
+   * the trail all see the same thing. Returns the readable change, if any.
+   */
+  private async fitLines(manager: EntityManager, booking: Booking, patch: BookingPatch): Promise<string> {
+    const from: Party = { adults: booking.adults, kids: booking.kids };
+    const to: Party = { adults: patch.adults ?? booking.adults, kids: patch.kids ?? booking.kids };
+    const requested = patchItems(patch);
+    if (requested) {
+      const clamped = fitLinesToParty(requested, { adults: 0, kids: 0 }, to);
+      patch.items = JSON.stringify(clamped);
+      return lineCountChanges(requested, clamped);
+    }
+    if (from.adults === to.adults && from.kids === to.kids) return '';
+    const existing = linesAsItems(await manager.find(BookingLine, {
+      where: [{ bookingId: booking.id, experienceId: Not(IsNull()) }, { bookingId: booking.id, productKey: Not(IsNull()) }],
+      order: LINE_ORDER,
+    }));
+    const fitted = fitLinesToParty(existing, from, to);
+    const note = lineCountChanges(existing, fitted);
+    if (note) patch.items = JSON.stringify(fitted);
+    return note;
+  }
+
+  /**
+   * "Mark arrived" from the drawer or the day sheet follows the gate's rule:
+   * with waivers missing or flagged it needs an explicit override and a reason,
+   * and the trail records both. Returns the extra audit entries.
+   */
+  private async arrivalRule(refCode: string, dto: UpdateBookingDto): Promise<BookingAuditChanges> {
+    const check = this.waivers ? await this.waivers.arrivalCheck(refCode) : null;
+    if (!check) return {};
+    const signed = { waivers: { from: null, to: `${check.signedCount}/${check.required} signed` } };
+    if (!check.blocked) return signed;
+    if (!dto.override) {
+      throw new ConflictException({
+        statusCode: 409, error: 'Conflict', code: 'WAIVERS_MISSING', message: check.message,
+        missing: check.missing, required: check.required, signed: check.signedCount, stops: check.stops,
+      });
+    }
+    const reason = (dto.reason ?? '').trim();
+    if (reason.length < 3) throw new BadRequestException('Give the reason for checking in without all the waivers');
+    return { ...signed, gateOverride: { from: null, to: reason } };
   }
 
   /**
@@ -460,14 +535,14 @@ export class StaffBookingsService {
           .select('COALESCE(SUM(b.total), 0)', 'sum')
           .getRawOne<{ sum: string | number | null }>(),
 
-        this.chatRepo.count({ where: { status: 'open' } }),
+        this.openChats().getCount(),
       ]);
     const [todayRaw, unansweredChats] = await Promise.all([
       this.visitsOn(today)
         .select('COALESCE(SUM(b.total), 0)', 'sum')
         .addSelect('COALESCE(SUM(b.adults + b.kids), 0)', 'guests')
         .getRawOne<{ sum: string | number | null; guests: string | number | null }>(),
-      this.chatRepo.count({ where: { status: 'open', unreadStaff: MoreThan(0) } }),
+      this.openChats().andWhere('c.unreadStaff > 0').getCount(),
     ]);
 
     return {
@@ -479,6 +554,17 @@ export class StaffBookingsService {
       revenueToday: Number(todayRaw?.sum ?? 0),
       revenueMonth: Number(revenueRaw?.sum ?? 0),
     };
+  }
+
+  /**
+   * Open conversations a visitor has actually written in. Opening the chat
+   * widget creates an empty thread; those are not chats anyone has to answer.
+   */
+  private openChats(): SelectQueryBuilder<ChatConversation> {
+    return this.chatRepo
+      .createQueryBuilder('c')
+      .where('c.status = :open', { open: 'open' })
+      .andWhere("EXISTS (SELECT 1 FROM chat_messages m WHERE m.conversation_id = c.id AND m.sender = 'visitor')");
   }
 
   /** Bookings due on site that day, cancellations excluded. */
@@ -518,6 +604,33 @@ async function lockOr404(manager: EntityManager, refCode: string): Promise<Booki
   return booking;
 }
 
+/** "  Ana   Peirce " -> ["Ana", "Peirce"]: trimmed, runs of spaces collapsed, at most 6 words. */
+export function searchTerms(q: string | undefined): string[] {
+  return (q ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 6);
+}
+
+/** % and _ typed by an operator are literal characters, not wildcards. */
+const escapeLike = (s: string): string => s.replace(/[\\%_]/g, (c) => '\\' + c);
+
+/** How the internal note names the channel a desk booking came in by. */
+const CHANNEL_LABEL: Record<string, string> = {
+  phone: 'phone', desk: 'desk walk-in', email: 'e-mail', whatsapp: 'WhatsApp', agency: 'agency / hotel', other: 'other',
+};
+
+/**
+ * Optimistic concurrency: the screen sent the `updatedAt` it was showing; if
+ * the row has moved since, someone else saved in between.
+ */
+export function assertNotStale(booking: Booking, expected: string | undefined): void {
+  if (!expected || !booking.updatedAt) return;
+  if (new Date(expected).getTime() !== new Date(booking.updatedAt).getTime()) {
+    throw new ConflictException({
+      statusCode: 409, error: 'Conflict', code: 'STALE_BOOKING',
+      message: 'This booking was changed by someone else — reload',
+    });
+  }
+}
+
 /** Stamps who last changed the booking, and when. */
 function touch(booking: Booking, by: Actor): void {
   booking.updatedAt = new Date();
@@ -539,15 +652,17 @@ function filterBookings(qb: SelectQueryBuilder<Booking>, query: ListBookingsQuer
   if (query.payMode) qb.andWhere('b.payMode = :payMode', { payMode: query.payMode });
   if (query.rate) qb.andWhere('b.rate = :rate', { rate: query.rate });
   if (query.nationality) qb.andWhere('b.nationality = :nationality', { nationality: query.nationality });
-  const term = query.q?.trim();
-  if (term) {
-    // One bound parameter reused across the four columns; the wildcards are
-    // added here, never by concatenating the term into the SQL text.
+  searchTerms(query.q).forEach((term, i) => {
+    // Every word must match one of the four columns ("ana 2857", "VAL 2857 26").
+    // Bound parameters only: the wildcards are added here, never by concatenating
+    // the term into the SQL text. Digits also match the phone with its spaces removed.
+    const digits = term.replace(/\D/g, '');
+    const phoneDigits = digits.length >= 3 ? ` OR regexp_replace(b.phone, '[^0-9]', '', 'g') LIKE :d${i}` : '';
     qb.andWhere(
-      '(b.refCode ILIKE :q OR b.guestName ILIKE :q OR b.email ILIKE :q OR b.phone ILIKE :q)',
-      { q: `%${term}%` },
+      `(b.refCode ILIKE :q${i} OR b.guestName ILIKE :q${i} OR b.email ILIKE :q${i} OR b.phone ILIKE :q${i}${phoneDigits})`,
+      { [`q${i}`]: `%${escapeLike(term)}%`, ...(phoneDigits ? { [`d${i}`]: `%${digits}%` } : {}) },
     );
-  }
+  });
   return qb;
 }
 

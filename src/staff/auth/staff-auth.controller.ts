@@ -4,12 +4,13 @@ import {
   Get,
   HttpCode,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { CurrentStaff } from './current-staff.decorator';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto, ResetPasswordDto, TwoFactorLoginDto } from './dto/security.dto';
@@ -100,5 +101,18 @@ export class StaffAuthController {
   @ApiResponse({ status: 401, description: 'No valid session' })
   me(@CurrentStaff() staff: StaffPrincipal): StaffPrincipal {
     return staff;
+  }
+
+  /**
+   * The same answer as `me`, but "not signed in" is a normal 200 with
+   * `user: null`: the back office asks on every page load, and a 401 there
+   * only fills the browser console with an expected failure.
+   */
+  @Get('session')
+  @ApiOperation({ summary: 'The signed-in operator, or { user: null } (never 401)' })
+  async session(@Req() req: Request): Promise<{ user: StaffPrincipal | null }> {
+    const cookies = (req as Request & { cookies?: Record<string, string> }).cookies;
+    const token = cookies?.[this.auth.cookieName];
+    return { user: token ? await this.auth.staffFromToken(token) : null };
   }
 }

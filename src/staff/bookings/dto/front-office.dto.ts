@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { IsSafeText } from '../../../common/validation';
 
-export const PAYMENT_METHODS = ['cash', 'card', 'juice', 'online', 'other'] as const;
+export const PAYMENT_METHODS = ['cash', 'card', 'juice', 'online', 'transfer', 'other'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export class RefundDto {
@@ -29,8 +30,24 @@ export class RecordPaymentDto {
   receiptNo?: string;
 }
 
+/** A payment taken in the same step as a desk booking; no amount = the booking's total. */
+export class DeskPaymentDto {
+  @ApiPropertyOptional({ description: "Rupees taken now; leave out for the booking's total", example: 2500 })
+  @IsOptional() @IsInt() @Min(1) @Max(5_000_000)
+  amount?: number;
+
+  @ApiProperty({ enum: PAYMENT_METHODS })
+  @IsIn(PAYMENT_METHODS)
+  method: PaymentMethod;
+
+  @ApiPropertyOptional({ description: "The till's receipt number" })
+  @IsOptional() @IsString() @IsSafeText() @MaxLength(40)
+  receiptNo?: string;
+}
+
 export class PostponeDto {
-  @ApiPropertyOptional({ example: 'Heavy rain, park closed at 11:00' })
-  @IsOptional() @IsString() @IsSafeText() @MaxLength(200)
-  reason?: string;
+  @ApiProperty({ example: 'Heavy rain, park closed at 11:00', minLength: 3 })
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString() @IsSafeText() @MinLength(3, { message: 'Give a reason for the postponement (at least 3 characters)' }) @MaxLength(200)
+  reason: string;
 }
