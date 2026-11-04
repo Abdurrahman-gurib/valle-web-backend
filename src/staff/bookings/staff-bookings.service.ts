@@ -146,7 +146,10 @@ export class StaffBookingsService {
       })));
     }
     // A walk-in paying at the desk: the cashier's payment, in the same step.
-    if (payment) return this.recordPayment(booking.refCode, payment, staff);
+    // No amount means "paid in full": the total the server priced, coupon included.
+    if (payment && booking.total > 0) {
+      return this.recordPayment(booking.refCode, { ...payment, amount: payment.amount ?? booking.total }, staff);
+    }
     return this.detail(booking.refCode);
   }
 

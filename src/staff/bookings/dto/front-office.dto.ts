@@ -30,6 +30,21 @@ export class RecordPaymentDto {
   receiptNo?: string;
 }
 
+/** A payment taken in the same step as a desk booking; no amount = the booking's total. */
+export class DeskPaymentDto {
+  @ApiPropertyOptional({ description: "Rupees taken now; leave out for the booking's total", example: 2500 })
+  @IsOptional() @IsInt() @Min(1) @Max(5_000_000)
+  amount?: number;
+
+  @ApiProperty({ enum: PAYMENT_METHODS })
+  @IsIn(PAYMENT_METHODS)
+  method: PaymentMethod;
+
+  @ApiPropertyOptional({ description: "The till's receipt number" })
+  @IsOptional() @IsString() @IsSafeText() @MaxLength(40)
+  receiptNo?: string;
+}
+
 export class PostponeDto {
   @ApiProperty({ example: 'Heavy rain, park closed at 11:00', minLength: 3 })
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
