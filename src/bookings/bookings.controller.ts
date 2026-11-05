@@ -50,7 +50,7 @@ export class BookingsController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: BOOKING_TTL_MS } })
   saveDraft(@Body() dto: SaveDraftDto): Promise<{ id: string; sent: boolean }> {
-    return this.bookingsService.saveDraft(dto.email.trim(), dto.payload);
+    return this.bookingsService.saveDraft(dto.email.trim(), dto.payload, dto.lang);
   }
 
   @Get('draft/:id')

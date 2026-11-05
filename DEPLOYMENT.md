@@ -414,6 +414,26 @@ shows the policy and the last runs; `POST /api/staff/ops/retention/preview` coun
 what the next run would touch without changing anything. `RETENTION_JOB=0` on
 `api` switches the job off.
 
+## Guest messages in the guest's language
+
+Bookings keep the page language (`bookings.lang`, migration 030) and restaurant
+tables too (`table_reservations.lang`, migration 034). The wording lives in
+`src/notifications/i18n/` (one file per language: en, fr, de, it, ar, ru, es, hi;
+`i18n.spec.ts` checks every language has every key with the same `{placeholders}`).
+Dates and amounts follow the language (Intl, `Indian/Mauritius`); activity and
+package names stay the English catalogue names (brand names).
+
+| Message | Translated |
+| --- | --- |
+| Ticket e-mail (subject, text and HTML), reminder e-mail (now also HTML), waiver nudge, photos ready, saved booking draft, restaurant table request / confirmed / cancelled | yes; HTML carries `lang` and, for Arabic, `dir="rtl"` with an Arabic-capable font stack (Devanagari stack for Hindi) |
+| WhatsApp / SMS free text: the Twilio fallback text of ticket and reminder, the waiver nudge and photos text (360dialog session messages), the waiver-copy fallback text | yes |
+| Receipt PDF linked from the ticket page | yes (Arabic right to left; Arabic, Russian and Hindi use the Noto fonts in `assets/fonts`, English when they are missing). The cashier's print from the staff app stays English |
+| Approved WhatsApp templates (`valle_booking_ticket`, `valle_visit_reminder`, waiver copy; `scripts/whatsapp-templates.js`, `WA_TEMPLATE_LANG`) | **no**: template ids and their parameters stay English. Translating them needs a template per language submitted to and approved by Meta, then choosing the template language from `booking.lang` |
+| Staff mail (desk alerts, inbox, backup reports, staff security), the desk's park-status notice quoted in the reminder | no, English |
+
+Deploy `api` before `web` when shipping this: the site now sends `lang` with
+table requests and saved drafts, and the API rejects fields it does not know.
+
 ## Day-two operations
 
 ```bash

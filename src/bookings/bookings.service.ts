@@ -31,6 +31,8 @@ import { toBookingRow } from '../staff/bookings/booking-row';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { adjustmentAmount, computeBooking, entrySettings, groupDepositAmount, PricedBooking } from './pricing';
 import { assertAgeMinimums, assertLinesFitParty, type LineInfo } from './party-rules';
+import { guestLang, t } from '../notifications/i18n';
+import { PARK_PHONE } from '../notifications/guest-messages';
 
 export { AVAILABILITY_MAX_DAYS, busyLevel, type AvailabilityDay, type BusyLevel, type SlotLoad } from './availability';
 export type { BookingResponse } from './booking-records';
@@ -254,15 +256,16 @@ export class BookingsService {
    * Keeps what the guest had on the booking page for 14 days and e-mails them
    * a link that brings it all back (cart, party, date, slot, details).
    */
-  async saveDraft(email: string, payload: Record<string, unknown>): Promise<{ id: string; sent: boolean }> {
+  async saveDraft(email: string, payload: Record<string, unknown>, pageLang?: string): Promise<{ id: string; sent: boolean }> {
     if (JSON.stringify(payload).length > DRAFT_MAX_CHARS) throw new BadRequestException('The saved booking is too large');
     const d = await this.draftRepo.save(this.draftRepo.create({ email, payload, expiresAt: new Date(Date.now() + DRAFT_DAYS * DAY_MS) }));
-    const link = `${this.tickets?.siteUrl ?? ''}/booking?draft=${d.id}`;
+    const lang = guestLang(pageLang);
+    const link = `${this.tickets?.siteUrl ?? ''}${lang === 'en' ? '' : '/' + lang}/booking?draft=${d.id}`;
     const sent = this.notifier?.enabled
       ? await this.notifier.mail.send({
           to: email,
-          subject: 'Your VALLÉ day, saved',
-          text: `Hi,\n\nYour booking at VALLÉ Advenature Park is saved, not booked yet. Pick it up where you left off, any time in the next 14 days:\n\n${link}\n\nNothing is reserved until you confirm on that page. Questions? Call +230 660 4477.\n\nVALLÉ Advenature Park`,
+          subject: t(lang, 'draft_subject'),
+          text: t(lang, 'draft_text', { link, phone: PARK_PHONE }),
         })
       : false;
     return { id: d.id, sent };

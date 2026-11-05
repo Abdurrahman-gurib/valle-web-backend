@@ -42,6 +42,10 @@ export class TableReservation {
   @Column({ name: 'booking_ref', type: 'text', default: '' })
   bookingRef: string;
 
+  /** The language of the page the table was asked from: the guest's e-mails are written in it (migration 034). */
+  @Column({ name: 'lang', type: 'text', default: 'en' })
+  lang: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -141,7 +141,7 @@ export class TicketService {
   async receiptPdf(refCode: string, token: string | undefined): Promise<Buffer> {
     const b = await this.requireBooking(refCode, token);
     const lines = await this.lineRepo.find({ where: { bookingId: b.id }, order: { sortOrder: 'ASC' } });
-    return renderReceiptPdf(b, lines, { siteUrl: this.siteUrl });
+    return renderReceiptPdf(b, lines, { siteUrl: this.siteUrl, lang: b.lang });
   }
 
   toView(b: Booking, lines: BookingLine[], waiversSigned = 0, waiversRequired = b.adults + b.kids + (b.infants ?? 0), bankDetails = ''): TicketView {

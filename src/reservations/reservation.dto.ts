@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { IsSafeText } from '../common/validation';
+import { BOOKING_LANGS } from '../bookings/dto/create-booking.dto';
 
 export class PreorderLineDto {
   @ApiProperty({ example: 'Grilled catch of the day' })
@@ -49,6 +50,10 @@ export class CreateReservationDto {
   @ApiPropertyOptional({ description: 'The park booking this table goes with, if any' })
   @IsOptional() @IsString() @MaxLength(20)
   bookingRef?: string;
+
+  @ApiPropertyOptional({ enum: BOOKING_LANGS, description: 'The page language: the guest e-mails are written in it' })
+  @IsOptional() @IsIn(BOOKING_LANGS)
+  lang?: string;
 }
 
 export class SetReservationStatusDto {

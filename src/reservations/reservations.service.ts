@@ -6,6 +6,11 @@ import { InboxNotifierService } from '../notifications/inbox-notifier.service';
 import { MailService } from '../notifications/mail.service';
 import type { CreateReservationDto } from './reservation.dto';
 import { parkToday } from '../common/park-time';
+import { PARK_PHONE } from '../notifications/guest-messages';
+import { dateIn, guestLang, t, type GuestLang } from '../notifications/i18n';
+
+/** The table's day as the guest reads it: as written (YYYY-MM-DD) in English, as before; the long local date otherwise. */
+const tableDate = (day: string, lang: GuestLang): string => (lang === 'en' ? day : dateIn(String(day).slice(0, 10), lang));
 
 export interface ReservationRow {
   id: string; restaurantId: string; restaurantName: string; guestName: string; email: string; phone: string;
@@ -34,6 +39,7 @@ export class ReservationsService {
       visitDate: dto.visitDate, visitTime: dto.visitTime, party: dto.party,
       preorder: (dto.preorder ?? []).filter((l) => l.qty > 0).map((l) => ({ item: l.item.trim().slice(0, 120), qty: Math.min(60, l.qty) })),
       notes: (dto.notes ?? '').trim(), status: 'requested', bookingRef: (dto.bookingRef ?? '').trim().toUpperCase(),
+      lang: guestLang(dto.lang),
     }));
     // the desk hears about it; the guest gets an acknowledgement. Neither may fail the request.
     void this.inbox.notifyReservation(this.toRow(saved, restaurant.name)).catch(() => false);
@@ -41,17 +47,25 @@ export class ReservationsService {
     return { id: saved.id, status: 'requested' };
   }
 
+  /** The words of a table e-mail: guest, party, restaurant, the day as the guest reads it, time, park phone. */
+  private vars(r: TableReservation, restaurantName: string, lang: GuestLang): Record<string, string | number> {
+    return { name: r.guestName, party: r.party, restaurant: restaurantName, date: tableDate(r.visitDate, lang), time: r.visitTime, phone: PARK_PHONE };
+  }
+
+  /** The guest's acknowledgement, in the language of the page they asked from. */
   private async acknowledge(r: TableReservation, restaurantName: string): Promise<void> {
     if (!r.email || !this.mail.enabled) return;
-    const pre = r.preorder.length ? `\nPre-order:\n${r.preorder.map((l) => `  • ${l.qty} × ${l.item}`).join('\n')}\n` : '';
+    const lang = guestLang(r.lang);
+    const v = this.vars(r, restaurantName, lang);
+    const pre = r.preorder.length ? `\n${t(lang, 'table_preorder')}\n${r.preorder.map((l) => `  • ${l.qty} × ${l.item}`).join('\n')}\n` : '';
     await this.mail.send({
       to: r.email,
-      subject: `Your table at ${restaurantName} · ${r.visitDate} ${r.visitTime}`,
+      subject: t(lang, 'table_subject', v),
       text: [
-        `Hi ${r.guestName},`, ``,
-        `We have your request for a table of ${r.party} at ${restaurantName} on ${r.visitDate} at ${r.visitTime}. The team confirms it shortly by e-mail or phone.`,
+        t(lang, 'hiComma', v), ``,
+        t(lang, 'table_request', v),
         pre,
-        `Changes or questions: reply to this e-mail or call +230 660 4477.`, ``,
+        t(lang, 'table_changes', v), ``,
         `VALLÉ Advenature Park`,
       ].join('\n'),
     });
@@ -71,12 +85,13 @@ export class ReservationsService {
     const restaurant = await this.restaurants.findOne({ where: { id: r.restaurantId } });
     const row = this.toRow(r, restaurant?.name ?? r.restaurantId);
     if (r.email && this.mail.enabled) {
+      const lang = guestLang(r.lang);
+      const v = this.vars(r, row.restaurantName, lang);
+      const confirmed = status === 'confirmed';
       void this.mail.send({
         to: r.email,
-        subject: `${status === 'confirmed' ? 'Confirmed' : 'Cancelled'}: your table at ${row.restaurantName} · ${r.visitDate} ${r.visitTime}`,
-        text: status === 'confirmed'
-          ? `Hi ${r.guestName},\n\nYour table of ${r.party} at ${row.restaurantName} on ${r.visitDate} at ${r.visitTime} is confirmed. See you then!\n\nVALLÉ Advenature Park · +230 660 4477`
-          : `Hi ${r.guestName},\n\nWe could not keep a table of ${r.party} at ${row.restaurantName} on ${r.visitDate} at ${r.visitTime}. Call +230 660 4477 and we will find another time.\n\nVALLÉ Advenature Park`,
+        subject: t(lang, confirmed ? 'table_confirmedSubject' : 'table_cancelledSubject', v),
+        text: `${t(lang, 'hiComma', v)}\n\n${t(lang, confirmed ? 'table_confirmed' : 'table_cancelled', v)}\n\n${confirmed ? `VALLÉ Advenature Park · ${PARK_PHONE}` : 'VALLÉ Advenature Park'}`,
       }).catch(() => false);
     }
     return row;

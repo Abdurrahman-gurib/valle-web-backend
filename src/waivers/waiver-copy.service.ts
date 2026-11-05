@@ -6,6 +6,7 @@ import type { Booking, Waiver } from '../entities';
 import { MailService } from '../notifications/mail.service';
 import { WhatsAppService } from '../notifications/whatsapp.service';
 import { TicketService } from '../tickets/ticket.service';
+import { emailFont, guestLang } from '../notifications/i18n';
 import { TERMS, type TermsLang } from './terms';
 import { renderWaiverPdf } from './waiver-pdf';
 
@@ -84,7 +85,7 @@ export class WaiverCopyService {
       `${w.isMinor ? L.sigGuardian : L.sigParticipant}: ${w.signedBy} · ${w.signedAt.toISOString()}`,
       `PDF: ${this.pdfUrl(b, w)}`,
     ].join('\n');
-    const html = `<!doctype html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${lang}"><body style="margin:0;background:#F7F3FF;font-family:Arial,Helvetica,sans-serif;color:#340057">
+    const html = `<!doctype html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${lang}"><body style="margin:0;background:#F7F3FF;font-family:${emailFont(lang)};color:#340057">
 <div style="max-width:600px;margin:0 auto;padding:24px 16px">
   <div style="background:#340057;color:#FFFFFF;border-radius:18px 18px 0 0;padding:20px 24px">
     <div style="font-size:11px;letter-spacing:.16em;opacity:.7">VALLÉ ADVENATURE™ PARK</div>
@@ -139,7 +140,7 @@ export class WaiverCopyService {
         filename: `valle-disclaimer-${b.refCode}.pdf`,
         params: [w.participantName, b.refCode],
         ticketPath: `${b.refCode}?t=${this.tickets.token(b.refCode)}`,
-        text: `${INTRO['en'].replace('{name}', w.participantName).replace('{ref}', b.refCode)}\n${this.pdfUrl(b, w)}`,
+        text: `${INTRO[guestLang(w.lang)].replace('{name}', w.participantName).replace('{ref}', b.refCode)}\n${this.pdfUrl(b, w)}`,
       });
     }
     this.logger.log(`Waiver copy ${b.refCode}/${w.participantName}: e-mail ${email ? 'sent' : 'not sent'}, WhatsApp ${whatsapp ? 'sent' : 'not sent'}`);

@@ -56,7 +56,7 @@ interface Page {
 }
 
 /** Body and Bold faces for the form's language (embedded fonts where Helvetica cannot draw the script). */
-function registerFonts(doc: PDFKit.PDFDocument, lang: TermsLang): void {
+export function registerFonts(doc: PDFKit.PDFDocument, lang: TermsLang): void {
   if (lang === 'ar') {
     doc.registerFont('Body', AR_REGULAR);
     doc.registerFont('Bold', AR_BOLD);

@@ -12,21 +12,32 @@ import { productActivityMap } from '../waivers/waiver-products';
 import { MailService } from './mail.service';
 import { WhatsAppService, type BookingMessage } from './whatsapp.service';
 import { escapeHtml as esc } from '../common/html';
-import { rupees as rs } from '../common/money';
-import { addDays, isoDay, longDate, parkNow, parkToday } from '../common/park-time';
+import { addDays, isoDay, parkNow, parkToday } from '../common/park-time';
 import {
-  emailFrame, firstName, MAPS, PARK_ADDRESS, PARK_PHONE, party, payLine, pinkButton, slotLabel, waiverDeadline,
+  emailFrame, firstName, MAPS, PARK_ADDRESS, PARK_PHONE, party, payLine, payText, pinkButton, slotLabel, waiverDeadline,
 } from './guest-messages';
+import { dateIn, guestLang, isRtl, moneyIn, plural, t, th, type GuestLang } from './i18n';
 
 const REMINDER_HOUR = 17; // sent between 17:00 and midnight, park time, the evening before
 const REMINDER_SWEEP_MS = 15 * 60 * 1000;
 
-const visitDay = (b: Booking): string => longDate(isoDay(b.visitDate));
+/** The guest's language: the one the booking was made in (English when unknown). */
+const langOf = (b: Booking): GuestLang => guestLang(b.lang);
+const visitDay = (b: Booking, lang: GuestLang = langOf(b)): string => dateIn(isoDay(b.visitDate), lang);
+const SIGNATURE = `VALLÉ Advenature™ Park · ${PARK_PHONE} · sales@vallepark.com`;
+/** A bare link shown under a button; kept left to right inside an Arabic card. */
+const linkLine = (url: string, lang: GuestLang): string =>
+  `    <p style="margin:0;font-size:12px;color:#7A6A93;word-break:break-all"${isRtl(lang) ? ' dir="ltr"' : ''}>${esc(url)}</p>`;
 
 /**
  * What the guest receives: the ticket (with QR) right after booking, by e-mail
  * and, when a WhatsApp sender is configured, by WhatsApp; and a reminder the
  * evening before the visit. Sending never blocks or fails a booking.
+ *
+ * Everything is written in the booking's language (booking.lang) from the
+ * catalogue in ./i18n, except the parameters of the approved WhatsApp
+ * templates, which stay English until per-language templates are approved
+ * (see DEPLOYMENT.md). Activity and package names are the English catalogue names.
  */
 @Injectable()
 export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
@@ -74,20 +85,18 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
     return { email, whatsapp };
   }
 
-  /** Visit line shared by the WhatsApp templates: "Friday 2 October 2026, morning arrival 09:00 to 12:00". */
+  /**
+   * Visit line of the WhatsApp templates: "Friday 2 October 2026, morning arrival 09:00 to 12:00".
+   * English: the approved templates are English, a translated parameter would sit in an English sentence.
+   */
   private visitLine(b: Booking): string {
-    return `${visitDay(b)}, ${slotLabel(b.slot).replace('Morning arrival', 'morning arrival').replace('Afternoon arrival', 'afternoon arrival')}`;
+    return `${visitDay(b, 'en')}, ${t('en', b.slot === 'morning' ? 'slotInline_morning' : 'slotInline_afternoon')}`;
   }
 
-  /** What the guest still owes (see payLine in guest-messages). */
-  private payLine(b: Booking): string {
-    return payLine(b);
-  }
-
-  /** Template parameters (360dialog) plus the full text (Twilio fallback) for the ticket. */
+  /** Template parameters (360dialog, English like the template) plus the full text in the guest's language (Twilio fallback). */
   ticketWhatsApp(b: Booking): BookingMessage {
     return {
-      params: [firstName(b), b.refCode, this.visitLine(b), party(b), this.payLine(b)],
+      params: [firstName(b), b.refCode, this.visitLine(b), party(b), payLine(b)],
       ticketPath: `${b.refCode}?t=${this.tickets.token(b.refCode)}`,
       text: this.ticketWhatsAppText(b),
     };
@@ -95,88 +104,95 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
 
   reminderWhatsApp(b: Booking): BookingMessage {
     return {
-      params: [firstName(b), this.visitLine(b), this.payLine(b)],
+      params: [firstName(b), this.visitLine(b), payLine(b)],
       ticketPath: `${b.refCode}?t=${this.tickets.token(b.refCode)}`,
       text: this.reminderText(b),
     };
   }
 
   ticketWhatsAppText(b: Booking): string {
+    const lang = langOf(b);
     return [
-      `Hi ${b.guestName.split(' ')[0]}, your VALLÉ Advenature™ Park booking is confirmed! 🎟️`,
-      `Reference: ${b.refCode}`,
-      `${visitDay(b)} · ${slotLabel(b.slot)}`,
-      `${party(b)} · ${this.payLine(b)}`,
+      t(lang, 'waTicket_hi', { name: b.guestName.split(' ')[0] }),
+      t(lang, 'reference', { ref: b.refCode }),
+      `${visitDay(b)} · ${slotLabel(b.slot, lang)}`,
+      `${party(b, lang)} · ${payLine(b, lang)}`,
       ``,
-      `Your ticket with QR code: ${this.tickets.ticketUrl(b.refCode, b.lang)}`,
-      `Sign the safety waiver for everyone in your party ${this.waiverDeadline(b)} and skip the paperwork at the gate: ${this.tickets.waiverUrl(b.refCode, b.lang)}`,
-      `Show it at the gate. Directions: ${MAPS}`,
-      `Questions? Reply here or call ${PARK_PHONE}.`,
+      t(lang, 'waTicket_qr', { url: this.tickets.ticketUrl(b.refCode, b.lang) }),
+      t(lang, 'waTicket_waiver', { deadline: this.waiverDeadline(b), url: this.tickets.waiverUrl(b.refCode, b.lang) }),
+      t(lang, 'waTicket_gate', { maps: MAPS }),
+      t(lang, 'questions', { phone: PARK_PHONE }),
     ].join('\n');
   }
 
   /** Subject, text and HTML of the ticket e-mail (exported for tests). */
   renderTicketEmail(b: Booking, lines: BookingLine[]): { subject: string; text: string; html: string } {
+    const lang = langOf(b);
+    const rs = (n: number) => moneyIn(n, lang);
+    const end = isRtl(lang) ? 'left' : 'right';
     const visit = visitDay(b);
     const url = this.tickets.ticketUrl(b.refCode, b.lang);
     const waiver = this.tickets.waiverUrl(b.refCode, b.lang);
-    const paidInFull = (b.paidAmount ?? 0) >= b.total;
-    const pay = paidInFull ? `Paid: ${rs(b.total)}` : `${this.payLine(b).replace(/^Rs/, 'To pay on arrival: Rs').replace(' to pay on arrival', '')} (cash or card at the gate)`;
-    const subject = `Your VALLÉ ticket ${b.refCode} · ${visit}`;
+    const deadline = this.waiverDeadline(b);
+    const pay = payText(b, lang, 'ticketPay');
+    const who = party(b, lang);
+    const subject = t(lang, 'ticket_subject', { ref: b.refCode, date: visit });
     const lineText = lines.map((l) => `  • ${l.label}: ${rs(l.amount)}`).join('\n');
     const text = [
-      `Hi ${b.guestName},`,
+      t(lang, 'hiComma', { name: b.guestName }),
       ``,
-      `Your day at VALLÉ Advenature™ Park is booked. Show the QR code (attached, and at the link below) at the gate.`,
+      t(lang, 'ticket_booked'),
       ``,
-      `Reference: ${b.refCode}`,
-      `Visit: ${visit}`,
-      `${slotLabel(b.slot)}`,
-      `Party: ${party(b)} · ${b.rate === 'nr' ? 'visitor rate' : 'resident rate (bring an ID)'}`,
+      t(lang, 'reference', { ref: b.refCode }),
+      t(lang, 'ticket_visit', { date: visit }),
+      slotLabel(b.slot, lang),
+      t(lang, 'ticket_party', { party: who, rate: t(lang, b.rate === 'nr' ? 'rate_visitor' : 'rate_residentId') }),
       lineText,
-      `Total: ${rs(b.total)} · ${pay}`,
+      t(lang, 'ticket_total', { total: rs(b.total), pay }),
       ``,
-      `Your ticket: ${url}`,
+      t(lang, 'yourTicket', { url }),
       ``,
-      `Sign the safety waiver ${this.waiverDeadline(b)} (one per person, 2 minutes on your phone, it saves queuing at the gate): ${waiver}`,
+      t(lang, 'ticket_waiver', { deadline, url: waiver }),
       ``,
-      `Getting here: ${PARK_ADDRESS}. ${MAPS}`,
-      `Bring closed shoes, sunscreen, water and a change of clothes for the waterfalls. Zipline, quad and buggy have age, height and weight limits.`,
-      `Free cancellation: reply to this e-mail or call ${PARK_PHONE}.`,
+      t(lang, 'ticket_gettingHere', { address: PARK_ADDRESS, maps: MAPS }),
+      t(lang, 'ticket_bring'),
+      t(lang, 'ticket_cancel', { phone: PARK_PHONE }),
       ``,
-      `See you in the valley!`,
-      `VALLÉ Advenature™ Park · ${PARK_PHONE} · sales@vallepark.com`,
+      t(lang, 'ticket_seeYou'),
+      SIGNATURE,
     ].join('\n');
-    const lineRows = lines.map((l) => `<tr><td style="padding:6px 0;color:#340057">${esc(l.label)}</td><td style="padding:6px 0;text-align:right;font-family:monospace;color:#340057">${rs(l.amount)}</td></tr>`).join('');
+    const lineRows = lines.map((l) => `<tr><td style="padding:6px 0;color:#340057">${esc(l.label)}</td><td style="padding:6px 0;text-align:${end};font-family:monospace;color:#340057">${rs(l.amount)}</td></tr>`).join('');
+    const label = 'padding:6px 0;color:#7333FF;font-size:11px;letter-spacing:.12em';
     const html = emailFrame({
-      title: 'Your ticket is ready',
+      lang,
+      title: th(lang, 'ticket_title'),
       titleSize: 26,
       footer: `VALLÉ Advenature™ Park · ${esc(PARK_ADDRESS)} · ${esc(PARK_PHONE)} · sales@vallepark.com`,
       body: [
-        `    <p style="margin:0 0 14px;font-size:15px;line-height:1.5">Hi ${esc(b.guestName)}, your day in the valley is booked. Show this QR code at the gate:</p>`,
-        `    <div style="text-align:center;margin:10px 0 18px"><img src="cid:ticket-qr" alt="Ticket QR code ${esc(b.refCode)}" width="220" height="220" style="display:inline-block;border:1px solid #EBE2FF;border-radius:12px;padding:8px;background:#FFFFFF"></div>`,
+        `    <p style="margin:0 0 14px;font-size:15px;line-height:1.5">${th(lang, 'ticket_intro', { name: b.guestName })}</p>`,
+        `    <div style="text-align:center;margin:10px 0 18px"><img src="cid:ticket-qr" alt="${th(lang, 'ticket_qrAlt', { ref: b.refCode })}" width="220" height="220" style="display:inline-block;border:1px solid #EBE2FF;border-radius:12px;padding:8px;background:#FFFFFF"></div>`,
         `    <div style="text-align:center;font-family:monospace;font-size:24px;font-weight:700;color:#FF3358;letter-spacing:.06em">${esc(b.refCode)}</div>`,
         `    <table style="width:100%;border-collapse:collapse;margin-top:18px;font-size:14px">`,
-        `      <tr><td style="padding:6px 0;color:#7333FF;font-size:11px;letter-spacing:.12em">VISIT</td><td style="padding:6px 0;text-align:right">${esc(visit)}</td></tr>`,
-        `      <tr><td style="padding:6px 0;color:#7333FF;font-size:11px;letter-spacing:.12em">ARRIVAL</td><td style="padding:6px 0;text-align:right">${esc(slotLabel(b.slot))}</td></tr>`,
-        `      <tr><td style="padding:6px 0;color:#7333FF;font-size:11px;letter-spacing:.12em">PARTY</td><td style="padding:6px 0;text-align:right">${esc(party(b))} · ${b.rate === 'nr' ? 'visitor rate' : 'resident rate, bring an ID'}</td></tr>`,
+        `      <tr><td style="${label}">${th(lang, 'label_visit')}</td><td style="padding:6px 0;text-align:${end}">${esc(visit)}</td></tr>`,
+        `      <tr><td style="${label}">${th(lang, 'label_arrival')}</td><td style="padding:6px 0;text-align:${end}">${esc(slotLabel(b.slot, lang))}</td></tr>`,
+        `      <tr><td style="${label}">${th(lang, 'label_party')}</td><td style="padding:6px 0;text-align:${end}">${esc(who)} · ${th(lang, b.rate === 'nr' ? 'rate_visitor' : 'rate_residentIdShort')}</td></tr>`,
         `    </table>`,
         `    <hr style="border:0;border-top:1px dashed #D9CCF2;margin:14px 0">`,
         `    <table style="width:100%;border-collapse:collapse;font-size:14px">${lineRows}`,
-        `      <tr><td style="padding:10px 0 0;font-weight:800;font-size:16px">Total</td><td style="padding:10px 0 0;text-align:right;font-weight:800;font-size:16px;font-family:monospace">${rs(b.total)}</td></tr>`,
+        `      <tr><td style="padding:10px 0 0;font-weight:800;font-size:16px">${th(lang, 'label_total')}</td><td style="padding:10px 0 0;text-align:${end};font-weight:800;font-size:16px;font-family:monospace">${rs(b.total)}</td></tr>`,
         `    </table>`,
         `    <p style="margin:8px 0 0;font-size:13px;color:#7333FF;font-weight:700">${esc(pay)}</p>`,
-        `    <p style="text-align:center;margin:22px 0 6px">${pinkButton(url, 'Open my ticket')}</p>`,
-        `    <p style="text-align:center;margin:0;font-size:12px;color:#7A6A93">Save it to your phone, or add it to WhatsApp from the ticket page.</p>`,
+        `    <p style="text-align:center;margin:22px 0 6px">${pinkButton(url, th(lang, 'btn_openTicket'))}</p>`,
+        `    <p style="text-align:center;margin:0;font-size:12px;color:#7A6A93">${th(lang, 'ticket_save')}</p>`,
         `    <div style="margin:20px 0 0;background:#FFFDE0;border:1.5px solid #FFE94D;border-radius:14px;padding:16px 18px">`,
-        `      <p style="margin:0 0 6px;font-size:14px;font-weight:800">Sign your waivers ${esc(this.waiverDeadline(b))}</p>`,
-        `      <p style="margin:0 0 12px;font-size:13px;line-height:1.5">Ziplines, quads and buggies need a signed safety waiver for every participant. Fill it in on your phone, one per person, and walk straight past the paperwork at the gate. Unsigned on the day means filling it in at the desk before the briefing.</p>`,
-        `      <a href="${waiver}" style="background:#340057;color:#FFFFFF;text-decoration:none;font-weight:700;padding:10px 20px;border-radius:999px;display:inline-block;font-size:14px">Sign the waivers</a>`,
+        `      <p style="margin:0 0 6px;font-size:14px;font-weight:800">${th(lang, 'ticket_signHead', { deadline })}</p>`,
+        `      <p style="margin:0 0 12px;font-size:13px;line-height:1.5">${th(lang, 'ticket_signBody')}</p>`,
+        `      <a href="${waiver}" style="background:#340057;color:#FFFFFF;text-decoration:none;font-weight:700;padding:10px 20px;border-radius:999px;display:inline-block;font-size:14px">${th(lang, 'btn_signWaivers')}</a>`,
         `    </div>`,
         `    <hr style="border:0;border-top:1px dashed #D9CCF2;margin:20px 0">`,
-        `    <p style="margin:0 0 8px;font-size:13px;line-height:1.55"><strong>Getting here.</strong> ${esc(PARK_ADDRESS)}. <a href="${MAPS}" style="color:#7333FF">Open in Google Maps</a>. Free parking at the gate.</p>`,
-        `    <p style="margin:0 0 8px;font-size:13px;line-height:1.55"><strong>Bring.</strong> Closed shoes, sunscreen, water and a change of clothes for the waterfalls. Zipline, quad and buggy have age, height and weight limits.</p>`,
-        `    <p style="margin:0;font-size:13px;line-height:1.55"><strong>Change of plans?</strong> Cancellation is free: reply to this e-mail or call ${esc(PARK_PHONE)}.</p>`,
+        `    <p style="margin:0 0 8px;font-size:13px;line-height:1.55"><strong>${th(lang, 'ticket_hereHead')}</strong> ${esc(PARK_ADDRESS)}. <a href="${MAPS}" style="color:#7333FF">${th(lang, 'ticket_openMaps')}</a>. ${th(lang, 'ticket_parking')}</p>`,
+        `    <p style="margin:0 0 8px;font-size:13px;line-height:1.55"><strong>${th(lang, 'ticket_bringHead')}</strong> ${th(lang, 'ticket_bringBody')}</p>`,
+        `    <p style="margin:0;font-size:13px;line-height:1.55"><strong>${th(lang, 'ticket_changeHead')}</strong> ${th(lang, 'ticket_changeBody', { phone: PARK_PHONE })}</p>`,
       ].join('\n'),
     });
     return { subject, text, html };
@@ -199,34 +215,43 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
 
   /** Text of the "please sign your waivers" message (exported for tests). */
   waiverLinkText(b: Booking): string {
+    const lang = langOf(b);
     return [
-      `Hi ${firstName(b)}, one thing before your visit to VALLÉ Advenature™ Park on ${visitDay(b)}:`,
-      `each participant needs a signed safety waiver (Disclaimer Form). Sign it on your phone ${this.waiverDeadline(b)}, one per person, and skip the paperwork at the gate:`,
+      t(lang, 'waiverLink_text1', { name: firstName(b), date: visitDay(b) }),
+      t(lang, 'waiverLink_text2', { deadline: this.waiverDeadline(b) }),
       this.tickets.waiverUrl(b.refCode, b.lang),
       ``,
-      `Booking ${b.refCode} · questions? Reply here or call ${PARK_PHONE}.`,
+      t(lang, 'bookingQuestions', { ref: b.refCode, phone: PARK_PHONE }),
     ].join('\n');
+  }
+
+  /** Subject, text and HTML of the waiver nudge (exported for tests). */
+  renderWaiverLinkEmail(b: Booking, waivers?: { signed: number; required: number }): { subject: string; text: string; html: string } {
+    const lang = langOf(b);
+    const text = this.waiverLinkText(b);
+    const left = waivers && waivers.required > 0 ? t(lang, 'waiverLink_left', { left: waivers.required - waivers.signed, required: waivers.required }) : '';
+    const url = this.tickets.waiverUrl(b.refCode, b.lang);
+    const html = emailFrame({
+      lang,
+      title: th(lang, 'waiverLink_title'),
+      titleSize: 24,
+      cardStyle: ';font-size:15px;line-height:1.5',
+      footer: th(lang, 'footerBooking', { ref: b.refCode, phone: PARK_PHONE }),
+      body: [
+        `    <p style="margin:0 0 12px">${th(lang, 'waiverLink_html1', { name: b.guestName, date: visitDay(b) })}</p>`,
+        `    <p style="margin:0 0 18px">${esc(left)}${th(lang, 'waiverLink_html2', { deadline: this.waiverDeadline(b) })}</p>`,
+        `    <p style="text-align:center;margin:0 0 18px">${pinkButton(url, th(lang, 'btn_signWaivers'))}</p>`,
+        linkLine(url, lang),
+      ].join('\n'),
+    });
+    return { subject: t(lang, 'waiverLink_subject', { ref: b.refCode }), text, html };
   }
 
   /** Staff re-sends the waiver link: e-mail always, WhatsApp when the 24-hour window allows a plain message. */
   async sendWaiverLink(b: Booking, waivers?: { signed: number; required: number }): Promise<{ email: boolean; whatsapp: boolean }> {
-    const text = this.waiverLinkText(b);
-    const left = waivers && waivers.required > 0 ? `${waivers.required - waivers.signed} of ${waivers.required} still to sign · ` : '';
-    const url = this.tickets.waiverUrl(b.refCode, b.lang);
-    const html = emailFrame({
-      title: 'Sign your waivers before you arrive',
-      titleSize: 24,
-      cardStyle: ';font-size:15px;line-height:1.5',
-      footer: `Booking ${esc(b.refCode)} · ${esc(PARK_PHONE)} · sales@vallepark.com`,
-      body: [
-        `    <p style="margin:0 0 12px">Hi ${esc(b.guestName)}, one thing before your visit on <strong>${esc(visitDay(b))}</strong>:</p>`,
-        `    <p style="margin:0 0 18px">${esc(left)}Each participant needs a signed safety waiver (Disclaimer Form). Fill it in on your phone ${esc(this.waiverDeadline(b))}, one per person, and walk straight past the paperwork at the gate.</p>`,
-        `    <p style="text-align:center;margin:0 0 18px">${pinkButton(url, 'Sign the waivers')}</p>`,
-        `    <p style="margin:0;font-size:12px;color:#7A6A93;word-break:break-all">${esc(url)}</p>`,
-      ].join('\n'),
-    });
+    const { subject, text, html } = this.renderWaiverLinkEmail(b, waivers);
     const [email, whatsapp] = await Promise.all([
-      b.email ? this.mail.send({ to: b.email, subject: `Sign your safety waivers · ${b.refCode}`, text, html }) : Promise.resolve(false),
+      b.email ? this.mail.send({ to: b.email, subject, text, html }) : Promise.resolve(false),
       b.phone ? this.whatsapp.sendText(b.phone, text) : Promise.resolve(false),
     ]);
     this.logger.log(`Waiver link ${b.refCode}: e-mail ${email ? 'sent' : 'not sent'}, WhatsApp ${whatsapp ? 'sent' : 'not sent'}`);
@@ -236,11 +261,11 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   // ---------------------------------------------------------------- reminder
 
   /**
-   * The waiver deadline as guests read it: the evening before the visit, or
-   * "before you arrive" when the visit is tomorrow or today.
+   * The waiver deadline as guests read it, in the booking's language: the
+   * evening before the visit, or "before you arrive" when the visit is tomorrow or today.
    */
   waiverDeadline(b: Booking): string {
-    return waiverDeadline(isoDay(b.visitDate), parkToday());
+    return waiverDeadline(isoDay(b.visitDate), parkToday(), langOf(b));
   }
 
   /** Signed / required waivers of a booking, 0/0 when the booking needs none. */
@@ -256,26 +281,48 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * `statusLine` is the desk's park notice of the moment (open / partly open / closed), when there is one;
-   * `waivers` what is signed so far (the line changes from a nudge to a tick).
+   * `statusLine` is the desk's park notice of the moment (open / partly open / closed), when there is one,
+   * passed on as the desk wrote it; `waivers` what is signed so far (the line changes from a nudge to a tick).
    */
   reminderText(b: Booking, statusLine = '', waivers?: { signed: number; required: number }): string {
+    const lang = langOf(b);
+    const waiverUrl = this.tickets.waiverUrl(b.refCode, b.lang);
     const waiverLine = !waivers || waivers.required === 0
-      ? `Waivers: sign them tonight and skip the queue at the gate: ${this.tickets.waiverUrl(b.refCode, b.lang)}`
+      ? t(lang, 'rem_waiverOpen', { url: waiverUrl })
       : waivers.signed >= waivers.required
-        ? `Waivers: all ${waivers.required} signed, thank you. Straight to the briefing tomorrow.`
-        : `⚠️ Waivers: ${waivers.required - waivers.signed} of ${waivers.required} still unsigned. Sign tonight (2 minutes each) or fill them in at the desk before the briefing: ${this.tickets.waiverUrl(b.refCode, b.lang)}`;
+        ? t(lang, 'rem_waiverDone', { required: waivers.required })
+        : t(lang, 'rem_waiverMissing', { left: waivers.required - waivers.signed, required: waivers.required, url: waiverUrl });
     return [
-      `See you tomorrow at VALLÉ Advenature™ Park, ${b.guestName.split(' ')[0]}! 🌴`,
-      `${visitDay(b)} · ${slotLabel(b.slot)} · ${party(b)}`,
+      t(lang, 'rem_hi', { name: b.guestName.split(' ')[0] }),
+      `${visitDay(b)} · ${slotLabel(b.slot, lang)} · ${party(b, lang)}`,
       ...(statusLine ? [`⚠️ ${statusLine}`] : []),
-      (b.paidAmount ?? 0) >= b.total ? 'Already paid.' : `${this.payLine(b)} (cash or card).`,
+      (b.paidAmount ?? 0) >= b.total ? t(lang, 'rem_paid') : t(lang, 'rem_pay', { pay: payLine(b, lang) }),
       ``,
-      `Your ticket: ${this.tickets.ticketUrl(b.refCode, b.lang)}`,
+      t(lang, 'yourTicket', { url: this.tickets.ticketUrl(b.refCode, b.lang) }),
       waiverLine,
-      `Directions: ${MAPS}`,
-      `Bring closed shoes, sunscreen and water. Reply here or call ${PARK_PHONE} if anything changes.`,
+      t(lang, 'directions', { maps: MAPS }),
+      t(lang, 'rem_bring', { phone: PARK_PHONE }),
     ].join('\n');
+  }
+
+  /** Subject, text and HTML of the reminder e-mail (the HTML carries the language and, for Arabic, dir="rtl"). */
+  renderReminderEmail(b: Booking, statusLine = '', waivers?: { signed: number; required: number }): { subject: string; text: string; html: string } {
+    const lang = langOf(b);
+    const text = this.reminderText(b, statusLine, waivers);
+    const [first, ...rest] = text.split('\n');
+    const html = emailFrame({
+      lang,
+      title: th(lang, 'rem_title'),
+      titleSize: 24,
+      cardStyle: ';font-size:15px;line-height:1.5',
+      footer: th(lang, 'footerBooking', { ref: b.refCode, phone: PARK_PHONE }),
+      body: [
+        `    <p style="margin:0 0 12px;font-weight:700">${esc(first)}</p>`,
+        ...rest.filter(Boolean).map((l) => `    <p style="margin:0 0 8px;word-break:break-word">${esc(l)}</p>`),
+        `    <p style="text-align:center;margin:18px 0 0">${pinkButton(this.tickets.ticketUrl(b.refCode, b.lang), th(lang, 'btn_openTicket'))}</p>`,
+      ].join('\n'),
+    });
+    return { subject: t(lang, 'rem_subject', { ref: b.refCode }), text, html };
   }
 
   async sendReminder(b: Booking): Promise<boolean> {
@@ -283,9 +330,9 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
       this.parkStatus?.line().catch(() => '') ?? Promise.resolve(''),
       this.waiverStatus(b).catch(() => ({ signed: 0, required: 0 })),
     ]);
-    const text = this.reminderText(b, statusLine, waivers);
+    const { subject, text, html } = this.renderReminderEmail(b, statusLine, waivers);
     const [email, wa] = await Promise.all([
-      b.email ? this.mail.send({ to: b.email, subject: `Tomorrow at VALLÉ · ${b.refCode}`, text }) : Promise.resolve(false),
+      b.email ? this.mail.send({ to: b.email, subject, text, html }) : Promise.resolve(false),
       b.phone ? this.whatsapp.sendBooking('reminder', b.phone, this.reminderWhatsApp(b)) : Promise.resolve(false),
     ]);
     if (email || wa) await this.bookingRepo.update({ id: b.id }, { reminderSentAt: new Date() });
@@ -299,28 +346,30 @@ export class GuestMessagingService implements OnModuleInit, OnModuleDestroy {
 
   /** "Your photos are ready": the ticket page now carries the visit photos. */
   async sendPhotosReady(b: Booking, count: number): Promise<{ email: boolean; whatsapp: boolean }> {
+    const lang = langOf(b);
     const url = this.tickets.ticketUrl(b.refCode, b.lang) + '#photos';
     const first = firstName(b);
     const text = [
-      `Hi ${first}, your photos from VALLÉ Advenature™ Park are ready! 📸`,
-      `${count} photo${count === 1 ? '' : 's'} from ${visitDay(b)} are waiting on your ticket page, yours to download and keep:`,
+      t(lang, 'photos_hi', { name: first }),
+      plural(lang, 'photos_text', count, { date: visitDay(b) }),
       url,
       ``,
-      `Booking ${b.refCode} · questions? Reply here or call ${PARK_PHONE}.`,
+      t(lang, 'bookingQuestions', { ref: b.refCode, phone: PARK_PHONE }),
     ].join('\n');
     const html = emailFrame({
-      title: 'Your photos are ready',
+      lang,
+      title: th(lang, 'photos_title'),
       titleSize: 24,
       cardStyle: ';font-size:15px;line-height:1.5',
-      footer: `Booking ${esc(b.refCode)} · ${esc(PARK_PHONE)} · sales@vallepark.com`,
+      footer: th(lang, 'footerBooking', { ref: b.refCode, phone: PARK_PHONE }),
       body: [
-        `    <p style="margin:0 0 12px">Hi ${esc(first)}, ${count} photo${count === 1 ? '' : 's'} from your visit on <strong>${esc(visitDay(b))}</strong> are on your ticket page, yours to download and keep.</p>`,
-        `    <p style="text-align:center;margin:0 0 18px">${pinkButton(url, 'See my photos')}</p>`,
-        `    <p style="margin:0;font-size:12px;color:#7A6A93;word-break:break-all">${esc(url)}</p>`,
+        `    <p style="margin:0 0 12px">${plural(lang, 'photos_html', count, { name: first, date: visitDay(b) }, true)}</p>`,
+        `    <p style="text-align:center;margin:0 0 18px">${pinkButton(url, th(lang, 'btn_seePhotos'))}</p>`,
+        linkLine(url, lang),
       ].join('\n'),
     });
     const [email, whatsapp] = await Promise.all([
-      b.email ? this.mail.send({ to: b.email, subject: `Your VALLÉ photos are ready · ${b.refCode}`, text, html }) : Promise.resolve(false),
+      b.email ? this.mail.send({ to: b.email, subject: t(lang, 'photos_subject', { ref: b.refCode }), text, html }) : Promise.resolve(false),
       b.phone ? this.whatsapp.sendText(b.phone, text) : Promise.resolve(false),
     ]);
     return { email, whatsapp };
