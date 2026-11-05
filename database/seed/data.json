@@ -530,10 +530,10 @@
       "price": 700,
       "mode": "pp",
       "img": "/images/giant-swing/giant-swing-06.webp",
-      "blurb": "Two giant arcs high above the valley: strap in, lift off and swing out over the hills.",
+      "blurb": "A giant pendulum high above the valley: strap in, lift off and swing until it comes to rest.",
       "gtk": [
         {
-          "t": "Two rides per ticket"
+          "t": "Swings like a pendulum until it comes to rest"
         },
         {
           "t": "Riders from 12 years"
@@ -1665,10 +1665,10 @@
       ]
     },
     "giantswing": {
-      "eyebrow": "THE GIANT SWING · 2 RIDES PER TICKET",
+      "eyebrow": "THE GIANT SWING · PENDULUM RIDE",
       "t1": "Lift off,",
       "t2": "swing out",
-      "copy": "Strap into the seat, rise high above the platform and let go: two giant arcs out over the treetops, with the whole valley below your feet.",
+      "copy": "Strap into the seat, rise high above the platform and let go: the swing arcs out over the treetops like a pendulum until gravity brings it to rest, with the whole valley below your feet.",
       "foot": "ABOUT 15 MINUTES · RIDERS 12+ · 40 TO 85 KG",
       "cta": "Add the Giant Swing to my day →",
       "shots": [
@@ -2155,9 +2155,9 @@
     ],
     "giantswing": [
       {
-        "n": "Giant Swing · 2 rides",
+        "n": "Giant Swing",
         "rr": 700,
-        "nr": 700
+        "nr": 850
       }
     ]
   },
