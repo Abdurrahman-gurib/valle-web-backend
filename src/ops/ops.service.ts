@@ -116,6 +116,21 @@ export class OpsService {
     return this.calendar();
   }
 
+  // -------------------------------------------------------- group deposits
+
+  /** The deposit payment details schools and groups see; '' while unset. */
+  async groupPayment(): Promise<{ bankDetails: string }> {
+    const row = await this.settingRepo.findOne({ where: { key: 'group_bank_details' } });
+    return { bankDetails: row?.value ?? '' };
+  }
+
+  /** Trimmed, with Windows line ends and runs of blank lines tidied; '' brings back "our team sends the details". */
+  async saveGroupPayment(text: string): Promise<{ bankDetails: string }> {
+    const value = text.replace(/\r\n?/g, '\n').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+    await this.settingRepo.save(Object.assign(new Setting(), { key: 'group_bank_details', value }));
+    return { bankDetails: value };
+  }
+
   /** The backup log, newest first, judged against the nightly and monthly expectations. */
   async backups(now = new Date()): Promise<BackupStatus> {
     const rows: Row[] = await this.db.query(

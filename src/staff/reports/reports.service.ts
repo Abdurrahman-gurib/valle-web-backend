@@ -31,6 +31,8 @@ export interface SalesSummary {
     guests: number;
     adults: number;
     kids: number;
+    /** Children under 6: free, but counted for capacity, waivers and the gate. */
+    infants: number;
     revenue: number;
     entryRevenue: number;
     experienceRevenue: number;
@@ -60,7 +62,7 @@ export interface ExperienceRow { experienceId: string; name: string; label: stri
 
 export interface ReconciliationRow {
   refCode: string; guestName: string; slot: string; payMode: string; status: string;
-  adults: number; kids: number; total: number; nationality: string; phone: string; email: string;
+  adults: number; kids: number; infants: number; total: number; nationality: string; phone: string; email: string;
   /** All paid on the booking so far, and what is owed back when that exceeds the total. */
   paid: number; refundDue: number;
   /** The payments recorded for this booking on the reconciliation day, per method. */
@@ -109,7 +111,7 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /** A row of the bookings CSV export, as the driver returns it. */
 interface BookingExportRow {
   ref_code: string; visit_date: string | Date; slot: string; status: string; guest_name: string; nationality: string;
-  email: string; phone: string; adults: number; kids: number; rate: string; pay_mode: string;
+  email: string; phone: string; adults: number; kids: number; infants: number; rate: string; pay_mode: string;
   entry_amount: string; subtotal: string; discount: string; total: string; currency: string; staff_note: string; created_at: string | Date;
 }
 
@@ -121,9 +123,10 @@ export class ReportsService {
     const live = `visit_date BETWEEN $1 AND $2 AND status <> 'cancelled'`;
     const [tot] = await this.db.query(
       `SELECT COUNT(*)::int AS bookings,
-              COALESCE(SUM(adults + kids), 0)::int AS guests,
+              COALESCE(SUM(adults + kids + infants), 0)::int AS guests,
               COALESCE(SUM(adults), 0)::int AS adults,
               COALESCE(SUM(kids), 0)::int AS kids,
+              COALESCE(SUM(infants), 0)::int AS infants,
               COALESCE(SUM(total), 0)::bigint AS revenue,
               COALESCE(SUM(entry_amount), 0)::bigint AS entry_revenue,
               COALESCE(SUM(subtotal), 0)::bigint AS subtotal,
@@ -149,7 +152,7 @@ export class ReportsService {
     );
     const breakdown = async (col: string, includeCancelled = false): Promise<Breakdown[]> => {
       const rows: { key: string; bookings: string; guests: string; revenue: string }[] = await this.db.query(
-        `SELECT ${col} AS key, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids), 0)::int AS guests,
+        `SELECT ${col} AS key, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids + infants), 0)::int AS guests,
                 COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN total ELSE 0 END), 0)::bigint AS revenue
            FROM bookings WHERE visit_date BETWEEN $1 AND $2 ${includeCancelled ? '' : "AND status <> 'cancelled'"}
           GROUP BY ${col} ORDER BY revenue DESC, bookings DESC`,
@@ -158,7 +161,7 @@ export class ReportsService {
       return rows.map((r) => ({ key: String(r.key ?? ''), bookings: num(r.bookings), guests: num(r.guests), revenue: num(r.revenue) }));
     };
     const dailyRaw: { date: string | Date; bookings: string; guests: string; revenue: string }[] = await this.db.query(
-      `SELECT visit_date AS date, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids), 0)::int AS guests,
+      `SELECT visit_date AS date, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids + infants), 0)::int AS guests,
               COALESCE(SUM(total), 0)::bigint AS revenue
          FROM bookings WHERE ${live} GROUP BY visit_date ORDER BY visit_date`,
       [from, to],
@@ -180,7 +183,7 @@ export class ReportsService {
     return {
       from, to,
       totals: {
-        bookings, cancelled: num(canc.cancelled), guests: num(tot.guests), adults: num(tot.adults), kids: num(tot.kids),
+        bookings, cancelled: num(canc.cancelled), guests: num(tot.guests), adults: num(tot.adults), kids: num(tot.kids), infants: num(tot.infants),
         revenue, entryRevenue, experienceRevenue, productRevenue,
         // entry + experiences + products + other - discounts = revenue, by construction
         otherRevenue: num(tot.subtotal) - entryRevenue - experienceRevenue - productRevenue,
@@ -199,7 +202,7 @@ export class ReportsService {
   async nationalities(from: string, to: string): Promise<NationalityRow[]> {
     const rows: { nationality: string; bookings: string; guests: string; revenue: string }[] = await this.db.query(
       `SELECT COALESCE(NULLIF(TRIM(nationality), ''), 'Not given') AS nationality, COUNT(*)::int AS bookings,
-              COALESCE(SUM(adults + kids), 0)::int AS guests, COALESCE(SUM(total), 0)::bigint AS revenue
+              COALESCE(SUM(adults + kids + infants), 0)::int AS guests, COALESCE(SUM(total), 0)::bigint AS revenue
          FROM bookings WHERE visit_date BETWEEN $1 AND $2 AND status <> 'cancelled'
         GROUP BY 1 ORDER BY guests DESC, revenue DESC`,
       [from, to],
@@ -231,10 +234,10 @@ export class ReportsService {
 
   async reconciliation(date: string): Promise<Reconciliation> {
     const raw: {
-      ref_code: string; guest_name: string; slot: string; pay_mode: string; status: string; adults: number; kids: number;
+      ref_code: string; guest_name: string; slot: string; pay_mode: string; status: string; adults: number; kids: number; infants: number;
       total: string; nationality: string; phone: string; email: string; paid_amount?: string | number;
     }[] = await this.db.query(
-      `SELECT ref_code, guest_name, slot, pay_mode, status, adults, kids, total, nationality, phone, email, paid_amount
+      `SELECT ref_code, guest_name, slot, pay_mode, status, adults, kids, infants, total, nationality, phone, email, paid_amount
          FROM bookings WHERE visit_date = $1
         ORDER BY CASE slot WHEN 'morning' THEN 0 ELSE 1 END, status, guest_name`,
       [date],
@@ -256,7 +259,7 @@ export class ReportsService {
       for (const p of payments) if (p.refCode === r.ref_code) mine.set(p.method, (mine.get(p.method) ?? 0) + p.amount);
       return {
         refCode: r.ref_code, guestName: r.guest_name, slot: r.slot, payMode: r.pay_mode, status: r.status,
-        adults: num(r.adults), kids: num(r.kids), total, nationality: r.nationality ?? '', phone: r.phone ?? '', email: r.email ?? '',
+        adults: num(r.adults), kids: num(r.kids), infants: num(r.infants), total, nationality: r.nationality ?? '', phone: r.phone ?? '', email: r.email ?? '',
         paid, refundDue: r.status === 'cancelled' ? 0 : Math.max(0, paid - total),
         paidToday: [...mine].map(([method, amount]) => ({ method, amount })),
       };
@@ -269,7 +272,7 @@ export class ReportsService {
     const n = Math.min(Math.max(1, days), 90);
     const to = addDays(today, n - 1);
     const booked: { date: string | Date; slot: string; bookings: string; guests: string; revenue: string }[] = await this.db.query(
-      `SELECT visit_date AS date, slot, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids), 0)::int AS guests,
+      `SELECT visit_date AS date, slot, COUNT(*)::int AS bookings, COALESCE(SUM(adults + kids + infants), 0)::int AS guests,
               COALESCE(SUM(total), 0)::bigint AS revenue
          FROM bookings WHERE visit_date BETWEEN $1 AND $2 AND status <> 'cancelled' GROUP BY visit_date, slot`,
       [today, to],
@@ -277,7 +280,7 @@ export class ReportsService {
     // Typical day: guests per calendar day of the previous 8 weeks, averaged per weekday.
     const hist: { dow: string; days: string; guests: string }[] = await this.db.query(
       `SELECT EXTRACT(DOW FROM visit_date)::int AS dow, COUNT(DISTINCT visit_date)::int AS days,
-              COALESCE(SUM(adults + kids), 0)::int AS guests
+              COALESCE(SUM(adults + kids + infants), 0)::int AS guests
          FROM bookings WHERE visit_date BETWEEN $1 AND $2 AND status <> 'cancelled' GROUP BY 1`,
       [addDays(today, -56), addDays(today, -1)],
     );
@@ -308,7 +311,7 @@ export class ReportsService {
     const stamp = `${from}_${to}`;
     if (type === 'bookings') {
       const rows: BookingExportRow[] = await this.db.query(
-        `SELECT ref_code, visit_date, slot, status, guest_name, nationality, email, phone, adults, kids, rate, pay_mode,
+        `SELECT ref_code, visit_date, slot, status, guest_name, nationality, email, phone, adults, kids, infants, rate, pay_mode,
                 entry_amount, subtotal, discount, total, currency, staff_note, created_at
            FROM bookings WHERE visit_date BETWEEN $1 AND $2 ORDER BY visit_date, slot, guest_name`,
         [from, to],
@@ -316,10 +319,10 @@ export class ReportsService {
       return {
         filename: `bookings_${stamp}.csv`,
         csv: toCsv(
-          ['Reference', 'Visit date', 'Slot', 'Status', 'Guest', 'Nationality', 'Email', 'Phone', 'Adults', 'Children', 'Rate', 'Payment', 'Park entry', 'Subtotal', 'Discount', 'Total', 'Currency', 'Internal note', 'Booked at'],
+          ['Reference', 'Visit date', 'Slot', 'Status', 'Guest', 'Nationality', 'Email', 'Phone', 'Adults', 'Children', 'Under 6 (free)', 'Rate', 'Payment', 'Park entry', 'Subtotal', 'Discount', 'Total', 'Currency', 'Internal note', 'Booked at'],
           rows.map((r) => [
             r.ref_code, isoDay(r.visit_date), r.slot, r.status, r.guest_name, r.nationality,
-            r.email, r.phone, num(r.adults), num(r.kids), r.rate === 'nr' ? 'Visitor' : 'Resident',
+            r.email, r.phone, num(r.adults), num(r.kids), num(r.infants), r.rate === 'nr' ? 'Visitor' : 'Resident',
             r.pay_mode === 'online' ? 'Online' : 'At gate', num(r.entry_amount), num(r.subtotal), num(r.discount), num(r.total),
             r.currency, r.staff_note, new Date(r.created_at).toISOString(),
           ]),

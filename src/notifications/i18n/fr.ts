@@ -144,5 +144,5 @@ export const fr: GuestCatalogue = {
   rc_balanceDue: "Solde à régler à l'entrée",
   rc_balance: 'Solde',
   rc_onlinePending: 'Paiement en ligne en attente.',
-  rc_terms: "Aucun remboursement en cas d'annulation une fois la réservation payée ; la pluie ou la météo ne justifient pas une annulation. Une visite interrompue par le parc pour cause de météo est reportée à la date de votre choix (formulaire de décharge, clause 12).",
+  rc_terms: "Modification ou annulation gratuite jusqu'au jour de la visite ; le montant payé est remboursé, sauf offres Expo et forfaits photo et vidéo. Le jour même, une activité payée qui peut avoir lieu n'est pas remboursée si elle n'est pas faite ; la pluie ou la météo ne justifient pas une annulation. Une visite interrompue par le parc pour cause de météo est reportée à la date de votre choix (formulaire de décharge, clause 12).",
 };

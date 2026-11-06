@@ -162,7 +162,7 @@ export const en = {
   rc_balanceDue: 'Balance to pay at the gate',
   rc_balance: 'Balance',
   rc_onlinePending: 'Online payment pending.',
-  rc_terms: 'No refund on cancellation once booked and paid; rain or weather is not a ground for cancellation. A visit stopped by the park for weather is postponed to a date of your choice (Disclaimer Form, clause 12).',
+  rc_terms: 'Free change or cancellation up to the day of the visit; what was paid is refunded, except Expo deals and photo and video packages. On the day, a paid activity that can go ahead is not refunded if not taken; rain or weather is not a ground for cancellation. A visit stopped by the park for weather is postponed to a date of your choice (Disclaimer Form, clause 12).',
 };
 
 export type GuestKey = keyof typeof en;

@@ -144,5 +144,5 @@ export const de: GuestCatalogue = {
   rc_balanceDue: 'Restbetrag am Eingang zu zahlen',
   rc_balance: 'Restbetrag',
   rc_onlinePending: 'Online-Zahlung ausstehend.',
-  rc_terms: 'Keine Erstattung bei Stornierung nach Buchung und Zahlung; Regen oder Wetter sind kein Stornierungsgrund. Ein Besuch, den der Park wegen des Wetters abbricht, wird auf ein Datum Ihrer Wahl verschoben (Haftungsausschlusserklärung, Klausel 12).',
+  rc_terms: 'Kostenlose Änderung oder Stornierung bis zum Besuchstag; der bezahlte Betrag wird erstattet, ausgenommen Expo-Angebote sowie Foto- und Videopakete. Am Besuchstag wird eine bezahlte Aktivität, die stattfinden kann, bei Nichtteilnahme nicht erstattet; Regen oder Wetter sind kein Stornierungsgrund. Ein Besuch, den der Park wegen des Wetters abbricht, wird auf ein Datum Ihrer Wahl verschoben (Haftungsausschlusserklärung, Klausel 12).',
 };

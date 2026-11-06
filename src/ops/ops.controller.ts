@@ -4,6 +4,7 @@ import { Roles, RolesGuard } from '../staff/auth/roles.guard';
 import { StaffAuthGuard } from '../staff/auth/staff-auth.guard';
 import { BackupStatus, CalendarView, OpsService } from './ops.service';
 import { CalendarDto } from './calendar.dto';
+import { GroupPaymentDto } from './group-payment.dto';
 import { RetentionPolicyDto } from './retention.dto';
 import { RetentionService, RetentionStatus } from './retention.service';
 
@@ -34,6 +35,19 @@ export class OpsController {
   @ApiOperation({ summary: 'Save the capacity calendar (takes effect on the next booking)' })
   saveCalendar(@Body() dto: CalendarDto): Promise<CalendarView> {
     return this.ops.saveCalendar(dto);
+  }
+
+  @Get('group-payment')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'How schools and groups pay their deposit (setting group_bank_details)' })
+  groupPayment(): Promise<{ bankDetails: string }> {
+    return this.ops.groupPayment();
+  }
+
+  @Put('group-payment')
+  @ApiOperation({ summary: 'Save the deposit payment details shown to schools and groups (empty = the team sends them)' })
+  saveGroupPayment(@Body() dto: GroupPaymentDto): Promise<{ bankDetails: string }> {
+    return this.ops.saveGroupPayment(dto.bankDetails);
   }
 
   @Get('retention')

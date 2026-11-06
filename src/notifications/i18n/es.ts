@@ -144,5 +144,5 @@ export const es: GuestCatalogue = {
   rc_balanceDue: 'Saldo a pagar en la entrada',
   rc_balance: 'Saldo',
   rc_onlinePending: 'Pago en línea pendiente.',
-  rc_terms: 'Sin reembolso por cancelación una vez reservado y pagado; la lluvia o el tiempo no son motivo de cancelación. Una visita interrumpida por el parque por el tiempo se aplaza a la fecha que usted elija (formulario de exención, cláusula 12).',
+  rc_terms: 'Cambio o cancelación gratuitos hasta el día de la visita; lo pagado se reembolsa, salvo las ofertas Expo y los paquetes de fotos y vídeo. El mismo día, una actividad pagada que puede realizarse no se reembolsa si no se hace; la lluvia o el tiempo no son motivo de cancelación. Una visita interrumpida por el parque por el tiempo se aplaza a la fecha que usted elija (formulario de exención, cláusula 12).',
 };

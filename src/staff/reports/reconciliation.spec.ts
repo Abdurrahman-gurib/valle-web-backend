@@ -18,4 +18,9 @@ describe('reconciliationTotals', () => {
   it('counts the still-confirmed bookings of a past day as no-shows', () => {
     expect(reconciliationTotals(rows, true)).toMatchObject({ noShows: 2, noShowAmount: 3500 });
   });
+
+  it('counts free under-6s as guests at the gate', () => {
+    const withInfants = [{ status: 'arrived', payMode: 'gate', adults: 2, kids: 0, infants: 2, total: 2000 }];
+    expect(reconciliationTotals(withInfants, false)).toMatchObject({ guestsExpected: 4, guestsArrived: 4 });
+  });
 });

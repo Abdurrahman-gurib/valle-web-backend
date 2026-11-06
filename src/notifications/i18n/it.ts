@@ -144,5 +144,5 @@ export const it: GuestCatalogue = {
   rc_balanceDue: "Saldo da pagare all'ingresso",
   rc_balance: 'Saldo',
   rc_onlinePending: 'Pagamento online in attesa.',
-  rc_terms: "Nessun rimborso in caso di cancellazione dopo prenotazione e pagamento; pioggia o maltempo non sono motivo di cancellazione. Una visita interrotta dal parco per il maltempo viene rinviata a una data a sua scelta (modulo di esonero, clausola 12).",
+  rc_terms: "Modifica o cancellazione gratuita fino al giorno della visita; quanto pagato viene rimborsato, tranne le offerte Expo e i pacchetti foto e video. Il giorno stesso, un'attività pagata che può svolgersi non viene rimborsata se non effettuata; pioggia o maltempo non sono motivo di cancellazione. Una visita interrotta dal parco per il maltempo viene rinviata a una data a sua scelta (modulo di esonero, clausola 12).",
 };

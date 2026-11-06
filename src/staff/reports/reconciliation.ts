@@ -9,6 +9,8 @@ export interface ReconciliationInput {
   payMode: string;
   adults: number;
   kids: number;
+  /** Under 6s: free, but they come through the gate. */
+  infants?: number;
   total: number;
 }
 
@@ -32,7 +34,7 @@ export function reconciliationTotals(rows: ReconciliationInput[], dayHasPassed: 
     onlinePaid: 0, cancelled: 0, cancelledAmount: 0, noShows: 0, noShowAmount: 0,
   };
   for (const r of rows) {
-    const guests = r.adults + r.kids;
+    const guests = r.adults + r.kids + (r.infants ?? 0);
     if (r.status === 'cancelled') { t.cancelled++; t.cancelledAmount += r.total; continue; }
     t.guestsExpected += guests;
     if (r.status === 'arrived') t.guestsArrived += guests;
