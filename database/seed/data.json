@@ -627,9 +627,9 @@
       "px": 43.7,
       "py": 31.2,
       "kind": "main",
-      "name": "La Citronelle",
-      "sub": "Refined Indian cuisine in a rustic lakeside setting. Events up to 400 guests.",
-      "img": "/images/la-citronelle-4.avif",
+      "name": "La Bigarade",
+      "sub": "Indian and Mauritian cuisine beside a quiet river. Events up to 400 guests.",
+      "img": "/images/bigarade-interior.webp",
       "btnLabel": "See the restaurant",
       "act": null,
       "go": "citronelle"
@@ -698,7 +698,9 @@
         "/images/le-chamouze-grilled-steak.avif",
         "/images/le-chamouze-catch-of-the-day-fries.avif",
         "/images/le-chamouze-restaurant-entrance.avif",
-        "/images/le-chamouze-bartender-cocktail.avif"
+        "/images/le-chamouze-bartender-cocktail.avif",
+        "/images/chamouze-starter.webp",
+        "/images/chamouze-seafood.webp"
       ],
       "menuGroups": [
         {
@@ -863,23 +865,27 @@
       ]
     },
     "citronelle": {
-      "name": "La Citronelle",
+      "name": "La Bigarade",
       "badge": "RIVERSIDE · EVENTS TO 400",
-      "img": "/images/la-citronelle-4.avif",
-      "tag": "Refined Indian cuisine in a rustic lakeside setting.",
-      "cuisine": "Refined Indian",
-      "hours": "Daily · 11:30 – 16:30",
-      "price": "À la carte from Rs 600",
-      "setting": "Lakeside, near the entrance",
-      "about": "A rustic lakeside pavilion serving refined Indian cuisine: tandoor grills, slow-simmered curries and fresh naan, with generous vegetarian choices. The riverside deck hosts weddings and corporate days for up to 400 guests, and quiet valley lunches the rest of the time.",
-      "detail": "À la carte from Rs 600 · vegetarian friendly · event and group bookings via the sales team.",
+      "img": "/images/bigarade-interior.webp",
+      "tag": "Indian and Mauritian cuisine beside a quiet river.",
+      "cuisine": "Indian & Mauritian",
+      "hours": "11:30 – 16:30 · not open every day",
+      "price": "À la carte from Rs 400",
+      "setting": "Riverside, near the entrance",
+      "about": "An à la carte menu with a focus on Indian cuisine, set against the backdrop of a serene river: thalis, curries, Mauritian favourites and pasta, with plenty for vegetarians. The pavilion is also a premium event space for weddings, corporate events and special gatherings of up to 400 guests.",
+      "detail": "Thali from Rs 600 · pasta, fried rice and noodles from Rs 400 · vegetarian choices · events through the sales team.",
       "menuPdf": "/menus/la-citronelle-menu.pdf",
       "gallery": [
-        "/images/la-citronelle-4.avif",
+        "/images/bigarade-interior.webp",
         "/images/la-citronelle-dining-hall.avif",
-        "/images/la-citronelle-garden-lawn.avif",
+        "/images/bigarade-sign.webp",
+        "/images/bigarade-lawn.webp",
         "/images/la-citronelle-entrance-hall.avif",
-        "/images/la-citronelle-mauritian-thali.avif"
+        "/images/bigarade-thali.webp",
+        "/images/la-citronelle-mauritian-thali.avif",
+        "/images/bigarade-curry.webp",
+        "/images/bigarade-pasta.webp"
       ],
       "menuGroups": [
         {
@@ -968,6 +974,26 @@
           ]
         }
       ]
+    },
+    "palmiste": {
+      "name": "Le Palmiste",
+      "badge": "CAFÉ · COFFEE & PASTRIES",
+      "img": "/images/palmiste-cappuccino-croissant.webp",
+      "tag": "A relaxing café stop for coffee, pastries and freshly baked bread.",
+      "cuisine": "Café",
+      "hours": "Daily · 09:00 – 17:30",
+      "price": "Café prices, pay at the counter",
+      "setting": "Café terrace inside the park",
+      "about": "A classic café serving hot and cold drinks, pastries and freshly baked bread, with cakes, sandwiches, bubble teas and our signature Arabian coffee. Unwind in the calm of the terrace, and say hello to Souris, our friendly domesticated deer.",
+      "detail": "Open every day 09:00 – 17:30 · 30 seats · hot and cold drinks, pastries, cakes and sandwiches.",
+      "menuPdf": "",
+      "gallery": [
+        "/images/palmiste-cappuccino-croissant.webp",
+        "/images/palmiste-terrace.webp",
+        "/images/palmiste-arabian-coffee.webp",
+        "/images/palmiste-cappuccino.webp"
+      ],
+      "menuGroups": []
     }
   },
   "PACKS": {
@@ -1425,6 +1451,36 @@
           "src": "/images/expedition-convoy-trail.webp",
           "tag": "FOREST TRACK",
           "cap": "Twelve kilometres of trail no walking path reaches."
+        },
+        {
+          "src": "/images/group-lookout.webp",
+          "tag": "LOOKOUT DECK",
+          "cap": "Guests and the 4x4 at the lookout shelter."
+        },
+        {
+          "src": "/images/group-drone-earth.webp",
+          "tag": "FROM THE SKY",
+          "cap": "The 4x4 on the road beside the 23 Coloured Earth."
+        },
+        {
+          "src": "/images/group-south-coast.webp",
+          "tag": "SOUTH COAST",
+          "cap": "The track opens onto the sea and the south coast."
+        },
+        {
+          "src": "/images/group-on-board.webp",
+          "tag": "ON BOARD",
+          "cap": "Open sides, so nothing stands between you and the view."
+        },
+        {
+          "src": "/images/group-forest-tunnel.webp",
+          "tag": "FOREST TUNNEL",
+          "cap": "Headlights on under the canopy."
+        },
+        {
+          "src": "/images/group-earth-road.webp",
+          "tag": "COLOURED EARTH",
+          "cap": "Past the coloured dunes on the expedition road."
         }
       ]
     },
@@ -1486,6 +1542,26 @@
           "src": "/images/buggy-earth.webp",
           "tag": "PAST THE 23 EARTHS",
           "cap": "The coloured dunes right beside the track."
+        },
+        {
+          "src": "/images/buggy-pointing.webp",
+          "tag": "LOOK THERE",
+          "cap": "The coloured earth from the buggy seat."
+        },
+        {
+          "src": "/images/buggy-first-ride.webp",
+          "tag": "CO-PILOT",
+          "cap": "A young co-pilot points the way."
+        },
+        {
+          "src": "/images/buggy-sea-view.webp",
+          "tag": "SEA VIEW",
+          "cap": "The ridge road with the ocean behind."
+        },
+        {
+          "src": "/images/buggy-splash.webp",
+          "tag": "SPLASH",
+          "cap": "Through the river crossing."
         }
       ]
     },
@@ -1661,6 +1737,26 @@
           "src": "/images/expedition-guide-guests.webp",
           "tag": "YOUR GUIDE",
           "cap": "A local storyteller for the whole three hours."
+        },
+        {
+          "src": "/images/private-guide-earth.webp",
+          "tag": "YOUR GUIDE",
+          "cap": "A private guide at the 23 Coloured Earth."
+        },
+        {
+          "src": "/images/private-guide-valley.webp",
+          "tag": "THE VALLEY",
+          "cap": "Your guide points out the valley from the ridge."
+        },
+        {
+          "src": "/images/private-lookout.webp",
+          "tag": "LOOKOUT",
+          "cap": "A quiet viewpoint, just your party."
+        },
+        {
+          "src": "/images/private-raptor-earth.webp",
+          "tag": "THE RAPTOR",
+          "cap": "The private vehicle above the coloured dunes."
         }
       ]
     },
@@ -1702,6 +1798,56 @@
         "src": "/images/giant-swing/giant-swing.mp4",
         "poster": "/images/giant-swing/giant-swing-04.webp"
       }
+    },
+    "coaster": {
+      "eyebrow": "KIDS PARK",
+      "t1": "Hands",
+      "t2": "in the air",
+      "copy": "Twists and turns through the trees of the Kids Park, with grown-ups riding along.",
+      "foot": "KIDS PARK · AGES 4–12",
+      "cta": "Plan your visit →",
+      "shots": [
+        {
+          "src": "/images/coaster-hands-up.webp",
+          "tag": "HANDS UP",
+          "cap": "Arms in the air, the whole train."
+        },
+        {
+          "src": "/images/coaster-family.webp",
+          "tag": "ALL ABOARD",
+          "cap": "Children and parents in the same train."
+        },
+        {
+          "src": "/images/coaster-trees.webp",
+          "tag": "IN THE TREES",
+          "cap": "The track runs above the garden."
+        },
+        {
+          "src": "/images/coaster-ride.webp",
+          "tag": "THE RIDE",
+          "cap": "Round the bend with the hills behind."
+        }
+      ]
+    },
+    "pirate": {
+      "eyebrow": "KIDS PARK",
+      "t1": "All",
+      "t2": "aboard",
+      "copy": "The Pirate Ship swings higher with every pass over the Kids Park.",
+      "foot": "KIDS PARK · AGES 12+",
+      "cta": "Plan your visit →",
+      "shots": [
+        {
+          "src": "/images/pirate-ship-sky.webp",
+          "tag": "FULL SAIL",
+          "cap": "The ship against a blue sky."
+        },
+        {
+          "src": "/images/pirate-ship-swing.webp",
+          "tag": "THE SWING",
+          "cap": "High over the Kids Park."
+        }
+      ]
     }
   },
   "COMBO": [
